@@ -4,9 +4,11 @@ import { edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { hasQueue } from "./queue.ts";
+import { isNever } from "../is-never.ts";
 import { isSharedNode, shareArrows } from "./shared.ts";
 import type { Shared } from "./shared.ts";
 import type { Overlap } from "./overlaps.ts";
+import { arrowMembersOf, groupNodesOf } from "./groups/fold-groups.ts";
 import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
@@ -27,14 +29,20 @@ export interface PlacedState {
   workers?: LabelBox;
 }
 
-/** A state that embeds another machine: one node, with a row under its name for a glyph, the machine's id and an enter control. Its internals are never drawn here. */
+/** What a machine node stands for: the machine a state embeds (by id, in the same document), or the states a group folds into one node. */
+export type Holds =
+  | { kind: "machine"; machine: string }
+  | { kind: "group"; group: string; states: string[] };
+
+/** A node that holds more than one state: a row under its name for a glyph, what it holds, and the enter control of an embedded machine. Its internals are never drawn here. */
 export interface PlacedMachine extends Omit<PlacedState, "kind"> {
   kind: "machine";
-  /** Id of the embedded machine, in the same document. */
-  machine: string;
+  holds: Holds;
   glyph: LabelBox;
+  /** The row's text: the embedded machine's id, or how many states the group holds. */
   name: LabelBox;
-  enter: LabelBox;
+  /** Absent for a group: it has no enter control yet. */
+  enter?: LabelBox;
 }
 
 /** Placeholder target for an undetermined edge. One per edge; never shared or guessed. */
@@ -201,6 +209,10 @@ const ANY_LABEL = "any state";
 /** A machine with the shared arrows already swapped in for the edges they stand for. */
 interface Drawing extends VizMachine {
   shared: Shared;
+  /** The machine nodes by state id. */
+  holds: ReadonlyMap<string, Holds>;
+  /** The real edges a drawn arrow stands for, by its id; absent when it is its own one edge. */
+  members: ReadonlyMap<string, string[]>;
 }
 
 function anyIds(machine: VizMachine): string[] {
@@ -228,20 +240,53 @@ function hasRow(machine: VizMachine, state: VizState): boolean {
   return hasQueue(machine);
 }
 
-/** Glyph, machine id and enter control, `LABEL_PAD` apart. */
-function machineRowWidth(machine: string): number {
-  return MACHINE_GLYPH + LABEL_PAD + textWidth(machine, CHIP_FONT) + LABEL_PAD + ENTER_WIDTH;
+/** What a machine node of the drawn machine holds; undefined for a plain state. */
+function holdsOf(machine: VizMachine, state: VizState): Holds | undefined {
+  if (state.machine !== undefined) return { kind: "machine", machine: state.machine };
+  const node = groupNodesOf(machine).find((each) => each.id === state.id);
+  return node === undefined ? undefined : { kind: "group", group: node.name, states: node.states };
+}
+
+/** The text of a machine node's row: the embedded machine's id, or the group's size. */
+export function rowText(holds: Holds): string {
+  switch (holds.kind) {
+    case "machine":
+      return holds.machine;
+    case "group": {
+      const count = holds.states.length;
+      return count === 1 ? "1 state" : `${count} states`;
+    }
+    default:
+      return isNever(holds);
+  }
+}
+
+/** Room for an embedded machine's enter control after the row's text; a group has none. */
+function enterRoom(holds: Holds): number {
+  return holds.kind === "machine" ? LABEL_PAD + ENTER_WIDTH : 0;
+}
+
+/** Glyph, the row's text and the enter control, `LABEL_PAD` apart. */
+function machineRowWidth(holds: Holds): number {
+  return MACHINE_GLYPH + LABEL_PAD + textWidth(rowText(holds), CHIP_FONT) + enterRoom(holds);
 }
 
 /** Height a machine node's row adds under the name; 0 for a plain state. */
-function machineRoom(state: VizState): number {
-  return state.machine === undefined ? 0 : LABEL_PAD + MACHINE_ROW_HEIGHT;
+function machineRoom(holds: Holds | undefined): number {
+  return holds === undefined ? 0 : LABEL_PAD + MACHINE_ROW_HEIGHT;
 }
 
-function stateWidth(state: VizState, worker: boolean): number {
+/** What shapes a state's box besides the state: its worker row, and what it holds as a machine node. */
+interface StateShape {
+  worker: boolean;
+  holds: Holds | undefined;
+}
+
+function stateWidth(state: VizState, shape: StateShape): number {
+  const { worker, holds } = shape;
   const chips = state.effects.map((effect) => textWidth(effect.name, CHIP_FONT) + 24);
   const frame = state.final ? 2 * FINAL_INSET : 0;
-  const row = state.machine === undefined ? 0 : machineRowWidth(state.machine) + 24;
+  const row = holds === undefined ? 0 : machineRowWidth(holds) + 24;
   return Math.max(
     worker ? MAP_STATE_MIN_WIDTH : 80,
     textWidth(state.label) + 24 + frame,
@@ -250,7 +295,8 @@ function stateWidth(state: VizState, worker: boolean): number {
   );
 }
 
-function stateHeight(state: VizState, worker: boolean): number {
+function stateHeight(state: VizState, shape: StateShape): number {
+  const { worker, holds } = shape;
   const frame = state.final ? 2 * FINAL_INSET : 0;
   return (
     frame +
@@ -258,7 +304,7 @@ function stateHeight(state: VizState, worker: boolean): number {
       NODE_HEIGHT,
       2 * LABEL_PAD +
         NAME_HEIGHT +
-        machineRoom(state) +
+        machineRoom(holds) +
         state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
     ) +
     (worker ? LABEL_PAD + WORKER_ROW_HEIGHT : 0)
@@ -268,32 +314,32 @@ function stateHeight(state: VizState, worker: boolean): number {
 /** The name box and chip boxes of a placed state, each `LABEL_PAD` inside and apart. */
 function insideOf(
   state: VizState,
-  box: LabelBox,
-  worker: boolean,
+  spot: NodeSpot,
 ): { label: LabelBox; chips: LabelBox[]; workers?: LabelBox } {
+  const { box: area, worker, holds } = spot;
   const frame = state.final ? FINAL_INSET : 0;
-  const top = box.y - box.height / 2 + frame;
-  const alone = state.effects.length === 0 && !worker && state.machine === undefined;
+  const top = area.y - area.height / 2 + frame;
+  const alone = state.effects.length === 0 && !worker && holds === undefined;
   const label = {
-    x: box.x,
-    y: alone ? box.y : top + LABEL_PAD + NAME_HEIGHT / 2,
+    x: area.x,
+    y: alone ? area.y : top + LABEL_PAD + NAME_HEIGHT / 2,
     width: textWidth(state.label),
     height: NAME_HEIGHT,
   };
-  const below = top + 2 * LABEL_PAD + NAME_HEIGHT + machineRoom(state);
+  const below = top + 2 * LABEL_PAD + NAME_HEIGHT + machineRoom(holds);
   const chips = state.effects.map((_, index) => ({
-    x: box.x,
+    x: area.x,
     y: below + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
-    width: box.width - 2 * (LABEL_PAD + frame),
+    width: area.width - 2 * (LABEL_PAD + frame),
     height: CHIP_HEIGHT,
   }));
   if (!worker) return { label, chips };
   const above = chips.at(-1);
   const bottom = above === undefined ? below - LABEL_PAD : above.y + above.height / 2;
   const workers = {
-    x: box.x,
+    x: area.x,
     y: bottom + LABEL_PAD + WORKER_ROW_HEIGHT / 2,
-    width: box.width - 2 * (LABEL_PAD + frame),
+    width: area.width - 2 * (LABEL_PAD + frame),
     height: WORKER_ROW_HEIGHT,
   };
   return { label, chips, workers };
@@ -306,7 +352,7 @@ function parentRegion(region: string): string | null {
 
 type LayoutGraph = Graph<GraphLabel, NodeLabel, EdgeLabel>;
 
-interface LabelBox {
+export interface LabelBox {
   x: number;
   y: number;
   width: number;
@@ -456,10 +502,10 @@ function specsOf(machine: Drawing, heights: ReadonlyMap<string, number>): Map<st
     loopsOf(machine.edges.filter((edge) => isDrawn(edge) && isLoop(edge) && edge.from === id));
   for (const state of machine.states) {
     const loops = loopsAt(state.id);
-    const worker = hasRow(machine, state);
+    const shape = { worker: hasRow(machine, state), holds: machine.holds.get(state.id) };
     const size = {
-      width: stateWidth(state, worker),
-      height: tall(state.id, stateHeight(state, worker)),
+      width: stateWidth(state, shape),
+      height: tall(state.id, stateHeight(state, shape)),
     };
     specs.set(state.id, specOf(state.id, size, loops, starts.has(state.id) ? ENTRY_STUB : 0));
   }
@@ -923,6 +969,53 @@ function laidOut(machine: Drawing): { graph: LayoutGraph; specs: Map<string, Spe
   }
 }
 
+interface Routing {
+  specs: ReadonlyMap<string, Spec>;
+  boxes: ReadonlyMap<string, LabelBox>;
+  geo: Geo;
+  ports: ReadonlyMap<string, Port>;
+  columns: Columns;
+}
+
+/** A drawn edge on its route: a loop beside its node, else level from port to port. */
+function routedOf(edge: VizEdge, options: Routing): PlacedEdge {
+  const { specs, boxes, geo, ports, columns } = options;
+  if (isLoop(edge)) {
+    const at = boxes.get(edge.from);
+    const loop = specs.get(edge.from)?.loops.find((each) => each.edge === edge);
+    if (at !== undefined && loop !== undefined) return loopPlaced(edge, loop, at);
+  }
+  const route = geo.routes.get(edge.id) ?? [];
+  const points = levelRoute(edge, route, ports, columns);
+  return placedOf(edge, points, geo.labels.get(edge.id) ?? { x: 0, y: 0 }, pathLength(points));
+}
+
+interface SharedIn {
+  shared: Shared;
+}
+
+/**
+ * The real edges each drawn arrow stands for, when that is not just itself: a
+ * shared arrow's members, and the members of a group arrow of a fold, so the
+ * marks and a click can find the one that leaves the current state.
+ */
+function realMembersOf(base: VizMachine, options: SharedIn): Map<string, string[]> {
+  const { shared } = options;
+  const members = new Map<string, string[]>();
+  for (const edge of shared.edges) {
+    const arrow = shared.arrows.find((each) => each.id === edge.id);
+    const drawn = arrow === undefined ? [edge.id] : arrow.members.map((member) => member.id);
+    const real: string[] = [];
+    for (const id of drawn) {
+      const found = arrowMembersOf(base, { arrow: id });
+      real.push(...(found.length === 0 ? [id] : found.map((member) => member.id)));
+    }
+    const alone = real.length === 1 && real[0] === edge.id;
+    if (!alone) members.set(edge.id, real);
+  }
+  return members;
+}
+
 function placedOf(edge: VizEdge, points: Point[], centre: Point, dotLength: number): PlacedEdge {
   return {
     edge,
@@ -955,10 +1048,17 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
  */
 export function placeMachine(base: VizMachine): MachineLayout {
   const shared = shareArrows(base);
+  const holds = new Map<string, Holds>();
+  for (const state of base.states) {
+    const held = holdsOf(base, state);
+    if (held !== undefined) holds.set(state.id, held);
+  }
   const machine: Drawing = {
     ...base,
     edges: [...shared.edges, ...messagesOf(base).map(messageEdge)],
     shared,
+    holds,
+    members: realMembersOf(base, { shared }),
   };
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
@@ -1010,23 +1110,13 @@ function assemble(
       };
     })
     .sort((a, b) => machine.regions.indexOf(a.region) - machine.regions.indexOf(b.region));
-  const edges = machine.edges.filter(isDrawn).map((edge) => {
-    if (isLoop(edge)) {
-      const at = boxes.get(edge.from);
-      const loop = specs.get(edge.from)?.loops.find((each) => each.edge === edge);
-      if (at !== undefined && loop !== undefined) return loopPlaced(edge, loop, at);
-    }
-    const route = geo.routes.get(edge.id) ?? [];
-    const points = levelRoute(edge, route, ports, columns);
-    const placed = placedOf(
-      edge,
-      points,
-      geo.labels.get(edge.id) ?? { x: 0, y: 0 },
-      pathLength(points),
-    );
-    const members = machine.shared.arrows.find((arrow) => arrow.id === edge.id)?.members;
-    return members === undefined ? placed : { ...placed, members: members.map((m) => m.id) };
-  });
+  const edges: PlacedEdge[] = [];
+  for (const edge of machine.edges) {
+    if (!isDrawn(edge)) continue;
+    const placed = routedOf(edge, { specs, boxes, geo, ports, columns });
+    const members = machine.members.get(edge.id);
+    edges.push(members === undefined ? placed : { ...placed, members });
+  }
   const laned = lanesOf(
     edges,
     placedRegions.map((region) => region.title),
@@ -1088,21 +1178,25 @@ function boxed(edge: VizEdge, centre: Point): Pick<PlacedEdge, "label" | "text">
   };
 }
 
-interface NodeSpot {
+interface NodeSpot extends StateShape {
   box: LabelBox;
-  worker: boolean;
 }
 
-/** The row under a machine node's name: glyph, machine id, then the enter control, centred as a whole. */
+interface RowAt {
+  label: LabelBox;
+}
+
+/** The row under a machine node's name: glyph, the row's text, then an embedded machine's enter control, centred as a whole. */
 function machineRowOf(
-  machine: string,
-  label: LabelBox,
+  holds: Holds,
+  options: RowAt,
 ): Pick<PlacedMachine, "glyph" | "name" | "enter"> {
-  const width = machineRowWidth(machine);
+  const { label } = options;
+  const width = machineRowWidth(holds);
   const left = label.x - width / 2;
   const y = label.y + label.height / 2 + LABEL_PAD + MACHINE_ROW_HEIGHT / 2;
-  const nameWidth = textWidth(machine, CHIP_FONT);
-  return {
+  const nameWidth = textWidth(rowText(holds), CHIP_FONT);
+  const row = {
     glyph: { x: left + MACHINE_GLYPH / 2, y, width: MACHINE_GLYPH, height: MACHINE_GLYPH },
     name: {
       x: left + MACHINE_GLYPH + LABEL_PAD + nameWidth / 2,
@@ -1110,23 +1204,31 @@ function machineRowOf(
       width: nameWidth,
       height: MACHINE_ROW_HEIGHT,
     },
-    enter: { x: left + width - ENTER_WIDTH / 2, y, width: ENTER_WIDTH, height: MACHINE_ROW_HEIGHT },
   };
+  if (holds.kind === "group") return row;
+  const enter = {
+    x: left + width - ENTER_WIDTH / 2,
+    y,
+    width: ENTER_WIDTH,
+    height: MACHINE_ROW_HEIGHT,
+  };
+  return { ...row, enter };
 }
 
 function placedStateOf(state: VizState, spot: NodeSpot): PlacedState | PlacedMachine {
-  const inside = insideOf(state, spot.box, spot.worker);
-  if (state.machine === undefined) {
+  const inside = insideOf(state, spot);
+  const { holds } = spot;
+  if (holds === undefined) {
     return { kind: "state", id: state.id, state, ...spot.box, ...inside };
   }
   return {
     kind: "machine",
     id: state.id,
     state,
-    machine: state.machine,
+    holds,
     ...spot.box,
     ...inside,
-    ...machineRowOf(state.machine, inside.label),
+    ...machineRowOf(holds, { label: inside.label }),
   };
 }
 
@@ -1137,7 +1239,11 @@ function placeNodes(
 ): PlacedNode[] {
   const at = (id: string): LabelBox => boxes.get(id) ?? { x: 0, y: 0, width: 0, height: 0 };
   const states: PlacedNode[] = machine.states.map((state) =>
-    placedStateOf(state, { box: at(state.id), worker: hasRow(machine, state) }),
+    placedStateOf(state, {
+      box: at(state.id),
+      worker: hasRow(machine, state),
+      holds: machine.holds.get(state.id),
+    }),
   );
   const anys: PlacedAny[] = anyIds(machine).map((id) => ({
     kind: "any",

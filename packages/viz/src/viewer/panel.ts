@@ -5,6 +5,8 @@ import { activatable, html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 import { edgeCondition } from "./labels.ts";
 import { isDrawn } from "./layout.ts";
+import { groupArrowsOf, groupNodesOf, realMachineOf } from "./groups/fold-groups.ts";
+import type { GroupArrow, GroupNode } from "./groups/fold-groups.ts";
 import { shareArrows } from "./shared.ts";
 import type { SharedArrow } from "./shared.ts";
 
@@ -128,6 +130,63 @@ function sharedPanel(
   ]);
 }
 
+interface FoldOf {
+  machine: VizMachine;
+}
+
+/** A drawn end of a fold as Details names it: a group node by its group's name. */
+function endName(id: string | null, options: FoldOf): string {
+  if (id === null) return "?";
+  const node = groupNodesOf(options.machine).find((each) => each.id === id);
+  return node === undefined ? localName(id) : `group ${node.name}`;
+}
+
+interface GroupArrowOptions {
+  arrow: GroupArrow;
+  machine: VizMachine;
+  select: (selection: Selection) => void;
+}
+
+/** One arrow that stands for several real edges across a group's edge: each real edge with its condition, a link to its own Details. */
+function groupArrowPanel(doc: Document, options: GroupArrowOptions): HTMLElement {
+  const { arrow, machine, select } = options;
+  const { drawn, members } = arrow;
+  const from = isAnyState(drawn.from) ? "any state" : endName(drawn.from, { machine });
+  const target = endName(drawn.to, { machine });
+  const title = `${from} —${drawn.event}→ ${target}`;
+  return html(doc, "section", { class: "details", "data-selected-edge": arrow.id }, [
+    html(doc, "h2", {}, [title]),
+    list(doc, [["edges", edgeList(doc, members, select, true)]]),
+  ]);
+}
+
+interface GroupPanelOptions {
+  node: GroupNode;
+  machine: VizMachine;
+  select: (selection: Selection) => void;
+}
+
+/** A group folded into one node: its states, each a link to its own Details, and the arrows drawn in and out. */
+function groupPanel(doc: Document, options: GroupPanelOptions): HTMLElement {
+  const { node, machine, select } = options;
+  const links: HTMLLIElement[] = [];
+  for (const id of node.states) {
+    const link = html(doc, "span", { class: "link", "data-state-link": id }, [localName(id)]);
+    activatable(link, () => select({ kind: "state", id }));
+    links.push(html(doc, "li", {}, [link]));
+  }
+  const outgoing = machine.edges.filter((edge) => isDrawn(edge) && edge.from === node.id);
+  const incoming = machine.edges.filter((edge) => isDrawn(edge) && edge.to === node.id);
+  return html(doc, "section", { class: "details", "data-selected-state": node.id }, [
+    html(doc, "h2", {}, [`Group ${node.name}`]),
+    list(doc, [
+      ["states", html(doc, "ul", {}, links)],
+      ["outgoing", edgeList(doc, outgoing, select, false)],
+      ["incoming", edgeList(doc, incoming, select, false)],
+    ]),
+  ]);
+}
+
 function statePanel(
   doc: Document,
   state: VizState,
@@ -160,19 +219,25 @@ export interface RenderPanelOptions {
   hint?: string;
 }
 
+/** The panel of a selection on the drawn machine: a real edge or state reads the real machine, a group node or arrow its fold. */
 function selectedPanel(doc: Document, options: RenderPanelOptions): HTMLElement | undefined {
   const { machine, selection, select } = options;
+  const real = realMachineOf(machine);
   const id = selection?.id;
   switch (selection?.kind) {
     case "edge": {
-      const edge = machine.edges.find((candidate) => candidate.id === id);
-      if (edge) return edgePanel(doc, { edge, machine, select, send: options.send });
+      const edge = real.edges.find((candidate) => candidate.id === id);
+      if (edge) return edgePanel(doc, { edge, machine: real, select, send: options.send });
+      const grouped = groupArrowsOf(machine).find((candidate) => candidate.id === id);
+      if (grouped) return groupArrowPanel(doc, { arrow: grouped, machine, select });
       const arrow = shareArrows(machine).arrows.find((candidate) => candidate.id === id);
       return arrow && sharedPanel(doc, arrow, select);
     }
     case "state": {
-      const state = machine.states.find((candidate) => candidate.id === id);
-      return state && statePanel(doc, state, { machine, select });
+      const state = real.states.find((candidate) => candidate.id === id);
+      if (state) return statePanel(doc, state, { machine: real, select });
+      const node = groupNodesOf(machine).find((candidate) => candidate.id === id);
+      return node && groupPanel(doc, { node, machine, select });
     }
     case undefined:
       return undefined;

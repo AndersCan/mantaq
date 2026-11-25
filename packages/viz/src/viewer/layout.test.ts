@@ -745,9 +745,9 @@ describe("placeMachine machine node", () => {
   test("under its name: the glyph, the machine's id and enter, each LABEL_PAD apart", () => {
     const node = placeMachine(checkout).nodes.find((each) => each.id === "paying");
     const shown =
-      node?.kind === "machine"
+      node?.kind === "machine" && node.enter !== undefined
         ? {
-            machine: node.machine,
+            holds: node.holds,
             height: node.height,
             nameToRow: node.name.y - node.name.height / 2 - (node.label.y + node.label.height / 2),
             glyphToName: Math.round(left(node.name) - right(node.glyph)),
@@ -756,7 +756,7 @@ describe("placeMachine machine node", () => {
           }
         : undefined;
     expect(shown).toEqual({
-      machine: "payment",
+      holds: { kind: "machine", machine: "payment" },
       height: 2 * LABEL_PAD + 18 + LABEL_PAD + 16,
       nameToRow: LABEL_PAD,
       glyphToName: LABEL_PAD,

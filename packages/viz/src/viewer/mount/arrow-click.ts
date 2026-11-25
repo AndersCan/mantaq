@@ -1,7 +1,10 @@
-import { arrowClick, arrowSend } from "./arrow-send.ts";
+import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
+import { arrowMembersOf, realMachineOf } from "../groups/fold-groups.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
-import { memberAt, shareArrows } from "../shared.ts";
+import { memberHere } from "../explore.ts";
+import { movesFrom } from "../../moves.ts";
+import { shareArrows } from "../shared.ts";
 import type { Shared } from "../shared.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
@@ -103,6 +106,7 @@ export function drawnArrowClick(
     const why = view.live === null ? undefined : STATIC_WHY;
     return { selection, edge: undefined, click: { kind: "plain", why } };
   }
+  updateBlocked(view, { machine, driver: from.driver });
   const selection = memberSelection(
     { kind: "edge", id: options.id },
     { machine: options.shown, view },
@@ -128,14 +132,36 @@ function sharedArrows(machine: VizMachine): Shared {
   return shared;
 }
 
-/** A shared arrow acts as the member of the current state; with none, it is its own Details. */
+interface ArrowQuery {
+  id: string;
+}
+
+/** The real edge ids a drawn arrow stands for: a shared arrow's members, each group arrow among them by its own real members. */
+function realMembers(machine: VizMachine, options: ArrowQuery): string[] {
+  const { id } = options;
+  const arrow = sharedArrows(machine).arrows.find((each) => each.id === id);
+  const drawn = arrow === undefined ? [id] : arrow.members.map((member) => member.id);
+  const real: string[] = [];
+  for (const each of drawn) {
+    const found = arrowMembersOf(machine, { arrow: each });
+    real.push(...(found.length === 0 ? [each] : found.map((member) => member.id)));
+  }
+  return real;
+}
+
+/** A shared or group arrow acts as its real member that leaves the current state; with none, it is its own Details. */
 export function memberSelection(selection: Selection, options: MemberOptions): Selection {
   const { machine, view } = options;
-  const arrow = sharedArrows(machine).arrows.find(
-    (each) => selection.kind === "edge" && each.id === selection.id,
-  );
-  const member = arrow && view.live && memberAt(arrow, currentsOf(view.live, view.picked));
-  return member ? { kind: "edge", id: member.id } : selection;
+  if (selection.kind !== "edge" || view.live === null) return selection;
+  const walked = realMachineOf(machine);
+  const currents = currentsOf(view.live, view.picked);
+  const moves = currents.flatMap((current) => movesFrom(walked, current));
+  const members = realMembers(machine, { id: selection.id });
+  const sources = new Map(walked.edges.map((edge) => [edge.id, edge.from]));
+  const member =
+    memberHere(members, { moves, blocked: view.blocked }) ??
+    members.find((each) => currents.includes(sources.get(each) ?? ""));
+  return member === undefined ? selection : { kind: "edge", id: member };
 }
 
 export interface PickChildOptions {

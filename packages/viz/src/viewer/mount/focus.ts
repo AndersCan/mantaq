@@ -1,6 +1,7 @@
 import { partMachine, partName, partsOf } from "../parts.ts";
 import type { VizDocument, VizMachine } from "../../schema.ts";
 import type { EnteredMachine } from "../graph.ts";
+import { foldGroups } from "../groups/fold-groups.ts";
 import { isNever } from "../../is-never.ts";
 
 /** One step in from the root: open one machine of a board, or enter the machine a state embeds. */
@@ -22,7 +23,7 @@ export interface Focus {
   canvas: "board" | "graph";
   /** The deepest machine: the root, or the last one entered. */
   machine: VizMachine;
-  /** The machine the canvas draws: `machine`, or one machine of its board. */
+  /** The machine the canvas draws: `machine`, or one machine of its board, folded by `foldGroups`. */
   drawn: VizMachine;
   /** The board machine shown alone (`""` for the machine's own); undefined when none is. */
   part: string | undefined;
@@ -38,8 +39,10 @@ interface Level {
   part: string | undefined;
 }
 
+/** What the canvas draws for a level: its machine or one machine of its board, with each group folded into one node. */
 function drawnOf(level: Level): VizMachine {
-  return level.part === undefined ? level.machine : partMachine(level.machine, level.part);
+  const { machine, part } = level;
+  return foldGroups(part === undefined ? machine : partMachine(machine, part));
 }
 
 function isBoard(level: Level): boolean {

@@ -267,23 +267,32 @@ function foldedMessages(
   return [...folded.values()];
 }
 
+interface Drawn extends NodeIndex {
+  arrows: ReadonlyArray<GroupArrow>;
+}
+
+/** The fold of a machine with groups; one without is drawn as it is. */
+function drawnOf(machine: VizMachine, options: Drawn): VizMachine {
+  const { nodeOfState, arrows } = options;
+  const { initial, fuzz } = machine;
+  return {
+    ...machine,
+    initial: initial === null ? initial : (nodeOfState.get(initial) ?? initial),
+    states: foldedStates(machine, options),
+    edges: arrows.map((arrow) => arrow.drawn),
+    fuzz: fuzz === null ? fuzz : { ...fuzz, messages: foldedMessages(fuzz.messages, options) },
+  };
+}
+
 function fold(machine: VizMachine): Folded {
   const nodes = nodesOf(machine);
   const nodeOfState = new Map<string, string>();
   for (const node of nodes) for (const state of node.states) nodeOfState.set(state, node.id);
   const index: NodeIndex = { nodes, nodeOfState };
   const arrows = drawnArrows(machine.edges, index);
-  const { initial, fuzz } = machine;
-  const drawn: VizMachine = {
-    ...machine,
-    initial: initial === null ? null : (nodeOfState.get(initial) ?? initial),
-    states: foldedStates(machine, index),
-    edges: arrows.map((arrow) => arrow.drawn),
-    fuzz: fuzz === null ? fuzz : { ...fuzz, messages: foldedMessages(fuzz.messages, index) },
-  };
   return {
     real: machine,
-    machine: nodes.length === 0 ? machine : drawn,
+    machine: nodes.length === 0 ? machine : drawnOf(machine, { ...index, arrows }),
     nodes,
     arrows: arrows.filter((arrow) => arrow.members.length > 1),
     nodeOfState,

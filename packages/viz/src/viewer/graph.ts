@@ -1,8 +1,9 @@
 import { activatable, html, onButtonPress, svg } from "./dom.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
 import { edgeCondition, edgeLines } from "./labels.ts";
-import { ENTER_TEXT, HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
+import { ENTER_TEXT, HELP_SLOT, layoutMachine, rowText, textWidth } from "./layout.ts";
 import type {
+  LabelBox,
   PlacedAny,
   PlacedEdge,
   PlacedMachine,
@@ -14,7 +15,9 @@ import type {
 } from "./layout.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
 import { Either } from "@mantaq/utils";
+import { groupNodesOf } from "./groups/fold-groups.ts";
 import { isAnyState } from "../schema.ts";
+import { isSharedNode } from "./shared.ts";
 import { isNever } from "../is-never.ts";
 import { localName } from "./compartments.ts";
 import { placeBoard } from "./board.ts";
@@ -233,19 +236,20 @@ function machineGlyph(placed: PlacedMachine, options: NodeOptions): SVGGElement 
 interface EnterOptions {
   doc: Document;
   enter: (entered: EnteredMachine) => void;
+  machine: string;
+  box: LabelBox;
 }
 
 function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
-  const { doc, enter } = options;
-  const box = placed.enter;
+  const { doc, enter, machine, box } = options;
   const group = svg(
     doc,
     "g",
     {
       class: "machine-enter",
-      "data-enter-machine": placed.machine,
+      "data-enter-machine": machine,
       "data-enter-state": placed.state.id,
-      "aria-label": `enter machine ${placed.machine}`,
+      "aria-label": `enter machine ${machine}`,
     },
     [
       svg(doc, "rect", {
@@ -258,30 +262,72 @@ function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
       svg(doc, "text", { x: box.x, y: box.y + 4, "text-anchor": "middle" }, [ENTER_TEXT]),
     ],
   );
-  activatable(group, () => enter({ machine: placed.machine, state: placed.state.id }));
+  activatable(group, () => enter({ machine, state: placed.state.id }));
   return group;
 }
 
-/** A state that embeds a machine: the state as usual, plus the machine's glyph and id, and its enter control beside the state's own button so the two never nest. */
+interface EmbedsOptions extends NodeOptions {
+  placed: PlacedMachine;
+  machine: string;
+}
+
+/** A state that embeds a machine: its enter control sits beside the state's own button so the two never nest. */
+function embedsGroup(state: SVGGElement, options: EmbedsOptions): SVGGElement {
+  const { doc, placed, machine } = options;
+  const label = state.getAttribute("aria-label");
+  state.setAttribute("aria-label", `${label}, embeds machine ${machine}`);
+  const { enter } = options.callbacks;
+  const box = placed.enter;
+  const unentered = enter === undefined || box === undefined;
+  const controls = unentered ? [] : [enterGroup(placed, { doc, enter, machine, box })];
+  return svg(doc, "g", { class: "machine-node", "data-machine": machine }, [state, ...controls]);
+}
+
+interface FoldedOptions {
+  doc: Document;
+  group: string;
+  states: ReadonlyArray<string>;
+  /** How many states it holds, as its row says. */
+  count: string;
+}
+
+/** A group folded into one node: `data-states` lists its real states, so the walk marks it current while it is in one. */
+function foldedGroup(state: SVGGElement, options: FoldedOptions): SVGGElement {
+  const { doc, group, states, count } = options;
+  const names: string[] = [];
+  for (const id of states) names.push(localName(id));
+  const listed = names.join(", ");
+  state.setAttribute("aria-label", `group ${group}, ${count}: ${listed}`);
+  state.setAttribute("data-states", JSON.stringify(states));
+  return svg(doc, "g", { class: "machine-node", "data-group": group }, [state]);
+}
+
+/** A node that holds more than one state: the state as usual, plus a glyph and what it holds under the name. */
 function machineGroup(placed: PlacedMachine, options: NodeOptions): SVGGElement {
   const { doc } = options;
+  const { holds } = placed;
   const state = stateGroup(placed, options);
   state.classList.add("machine");
-  const label = state.getAttribute("aria-label");
-  state.setAttribute("aria-label", `${label}, embeds machine ${placed.machine}`);
   const name = svg(
     doc,
     "text",
     { class: "machine-name", x: placed.name.x, y: placed.name.y + 4, "text-anchor": "middle" },
-    [placed.machine],
+    [rowText(holds)],
   );
   state.append(machineGlyph(placed, options), name);
-  const { enter } = options.callbacks;
-  const controls = enter === undefined ? [] : [enterGroup(placed, { doc, enter })];
-  return svg(doc, "g", { class: "machine-node", "data-machine": placed.machine }, [
-    state,
-    ...controls,
-  ]);
+  switch (holds.kind) {
+    case "machine":
+      return embedsGroup(state, { ...options, placed, machine: holds.machine });
+    case "group":
+      return foldedGroup(state, {
+        doc,
+        group: holds.group,
+        states: holds.states,
+        count: rowText(holds),
+      });
+    default:
+      return isNever(holds);
+  }
 }
 
 function nodeGroup(node: PlacedNode, options: NodeOptions): SVGGElement {
@@ -301,11 +347,27 @@ function nodeGroup(node: PlacedNode, options: NodeOptions): SVGGElement {
 
 const LINE_HEIGHT = 16;
 
-function edgeAria(edge: VizEdge, text: string, members?: ReadonlyArray<string>): string {
-  if (members !== undefined)
-    return `${members.length} states on ${text} to ${edge.to ?? "undetermined"}${whenText(edge)}`;
-  if (edge.kind === "stay") return `${sourceText(edge.from)} on ${text} stays`;
-  return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}${whenText(edge)}`;
+interface AriaOptions {
+  machine: VizMachine;
+  members: ReadonlyArray<string> | undefined;
+}
+
+/** A drawn end as a sentence names it: a group node by its group's name. */
+function endText(id: string, options: AriaOptions): string {
+  const node = groupNodesOf(options.machine).find((each) => each.id === id);
+  return node === undefined ? sourceText(id) : `group ${node.name}`;
+}
+
+function edgeAria(edge: VizEdge, options: AriaOptions): string {
+  const text = edge.event;
+  const target = edge.to === null ? "undetermined" : endText(edge.to, options);
+  const when = whenText(edge);
+  if (options.members !== undefined && isSharedNode(edge.from)) {
+    return `${options.members.length} states on ${text} to ${target}${when}`;
+  }
+  const from = endText(edge.from, options);
+  if (edge.kind === "stay") return `${from} on ${text} stays`;
+  return `${from} on ${text} to ${target}${when}`;
 }
 
 function whenText(edge: VizEdge): string {
@@ -345,7 +407,6 @@ function edgeGroup(
 ): SVGGElement {
   const { edge } = placed;
   const internal = context.machine.events.find((event) => event.id === edge.event)?.internal;
-  const text = edge.event;
   const group = svg(
     doc,
     "g",
@@ -360,7 +421,7 @@ function edgeGroup(
       "data-members": placed.members === undefined ? null : JSON.stringify(placed.members),
       "data-from": edge.from,
       "data-to": placed.target,
-      "aria-label": edgeAria(edge, text, placed.members),
+      "aria-label": edgeAria(edge, { machine: context.machine, members: placed.members }),
     },
     [
       svg(doc, "path", { class: "hit", d: placed.path, "aria-hidden": "true" }),
@@ -380,7 +441,15 @@ function edgeGroup(
 }
 
 /** The `?` beside an arrow's label: opens its Details, never sends. */
-function helpGroup(doc: Document, placed: PlacedEdge, details: (id: string) => void): SVGGElement {
+interface HelpOptions {
+  placed: PlacedEdge;
+  details: (id: string) => void;
+  machine: VizMachine;
+}
+
+function helpGroup(doc: Document, options: HelpOptions): SVGGElement {
+  const { placed, details, machine } = options;
+  const aria = edgeAria(placed.edge, { machine, members: placed.members });
   const lines = edgeLines(placed.edge);
   const cx = placed.text.x + textWidth(lines[0] ?? "", 12) / 2 + 2 + HELP_SLOT / 2;
   const cy = placed.text.y - ((lines.length - 1) * LINE_HEIGHT) / 2;
@@ -391,7 +460,7 @@ function helpGroup(doc: Document, placed: PlacedEdge, details: (id: string) => v
       class: "edge-help",
       "data-details-edge": placed.edge.id,
       "data-members": placed.members === undefined ? null : JSON.stringify(placed.members),
-      "aria-label": `Details of ${edgeAria(placed.edge, placed.edge.event, placed.members)}`,
+      "aria-label": `Details of ${aria}`,
     },
     [
       svg(doc, "circle", { class: "hit", cx, cy, r: 10 }),
@@ -507,7 +576,9 @@ export function renderGraph(
       ...placed.messages.map((message) => messageGroup(doc, message)),
       ...placed.edges.flatMap((edge) => [
         edgeGroup(doc, edge, { machine, callbacks }),
-        ...(callbacks.details === undefined ? [] : [helpGroup(doc, edge, callbacks.details)]),
+        ...(callbacks.details === undefined
+          ? []
+          : [helpGroup(doc, { placed: edge, details: callbacks.details, machine })]),
       ]),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
       ...placed.nodes.map((node) => nodeGroup(node, { doc, callbacks })),
