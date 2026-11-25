@@ -1,7 +1,7 @@
 import { drawnNodeOf } from "../groups/fold-groups.ts";
 import { actingMemberOf } from "../groups/acting-member.ts";
 import { affordance, svg } from "../dom.ts";
-import { drawnArrowClick, followedLook, whyOf } from "./arrow-click.ts";
+import { drawnArrowClick, followedLook, isJustSent, marksSelected, whyOf } from "./arrow-click.ts";
 import type { DrawnArrowClick } from "./arrow-click.ts";
 import type { Affordance } from "../dom.ts";
 import { drawChildMarkers, drawQueue } from "../markers.ts";
@@ -58,14 +58,13 @@ function drawnSelection(
   return { kind: "state", id: drawnNodeOf(options.shown, { state: selection.id }) };
 }
 
-/** The selection as the canvas marks it. With only the diagram, a selected arrow is marked while it is the one just sent; the `?` of a blocked arrow marks itself, not the arrow. */
+/** The selection as the canvas marks it: a selected arrow only while `marksSelected` says so; the `?` of a blocked arrow marks itself, not the arrow. */
 function markedSelection(context: MarkDiagramContext): Selection | undefined {
   const { machine, view, driver, shown } = context;
   const { selection } = view;
-  if (!view.diagramOnly || selection?.kind !== "edge") return drawnSelection(selection, { shown });
-  const { edge } = drawnArrowClick({ machine, view, driver }, { shown, id: selection.id });
-  const sentNow = edge !== undefined && view.sent?.edge === edge.id;
-  return sentNow ? selection : undefined;
+  if (selection?.kind !== "edge") return drawnSelection(selection, { shown });
+  const answer = drawnArrowClick({ machine, view, driver }, { shown, id: selection.id });
+  return marksSelected(answer, { view }) ? selection : undefined;
 }
 
 /** A state is a button while a click opens its Details in a panel that is shown, and the current choice while they show; an arrow, while a click sends it. Every other arrow says why on hover. A stub's look is its own: it goes back where it can. */
@@ -106,8 +105,7 @@ function markHelp(help: SVGGElement, options: HelpOptions): void {
     return;
   }
   help.setAttribute("aria-label", `Why ${arrowName} sends nothing`);
-  const { edge } = answer;
-  const sentNow = edge !== undefined && view.sent?.edge === edge.id;
+  const sentNow = isJustSent(answer, { view });
   if (why === undefined) affordance(help, "plain");
   else affordance(help, selected && !sentNow ? "current" : "button");
 }

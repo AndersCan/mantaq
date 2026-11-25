@@ -263,7 +263,27 @@ describe("a blocked arrow", () => {
     expect(pay?.querySelector(".blocked-lock")).not.toBeNull();
     clickEdge(root, "cart-pay-payment");
     expect(sent).toHaveLength(0);
-    expect(root.querySelector(".graph .selected")).not.toBeNull();
+  });
+
+  test("with the panel, its ? shows its Details and the arrow keeps its blocked look, unlike an arrow just sent", () => {
+    const { driver } = fakeDriver();
+    const root = mount(driver);
+    function arrow(id: string): Element | null {
+      return root.querySelector(`g.edge[data-edge-id="${id}"]`);
+    }
+    clickEdge(root, "cart-pay-payment");
+    const asked = {
+      details: root.querySelector("[data-selected-edge]")?.getAttribute("data-selected-edge"),
+      help: root
+        .querySelector('[data-details-edge="cart-pay-payment"]')
+        ?.getAttribute("aria-current"),
+      selected: arrow("cart-pay-payment")?.classList.contains("selected"),
+    };
+    arrow("cart-addItem-cart")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect({ asked, sent: arrow("cart-addItem-cart")?.classList.contains("selected") }).toEqual({
+      asked: { details: "cart-pay-payment", help: "true", selected: false },
+      sent: true,
+    });
   });
 
   test("a click on a blocked arrow sends nothing: it is no button, and its title says why", () => {
