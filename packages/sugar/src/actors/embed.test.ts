@@ -372,6 +372,7 @@ function editorOf(upload: ReturnType<typeof uploadMachine>, options?: EditorOpti
         error: uploadBroke,
         forward: [retry, dismiss],
         snapshot: uploadChanged,
+        keep: "upload",
       });
       builder.on(saving, {
         event: uploadChanged,
@@ -468,7 +469,7 @@ describe("embed forward", () => {
     expect([failedAgain, actor.state.name]).toEqual(["saving", "saved"]);
   });
 
-  test("the tag lists the forwarded inputs and the snapshot event, and sends lists the snapshot event", () => {
+  test("the tag lists the forwarded inputs, the snapshot event and its context field, and sends lists the snapshot event", () => {
     const upload = uploadMachine({ failures: 0 });
     const { actor } = editorOf(upload);
     const [entry] = actor.options.effects["saving"] ?? [];
@@ -485,6 +486,7 @@ describe("embed forward", () => {
         error: "uploadBroke",
         forward: ["retry", "dismiss"],
         snapshot: "uploadChanged",
+        keep: "upload",
       },
       targets: {
         retry: [],

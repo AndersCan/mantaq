@@ -198,6 +198,32 @@ describe("embed types", () => {
     expect(actor.options.transitions["idle"]).toHaveProperty("retry");
   });
 
+  test("keep names a context field that takes the child snapshot", () => {
+    interface WatchingContext {
+      check: Snapshot | undefined;
+      attempts: number;
+    }
+    const watching: WatchingContext = { check: undefined, attempts: 0 };
+    const actor = Actor({
+      inputs: [],
+      internal: [checkPassed, checkBroke, checkChanged],
+      states: [idle, closed],
+      initial: closed,
+      context: watching,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        const endings = { machine: askingCheck, done: { passed: checkPassed }, error: checkBroke };
+        embed(builder, { in: idle, ...endings, snapshot: checkChanged, keep: "check" });
+        // @ts-expect-error -- `attempts` holds a number, not the child snapshot
+        embed(builder, { in: idle, ...endings, snapshot: checkChanged, keep: "attempts" });
+        // @ts-expect-error -- the context has no `missing` field
+        embed(builder, { in: idle, ...endings, snapshot: checkChanged, keep: "missing" });
+      },
+    });
+    expectTypeOf<Embedded["keep"]>().toEqualTypeOf<string | undefined>();
+    expect(actor.state.name).toBe("closed");
+  });
+
   test("wrong forward and snapshot options do not typecheck", () => {
     const actor = Actor({
       inputs: [retry, dismiss, rateWithoutScore],

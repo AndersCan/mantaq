@@ -9,8 +9,10 @@ import type {
   VizRemovedChild,
   VizStep,
 } from "@mantaq/viz";
+import { isEmbedEffect, runningEmbeds } from "./embeds/live-embeds.ts";
 import { actorMapsOf } from "./maps.ts";
 import type { ActorMapLike } from "./maps.ts";
+import type { EmbedPart } from "./embeds/live-embeds.ts";
 import {
   applyStep,
   isActor,
@@ -85,11 +87,11 @@ function hasSignal(value: unknown): value is { signal: AbortSignal } {
   );
 }
 
-/** Swap each effect body for a stub that only records its signal; recurse into regions. */
+/** Swap each effect body for a stub that only records its signal; recurse into regions. An embed effect keeps running: a held one builds no child, so `forward` would reach nothing. */
 function holdEffects(actor: AnyActor<unknown>, held: HeldEffect[]): void {
   for (const list of Object.values(actor.options?.effects ?? {})) {
     for (const [index, entry] of list.entries()) {
-      if (!isEffectEntry(entry)) continue;
+      if (!isEffectEntry(entry) || isEmbedEffect(entry)) continue;
       list[index] = {
         ...entry,
         fn: (input: unknown) => {
@@ -512,6 +514,7 @@ function liveView(session: Session, effectMode: "held" | "real"): VizLiveState {
     payload: payloadOf(actor),
     effectMode,
     waiting: waiting.map((each) => each.name),
+    embeds: runningEmbeds(embedParts(actor, actors)),
   };
 }
 
@@ -526,6 +529,21 @@ interface Session extends Stepping {
   children: Map<string, MapChild>;
   removed: VizRemovedChild[];
   watch: (ref: MapChildRef) => void;
+}
+
+/** The parts whose states can embed machines: the machine, its regions and its returned machines. */
+function embedParts(
+  actor: AnyActor<unknown>,
+  actors: Readonly<Record<string, AnyActor<unknown>>>,
+): EmbedPart[] {
+  const parts: EmbedPart[] = [{ actor, prefix: "" }];
+  for (const region of regionActors(actor)) {
+    parts.push({ actor: region.actor, prefix: `${region.path}.` });
+  }
+  for (const [name, part] of Object.entries(actors)) {
+    parts.push({ actor: part, prefix: `${name}.` });
+  }
+  return parts;
 }
 
 /**

@@ -13,15 +13,39 @@ interface StateEmbedsOptions {
   prefix?: string;
 }
 
-/** The machine in the `embedded` tag that `embed` puts on its effect fn; the other tag fields are not read. */
-function embeddedMachine(entry: unknown): Machine | undefined {
+/** What tools read from the `embedded` tag that `embed` puts on its effect fn. */
+export interface EmbedTag {
+  machine: Machine;
+  /** Parent input types that embed sends on to the running child. */
+  forward: string[];
+  /** Parent internal event type that carries each child snapshot; undefined when the parent asks for none. */
+  snapshot: string | undefined;
+  /** Context field of the parent where its snapshot handler keeps the child snapshot; undefined when the parent does not say. */
+  keep: string | undefined;
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((each) => typeof each === "string");
+}
+
+/** The `embedded` tag of an effect entry; undefined when the entry is not an embed effect. */
+export function embedTagOf(entry: unknown): EmbedTag | undefined {
   if (typeof entry !== "object" || entry === null) return undefined;
   const effect: unknown = Reflect.get(entry, "fn");
   if (typeof effect !== "function") return undefined;
   const tag: unknown = Reflect.get(effect, "embedded");
   if (typeof tag !== "object" || tag === null) return undefined;
   const machine: unknown = Reflect.get(tag, "machine");
-  return isMachine(machine) ? machine : undefined;
+  if (!isMachine(machine)) return undefined;
+  const forward: unknown = Reflect.get(tag, "forward");
+  const snapshot: unknown = Reflect.get(tag, "snapshot");
+  const keep: unknown = Reflect.get(tag, "keep");
+  return {
+    machine,
+    forward: isStringList(forward) ? forward : [],
+    snapshot: typeof snapshot === "string" ? snapshot : undefined,
+    keep: typeof keep === "string" ? keep : undefined,
+  };
 }
 
 /** Every embed effect of the actor itself, in state order then registration order. Regions and parts are not read. */
@@ -33,7 +57,7 @@ export function stateEmbeds(
   const found: StateEmbed[] = [];
   for (const [state, entries] of Object.entries(actor.options?.effects ?? {})) {
     for (const entry of entries) {
-      const machine = embeddedMachine(entry);
+      const machine = embedTagOf(entry)?.machine;
       if (machine !== undefined) found.push({ state: `${prefix}${state}`, machine });
     }
   }
