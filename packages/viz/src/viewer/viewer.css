@@ -631,11 +631,9 @@
   align-self: end;
   justify-self: center;
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 8px;
-  max-width: calc(100% - 24px);
   margin-bottom: 20px;
   padding: 4px;
   box-sizing: border-box;

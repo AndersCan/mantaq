@@ -181,6 +181,20 @@ export function coveredTop(root: HTMLElement): number {
   return Math.max(page, bar.getBoundingClientRect().bottom);
 }
 
+/** How much of the window's top stays covered once the page scrolls: by the page, and by the viewer's bar where it sticks, at the place it sticks, not where it is now. */
+export function stuckTop(root: HTMLElement): number {
+  const doc = root.ownerDocument;
+  const view = doc.defaultView;
+  const style = view?.getComputedStyle(doc.documentElement);
+  const header = Number.parseFloat(style?.scrollPaddingTop ?? "") || 0;
+  const page = doc.fullscreenElement === root ? 0 : header;
+  const bar = root.querySelector<HTMLElement>(".viz-bar");
+  const barStyle = bar === null ? undefined : view?.getComputedStyle(bar);
+  if (bar === null || barStyle?.position !== "sticky") return page;
+  const stuck = (Number.parseFloat(barStyle.top) || 0) + bar.offsetHeight;
+  return Math.max(page, stuck);
+}
+
 /** The band of the canvas on screen; the whole canvas while none of it is on screen, so it still scrolls for when the reader gets there. */
 function bandOf(root: HTMLElement, canvas: HTMLElement): Band {
   const box = canvas.getBoundingClientRect();
@@ -223,7 +237,7 @@ export function fitRoom(root: HTMLElement, options: CanvasRoomOptions): Size {
   const capped = view?.getComputedStyle(canvas).maxHeight !== "none";
   const height =
     capped || view === null ? canvas.clientHeight : view.innerHeight - coveredTop(root);
-  return { width: canvas.clientWidth, height: height - toolsRoom(canvas) };
+  return { width: canvas.clientWidth, height: Math.max(1, height - toolsRoom(canvas)) };
 }
 
 interface TopOptions {

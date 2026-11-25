@@ -59,6 +59,8 @@ export interface ViewportOptions {
   coveredTop?: () => number;
   /** How far up from the window's bottom something may cover it, in client pixels: `fit` scrolls the page so the drawing ends above that. Default 0. */
   coveredBottom?: () => number;
+  /** How far down the window stays covered once the page scrolls, as by a bar that sticks there: that scroll keeps the drawing's top below it. Default `coveredTop`. */
+  stuckTop?: () => number;
   /** The part of the container the reader sees; zoom in, zoom out and 100% keep its center put. Default: the part inside the window. */
   shown?: () => Box;
   /** Default 100%, chosen, with the select tool. */
@@ -300,7 +302,7 @@ function visibleOrigin(container: HTMLElement): Point {
 interface LiftOptions {
   drawing: Element;
   /** What covers the window's top and bottom; the drawing's top stays below the first. */
-  covered: Pick<ViewportOptions, "coveredTop" | "coveredBottom">;
+  covered: Pick<ViewportOptions, "coveredTop" | "coveredBottom" | "stuckTop">;
 }
 
 /** Scrolls what holds the container, never the container itself, up so the drawing ends above what covers the window's bottom, as far as its top allows. */
@@ -309,7 +311,7 @@ function liftAbove(container: HTMLElement, options: LiftOptions): void {
   const holder = container.parentElement;
   if (view === null || holder === null) return;
   const { covered } = options;
-  const top = Math.max(0, covered.coveredTop?.() ?? 0);
+  const top = Math.max(0, covered.stuckTop?.() ?? covered.coveredTop?.() ?? 0);
   const bottom = view.innerHeight - (covered.coveredBottom?.() ?? 0);
   const rect = options.drawing.getBoundingClientRect();
   const lift = Math.min(rect.bottom - bottom, rect.top - top);

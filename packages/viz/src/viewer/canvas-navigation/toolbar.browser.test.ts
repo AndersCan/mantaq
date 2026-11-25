@@ -49,22 +49,25 @@ import { edgeOf, machineOf, stateOf } from "/groups/shop-machines.ts";
 import { walkDriver } from "/groups/walk-driver.ts";
 const single = new URLSearchParams(location.search).has("single");
 const names = single ? ["cart"] : ["cart", "address", "shipping", "payment", "review", "paid", "picked", "packed", "shipped", "delivered"];
-const states = names.map((name, index) => stateOf(name, { initial: index === 0 }));
+const grouped = new URLSearchParams(location.search).has("grouped");
+const states = names.map((name, index) => stateOf(name, { initial: index === 0, ...(grouped && index > 0 ? { group: "steps" } : {}) }));
 const edges = [edgeOf("__initial__", { event: "", to: "cart", kind: "initial" })];
 const tall = new URLSearchParams(location.search).has("tall");
 for (const [index, name] of names.slice(1).entries()) edges.push(edgeOf(tall ? "cart" : names[index], { event: "to" + name, to: name }));
 const machine = machineOf({ states, edges });
 const { driver, sent } = walkDriver(machine, { guarded: new Set() });
 const diagramOnly = new URLSearchParams(location.search).has("diagram-only");
-mountViewer(document.querySelector("#viewer"), { schemaVersion: 1, machines: [machine] }, { driver, diagramOnly });
+mountViewer(document.querySelector("#viewer"), { schemaVersion: 1, machines: [machine] }, { driver, diagramOnly, ...(grouped ? { focus: ["@steps"] } : {}) });
 window.sent = sent;
 `;
 
 interface ViewerPageOptions {
   /** "diagram": the viewer opens with Diagram only, so Show controls draws it all again. */
   shows?: "all" | "diagram";
-  /** "tall": every arrow leaves `cart`, so the drawing runs down, not across. "single": one state. */
-  drawing?: "wide" | "tall" | "single";
+  /** "tall": every arrow leaves `cart`, so the drawing runs down, not across. "single": one state. "grouped": the states after `cart` in a group, opened inside it, so a path shows and the canvas is capped. */
+  drawing?: "wide" | "tall" | "single" | "grouped";
+  /** How far down the page the viewer starts, in pixels. Default 0. */
+  below?: number;
 }
 
 async function viewerPage(options: ViewerPageOptions = {}): Promise<Page> {
@@ -76,8 +79,10 @@ async function viewerPage(options: ViewerPageOptions = {}): Promise<Page> {
   if (drawing !== "wide") query.set(drawing, "");
   const search = query.toString();
   await page.goto(`${origin}?${search}`);
+  const below = options.below ?? 0;
+  const spacer = `<div style="height: ${below}px"></div>`;
   await page.setContent(
-    '<link rel="stylesheet" href="/viewer.css"><style>body { margin: 16px; min-height: 3000px; }</style><div id="viewer"></div>',
+    `<link rel="stylesheet" href="/viewer.css"><style>body { margin: 16px; min-height: 3000px; }</style>${spacer}<div id="viewer"></div>`,
   );
   await page.addScriptTag({ type: "module", content: VIEWER });
   await page.getByRole("group", { name: "machine shop" }).waitFor();
@@ -465,5 +470,47 @@ test("the tools float at the bottom center of the canvas, below the drawing, and
     tall: { runsPast: true, toolsAtBottom: true },
     fitted: { inWindow: true, aboveTools: true },
   });
+  await page.close();
+}, 60_000);
+
+test("Ctrl+wheel with the pointer on the tools zooms the canvas, not the page", async () => {
+  const page = await viewerPage();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  const before = await shownOf(page);
+  const tools = await page.locator(".viz-tools").boundingBox();
+  await page.mouse.move((tools?.x ?? 0) + 4, (tools?.y ?? 0) + 4);
+  const cancelled = page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        addEventListener("wheel", (event) => resolve(event.defaultPrevented), { once: true });
+      }),
+  );
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, -40);
+  await page.keyboard.up("Control");
+  const after = await shownOf(page);
+  expect({ cancelled: await cancelled, zoomed: after.drawn > before.drawn }).toEqual({
+    cancelled: true,
+    zoomed: true,
+  });
+  await page.close();
+}, 60_000);
+
+test("with a path, Fit on a canvas that runs past the window lifts the drawing above the tools", async () => {
+  const page = await viewerPage({ drawing: "grouped", below: 400 });
+  await page.getByRole("navigation", { name: "Path" }).waitFor();
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  for (const _ of [1, 2, 3]) await zoomIn.click();
+  await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+  await page.getByRole("button", { name: "Zoom to fit" }).click();
+  const fitted = await page.evaluate(() => {
+    const tools = document.querySelector(".viz-tools")?.getBoundingClientRect() ?? new DOMRect();
+    const bar = document.querySelector(".viz-bar")?.getBoundingClientRect() ?? new DOMRect();
+    const drawing =
+      document.querySelector(".canvas svg.graph")?.getBoundingClientRect() ?? new DOMRect();
+    // The page rounds its scroll to a pixel.
+    return { belowBar: drawing.top >= bar.bottom - 1, aboveTools: drawing.bottom <= tools.top + 1 };
+  });
+  expect(fitted).toEqual({ belowBar: true, aboveTools: true });
   await page.close();
 }, 60_000);

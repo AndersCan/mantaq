@@ -78,7 +78,7 @@ export function listenNavigation(root: HTMLElement, options: NavigationOptions):
     (event) => {
       const viewport = current();
       if (event.defaultPrevented) return;
-      const onCanvas = canvasUnder(root, { target: event.target }) !== undefined;
+      const onCanvas = isOverCanvas(root, { target: event.target });
       const going = event.timeStamp - keys.lastZoom < PINCH_GAP_MS;
       if (viewport === undefined || !(onCanvas || going)) return;
       if (!wheelZoom(event, { viewport })) return;
@@ -149,6 +149,14 @@ interface KeyState {
 
 interface UnderOptions {
   target: EventTarget | null;
+}
+
+/** The target is in the canvas, or in the zoom and pan tools that float over it: a pinch there zooms the canvas, not the page. A press on the tools stays a press, so pans read `canvasUnder`. */
+function isOverCanvas(root: HTMLElement, options: UnderOptions): boolean {
+  const { target } = options;
+  if (!(target instanceof Element)) return false;
+  const frame = target.closest(".canvas-frame");
+  return frame !== null && root.contains(frame);
 }
 
 /** The viewer's canvas when the target is in it. */

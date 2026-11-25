@@ -1,4 +1,4 @@
-import { coveredTop, fitRoom, shownArea, toolsRoom } from "../keep-in-view.ts";
+import { coveredTop, fitRoom, shownArea, stuckTop, toolsRoom } from "../keep-in-view.ts";
 import type { Viewport, ViewportState } from "../viewport/viewport.ts";
 import { bindToolbar } from "./toolbar.ts";
 import { viewportOf } from "../viewport/viewport.ts";
@@ -8,7 +8,7 @@ export interface CanvasViewportOptions {
   view: ViewState;
 }
 
-/** Mounts a viewport on the viewer's canvas with the scale and tool the reader chose before, hands each change back to the view, and binds the bar's zoom and pan tools to it; undefined without a canvas. */
+/** Mounts a viewport on the viewer's canvas with the scale and tool the reader chose before, hands each change back to the view, and binds the zoom and pan tools on the canvas to it; undefined without a canvas. */
 export function viewportOnCanvas(
   root: HTMLElement,
   options: CanvasViewportOptions,
@@ -23,6 +23,7 @@ export function viewportOnCanvas(
     shown: () => shownArea(root, { canvas }),
     coveredTop: () => coveredTop(root),
     coveredBottom: () => toolsRoom(canvas),
+    stuckTop: () => stuckTop(root),
     initial: view.viewport,
   });
   viewport.subscribe(({ scale, tool, sizing }) => {
