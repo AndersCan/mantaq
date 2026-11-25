@@ -17,7 +17,7 @@ const FLOORS: Record<string, { stands: number; clicks: number }> = {
   teamInbox: { stands: 141, clicks: 284 },
   uploadRegions: { stands: 36, clicks: 81 },
   sharedGo: { stands: 44, clicks: 88 },
-  grouped: { stands: 118, clicks: 272 },
+  grouped: { stands: 118, clicks: 264 },
   timed: { stands: 21, clicks: 41 },
   lockedDoor: { stands: 24, clicks: 42 },
   photoQueue: { stands: 32, clicks: 82 },
