@@ -1,8 +1,11 @@
 import type { VizDocument, VizMachine } from "@mantaq/viz";
-import type { InspectedModule } from "../inspect.ts";
 import { VIZ_SCHEMA_VERSION } from "@mantaq/viz";
 
-type Drawn = Pick<InspectedModule, "machines" | "embedded">;
+/** One inspected file: the machines it exports and the ones they embed. */
+interface Drawn {
+  machines: ReadonlyArray<VizMachine>;
+  embedded: ReadonlyArray<VizMachine>;
+}
 
 export interface ModulesDocument {
   document: VizDocument;
