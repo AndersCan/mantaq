@@ -1,9 +1,11 @@
-import { button, code, elapsed, listOf, outcomeText, sentEventLine } from "../explore.ts";
+import { code, elapsed, listOf, outcomeText, sentEventLine } from "../explore.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
 import { arrowSend } from "./arrow-send.ts";
 import type { ArrowSendContext } from "./arrow-send.ts";
 import type { EventClick } from "./event-send.ts";
 import { html } from "../dom.ts";
+import type { PayloadEdit } from "../send/payloads.ts";
+import { sendForm } from "../send/send-form.ts";
 import type { ViewState } from "./view-state.ts";
 
 export interface SendForContext extends ArrowSendContext {
@@ -13,13 +15,15 @@ export interface SendForContext extends ArrowSendContext {
 
 export interface SendForHandlers {
   sendEvent: (click: EventClick) => void;
+  /** A field of the send form changed. */
+  edit: (edit: PayloadEdit) => void;
 }
 
-/** The selected arrow's Send: one button when its source is current; blocked, the reason; no driver, none. */
+/** The selected arrow's send form when a click on it sends (with the lock reason when blocked); else why it cannot be sent; no driver, none. */
 export function sendFor(
   from: SendForContext,
   handlers: SendForHandlers,
-): (edge: VizEdge) => HTMLElement | null {
+): (edge: VizEdge) => HTMLElement | undefined {
   const { doc, machine, view } = from;
   function timerLine(edge: VizEdge): HTMLElement | undefined {
     const { live } = view;
@@ -31,38 +35,33 @@ export function sendFor(
       ` fires on its own in ${left} ms; a click sends it now.`,
     ]);
   }
-  function sendOf(edge: VizEdge): HTMLElement | null {
+  function sendOf(edge: VizEdge): HTMLElement | undefined {
     const decision = arrowSend(from, edge);
     function note(text: string): HTMLElement {
       return html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [text]);
     }
-    function here(sendButton: HTMLElement | null): HTMLElement | null {
-      return sentHere(doc, { machine, view, edge, sendButton });
-    }
+    const sent = sentHere(doc, { machine, view, edge });
     switch (decision.kind) {
       case "none":
-        return here(null);
+        return sent;
       case "refuse":
         return note(decision.text);
       case "elsewhere":
-        return here(null) ?? note(decision.text);
+        return sent ?? note(decision.text);
       case "send": {
-        const { actor } = decision;
-        const recipient =
-          actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
-        const sent = here(
-          button(doc, ["Send ", code(doc, edge.event), ...recipient], {
-            onClick: () => {
-              handlers.sendEvent({ event: edge.event, actor, edge: edge.id });
-              focusEdge(from.root, { id: edge.id });
-            },
-            attrs: { "data-send-edge": edge.id },
-          }),
-        );
-        const line = timerLine(edge);
-        return line === undefined
-          ? sent
-          : html(doc, "div", {}, sent === null ? [line] : [line, sent]);
+        const form = sendForm(doc, {
+          from,
+          edge,
+          actor: decision.actor,
+          note,
+          edit: handlers.edit,
+          send: () => {
+            handlers.sendEvent({ event: edge.event, actor: decision.actor, edge: edge.id });
+            focusEdge(from.root, { id: edge.id });
+          },
+        });
+        const parts = [timerLine(edge), sent, form].filter((part) => part !== undefined);
+        return parts.length === 1 ? form : html(doc, "div", {}, parts);
       }
     }
   }
@@ -73,21 +72,16 @@ interface SentHereOptions {
   machine: VizMachine;
   view: ViewState;
   edge: VizEdge;
-  sendButton: HTMLElement | null;
 }
 
-/** After a Send from this arrow's Details: what was sent and where it went, then the button when it can still be pressed. */
-function sentHere(doc: Document, from: SentHereOptions): HTMLElement | null {
-  const { view, edge, sendButton } = from;
+/** After a send from this arrow: what was sent and where it went. */
+function sentHere(doc: Document, from: SentHereOptions): HTMLElement | undefined {
+  const { view, edge } = from;
   const { sent } = view;
-  if (sent?.edge !== edge.id) return sendButton;
+  if (sent?.edge !== edge.id) return undefined;
   const outcome = sentOutcome(doc, { machine: from.machine, view });
-  if (outcome === undefined) return sendButton;
-  const line = html(doc, "p", { "data-details-sent": "" }, [
-    ...sentEventLine(doc, sent),
-    ...outcome,
-  ]);
-  return html(doc, "div", {}, [line, sendButton]);
+  if (outcome === undefined) return undefined;
+  return html(doc, "p", { "data-details-sent": "" }, [...sentEventLine(doc, sent), ...outcome]);
 }
 
 interface SentOutcomeOptions {
@@ -112,7 +106,7 @@ interface FocusEdgeOptions {
   id: string;
 }
 
-/** The Send button goes once pressed; focus moves to the selected arrow so keyboard users keep their place. */
+/** The panel redraws once Send is pressed; focus moves to the selected arrow so keyboard users keep their place. */
 function focusEdge(root: HTMLElement, options: FocusEdgeOptions): void {
   const { id } = options;
   const edges = [...root.querySelectorAll<SVGElement>("g[data-edge-id]")];

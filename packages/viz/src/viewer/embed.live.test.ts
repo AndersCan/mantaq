@@ -895,13 +895,24 @@ describe("field forms and the context table", () => {
     );
     return { root, live };
   }
-  const valueBox = (root: HTMLElement, name: string) =>
-    root.querySelector<HTMLInputElement>(`[data-value="${name}"]`);
-  const setBox = (root: HTMLElement, name: string, text: string) => {
-    const box = valueBox(root, name);
-    if (box) box.value = text;
+  /** The box of the submit arrow's send form; its `?` opens the form. */
+  interface BoxOptions {
+    field: string;
+  }
+  function valueBox(root: HTMLElement, options: BoxOptions): HTMLInputElement | undefined {
+    clickEdge(root, "idle-submit-paying");
+    const selector = `[data-send-form] [data-value="${options.field}"]`;
+    return root.querySelector<HTMLInputElement>(selector) ?? undefined;
+  }
+  interface SetBoxOptions {
+    field: string;
+    text: string;
+  }
+  function setBox(root: HTMLElement, options: SetBoxOptions): void {
+    const box = valueBox(root, options);
+    if (box) box.value = options.text;
     box?.dispatchEvent(new Event("change", { bubbles: true }));
-  };
+  }
 
   test("the note is present when live and absent without a driver", () => {
     expect(mountFields().root.querySelector("[data-live-note]")).not.toBeNull();
@@ -958,71 +969,70 @@ describe("field forms and the context table", () => {
     ]);
   });
 
-  test("a value set in the Context tab is sent by every later click, kept for onNavigate and across Back", () => {
+  test("a value changed in the send form is sent by every later click, kept for onNavigate and across Back", () => {
     const seen: string[][] = [];
     const { root, live } = mountFields(requiredMachine, {
-      onNavigate: (where) => seen.push(where.values),
+      onNavigate: (where) => seen.push(where.payloads),
     });
-    expect(valueBox(root, "amount")?.value).toBe("1");
-    setBox(root, "amount", "7.5");
-    expect(seen.at(-1)).toEqual(["amount=7.5"]);
+    const prefilled = valueBox(root, { field: "amount" })?.value;
+    setBox(root, { field: "amount", text: "7.5" });
+    const changed = seen.at(-1);
     sendSubmit(root);
-    expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } },
-    ]);
-    expect(seen.at(-1)).toEqual(["amount=7.5"]);
+    const sent = seen.at(-1);
     click(root, '[data-explore-action="back"]');
-    expect(valueBox(root, "amount")?.value).toBe("7.5");
+    const afterBack = valueBox(root, { field: "amount" })?.value;
     sendSubmit(root);
-    expect(live.log.at(-1)).toEqual([
-      { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } },
-    ]);
+    const step = { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } };
+    expect({ prefilled, changed, sent, afterBack, log: live.log }).toEqual({
+      prefilled: "1",
+      changed: ['submit={"amount":7.5}'],
+      sent: ['submit={"amount":7.5}'],
+      afterBack: "7.5",
+      log: [[step], [step]],
+    });
   });
 
-  test("a Context row reads the field name only, with no type text", () => {
+  test("a send form row reads the field name only, with no type text", () => {
     const { root } = mountFields(requiredMachine);
+    clickEdge(root, "idle-submit-paying");
     const rows = [...root.querySelectorAll(".explore-field")].map((row) => row.textContent?.trim());
     expect(rows).toEqual(["amount", "label"]);
   });
 
-  test("values from the address are sent, and clearing the box sends the example again", () => {
+  test("values from an old address are sent, and clearing the box sends the example again", () => {
     const { root, live } = mountFields(requiredMachine, { values: ['label="from url"', "bad"] });
-    expect(valueBox(root, "label")?.value).toBe("from url");
-    setBox(root, "amount", "2");
-    setBox(root, "amount", "");
+    const label = valueBox(root, { field: "label" })?.value;
+    setBox(root, { field: "amount", text: "2" });
+    setBox(root, { field: "amount", text: "" });
     sendSubmit(root);
-    expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { amount: 1, label: "from url" } },
-    ]);
+    expect({ label, sent: live.log[0] }).toEqual({
+      label: "from url",
+      sent: [{ kind: "event", event: "submit", payload: { amount: 1, label: "from url" } }],
+    });
   });
 
-  test("text that is not a value empties the box, so the grey default is what is sent", () => {
+  test("text that is not a value puts the prefill back in the box, and the prefill is sent", () => {
     const { root, live } = mountFields(requiredMachine);
-    setBox(root, "amount", "7");
-    setBox(root, "amount", "seven");
-    expect(valueBox(root, "amount")?.value).toBe("1");
+    setBox(root, { field: "amount", text: "7" });
+    setBox(root, { field: "amount", text: "seven" });
+    const amount = valueBox(root, { field: "amount" })?.value;
     sendSubmit(root);
-    expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
-    ]);
-  });
-
-  test("an untouched box shows the value the last Send used", () => {
-    const { root } = mountFields(requiredMachine);
-    setBox(root, "label", "x");
-    sendSubmit(root);
-    setBox(root, "label", "");
-    expect(valueBox(root, "label")?.value).toBe("x");
+    expect({ amount, sent: live.log[0] }).toEqual({
+      amount: "1",
+      sent: [{ kind: "event", event: "submit", payload: { amount: 1, label: "hi" } }],
+    });
   });
 
   test("a typed default is kept and sent", () => {
     const seen: string[][] = [];
     const { root } = mountFields(requiredMachine, {
-      onNavigate: (where) => seen.push(where.values),
+      onNavigate: (where) => seen.push(where.payloads),
     });
-    setBox(root, "amount", "1");
-    expect(seen.at(-1)).toEqual(["amount=1"]);
-    expect(valueBox(root, "amount")?.value).toBe("1");
+    setBox(root, { field: "amount", text: "1" });
+    expect({ seen: seen.at(-1), amount: valueBox(root, { field: "amount" })?.value }).toEqual({
+      seen: ['submit={"amount":1}'],
+      amount: "1",
+    });
   });
 
   test("a name optional on one event and required on another shows the default the click sends", () => {
@@ -1036,11 +1046,12 @@ describe("field forms and the context table", () => {
       ],
     };
     const { root, live } = mountFields(shared);
-    expect(valueBox(root, "label")?.value).toBe("hi");
+    const shown = valueBox(root, { field: "label" })?.value;
     sendSubmit(root);
-    expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
-    ]);
+    expect({ label: shown, sent: live.log[0] }).toEqual({
+      label: "hi",
+      sent: [{ kind: "event", event: "submit", payload: { amount: 1, label: "hi" } }],
+    });
   });
 });
 
@@ -1612,7 +1623,7 @@ describe("Show controls, live", () => {
 });
 
 describe("Details and Step tab with docs", () => {
-  test("the Step tab shows no state doc; a sendable arrow's Details are title, Send, doc", () => {
+  test("the Step tab shows no state doc; a sendable arrow's Details are title, send form, doc", () => {
     const root = document.createElement("div");
     const documented: VizMachine = {
       ...checkout,
@@ -1633,7 +1644,7 @@ describe("Details and Step tab with docs", () => {
     clickEdge(root, "idle-submit-paying");
     const children = [...(root.querySelector(".details")?.children ?? [])].map(
       (child) =>
-        child.getAttribute("data-send-edge") ??
+        child.getAttribute("data-send-form") ??
         child.getAttribute("data-doc") ??
         child.tagName.toLowerCase(),
     );

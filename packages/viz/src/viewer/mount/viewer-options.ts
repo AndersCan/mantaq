@@ -12,10 +12,12 @@ export interface ViewerOptions {
   driver?: VizDriver;
   /** Name of a run in the shown machine's `runs` to open on (from `?run=`). Wins over `steps`. Replays only with a `driver`. */
   run?: string;
-  /** Values events are sent with, as `name=<json>` (from `?value=`); the Context tab sets them. */
+  /** Payload fields changed in the send forms, as `event=<json object>` (from `?payload=`); they win over `values`. */
+  payloads?: ReadonlyArray<string>;
+  /** Old links: a field value by name, as `name=<json>` (from `?value=`), for every event with a field of that name. */
   values?: ReadonlyArray<string>;
-  /** Called after every walk, or value change, e.g. to keep the URL shareable. */
-  onNavigate?: (where: { machine: string; steps: string[]; values: string[] }) => void;
+  /** Called after every walk, or payload change, e.g. to keep the URL shareable. */
+  onNavigate?: (where: { machine: string; steps: string[]; payloads: string[] }) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
   /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state, or, while a state is selected, for that state as a throwaway copy reaches it. */

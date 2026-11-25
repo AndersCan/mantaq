@@ -145,6 +145,10 @@ function fakeDriver(opens: (step: VizStep) => boolean = () => false) {
 
 const sendEvent = sendVia;
 
+function eventName(step: VizStep): string {
+  return step.kind === "event" ? step.event : step.kind;
+}
+
 /** The `?` beside an arrow: opens its Details without sending. */
 const clickEdge = (root: HTMLElement, id: string) =>
   root
@@ -180,11 +184,11 @@ describe("with only the diagram shown", () => {
     expect(root.querySelector(".panel")).toBeNull();
   });
 
-  test("a click on a blocked arrow says why and keeps the controls hidden", () => {
+  test("a click on a blocked arrow sends it, says why, and keeps the controls hidden", () => {
     const { driver, sent } = fakeDriver();
     const root = mountDiagram(driver);
     clickArrow(root, "cart-pay-payment");
-    expect(sent).toHaveLength(0);
+    expect(sent.map(eventName)).toEqual(["pay"]);
     expect(line(root)?.textContent).toContain("is blocked:");
     expect(root.querySelector("[data-show-controls]")).not.toBeNull();
   });
@@ -194,7 +198,7 @@ describe("with only the diagram shown", () => {
     const root = mountDiagram(driver);
     clickArrow(root, "cart-pay-payment");
     clickArrow(root, "cart-addItem-cart");
-    expect(sent).toHaveLength(1);
+    expect(sent).toHaveLength(2);
     expect(line(root)?.textContent).toBe("");
   });
 
@@ -205,12 +209,12 @@ describe("with only the diagram shown", () => {
 });
 
 describe("a blocked arrow", () => {
-  test("is grey with a lock, not a next step, and a click on it sends nothing", () => {
+  test("is grey with a lock, not a next step, says why to a screen reader, and its ? sends nothing", () => {
     const { driver, sent } = fakeDriver();
     const root = mount(driver);
     const pay = root.querySelector('[data-edge-id="cart-pay-payment"]');
     expect(pay?.classList.contains("blocked")).toBe(true);
-    expect(pay?.getAttribute("aria-disabled")).toBe("true");
+    expect(pay?.getAttribute("aria-description")).toBe("pay is blocked: items is 0");
     expect(pay?.classList.contains("next")).toBe(false);
     expect(pay?.querySelector(".blocked-lock")).not.toBeNull();
     clickEdge(root, "cart-pay-payment");
@@ -218,17 +222,20 @@ describe("a blocked arrow", () => {
     expect(root.querySelector(".graph .selected")).not.toBeNull();
   });
 
-  test("a click on a blocked arrow opens Details with the blocked line and sends nothing", () => {
+  test("a click on a blocked arrow sends its event, and the walk stays where the guard keeps it", () => {
     const { driver, sent } = fakeDriver();
     const root = mount(driver);
     root
       .querySelector('[data-edge-id="cart-pay-payment"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(sent).toHaveLength(0);
-    expect(root.querySelector("[data-blocked-note]")?.textContent).toContain("is blocked:");
+    expect({
+      sent: sent.map(eventName),
+      current: root.querySelector(".explore")?.getAttribute("data-current"),
+      note: root.querySelector("[data-blocked-note]")?.textContent,
+    }).toEqual({ sent: ["pay"], current: "cart", note: "pay is blocked: items is 0" });
   });
 
-  test("follows a value set in the Context tab, so its lock matches what a send does", () => {
+  test("follows a value changed in its send form, so its lock matches what a send does", () => {
     const coupon = {
       name: "coupon",
       type: "string",
@@ -250,13 +257,16 @@ describe("a blocked arrow", () => {
     const root = mount(driver, withCoupon);
     const pay = () => root.querySelector('[data-edge-id="cart-pay-payment"]');
     expect(pay()?.classList.contains("blocked")).toBe(true);
-    const box = root.querySelector<HTMLInputElement>('[data-value="coupon"]');
+    clickEdge(root, "cart-pay-payment");
+    const box = root.querySelector<HTMLInputElement>('[data-send-form] [data-value="coupon"]');
+    expect(box?.value).toBe("none");
     if (box) box.value = "nope";
     box?.dispatchEvent(new Event("change", { bubbles: true }));
     expect(pay()?.classList.contains("blocked")).toBe(true);
     if (box) box.value = "free";
     box?.dispatchEvent(new Event("change", { bubbles: true }));
     expect(pay()?.classList.contains("blocked")).toBe(false);
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
     sendEvent(root, "pay");
     expect(sent).toEqual([{ kind: "event", event: "pay", payload: { coupon: "free" } }]);
   });
@@ -268,7 +278,7 @@ describe("a blocked arrow", () => {
     sendEvent(root, "addItem");
     const pay = root.querySelector('[data-edge-id="cart-pay-payment"]');
     expect(pay?.classList.contains("blocked")).toBe(false);
-    expect(pay?.hasAttribute("aria-disabled")).toBe(false);
+    expect(pay?.hasAttribute("aria-description")).toBe(false);
     expect(pay?.querySelector(".blocked-lock")).toBeNull();
     expect(pay?.classList.contains("next")).toBe(true);
     sendEvent(root, "pay");
@@ -384,14 +394,14 @@ function stayedStep(step: VizStep) {
 }
 
 describe("a blocked arrow's Details", () => {
-  test("says why and has no Send button", () => {
+  test("says why and still offers Send, as a click on the arrow does", () => {
     const { driver } = fakeDriver();
     const root = mount(driver);
     clickEdge(root, "cart-pay-payment");
     const note = root.querySelector("[data-blocked-note]");
     expect(note?.getAttribute("data-blocked-note")).toBe("pay");
     expect(note?.textContent?.length).toBeGreaterThan(0);
-    expect(root.querySelector("[data-send-edge]")).toBeNull();
+    expect(root.querySelector("[data-send-edge]")?.textContent).toBe("Send pay");
   });
 
   test("names the guard's context values and follows an effect result while shown", () => {

@@ -11,15 +11,11 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { activatable, html, svg } from "./dom.ts";
-import { partMachine } from "./parts.ts";
-import { defaultValue, parseValue, valueFields, valueText } from "./fill.ts";
-import type { Values } from "./fill.ts";
+import { contextView } from "./context/context-view.ts";
 import { LOCK_SLOT, textWidth } from "./layout.ts";
 
 export interface ExploreContext {
   machine: VizMachine;
-  /** The opened part's actor ("" for the machine's own); null on the board. The Context tab lists only its fields. */
-  zoom: string | null;
   /** Keep the first `length` steps. */
   rewind: (length: number) => void;
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
@@ -35,10 +31,6 @@ export interface ExploreContext {
     picked?: { map: string; key: string } | null;
     /** Follow this child: Send in the map goes to it. */
     pick: (child: { map: string; key: string }) => void;
-    /** Field name → the value set in the Context tab. */
-    values: Values;
-    /** Set a field's value; undefined clears it. */
-    setValue: (name: string, value: VizJson | undefined) => void;
   };
 }
 
@@ -149,52 +141,14 @@ function childrenSections(
   });
 }
 
-/** One text box per field name the machine's events carry; each box starts at the default. */
-function valuesList(
-  doc: Document,
-  context: {
-    machine: VizMachine;
-    live: NonNullable<ExploreContext["live"]>;
-  },
-): HTMLElement | null {
-  const { machine, live } = context;
-  const fields = valueFields(machine);
-  if (fields.length === 0) return null;
-  const rows = fields.map((field) => {
-    const set = live.values[field.name];
-    const fallback = defaultValue(field, {
-      live: live.state,
-      afters: live.afters ?? [],
-      events: machine.events
-        .filter((event) => event.payload?.some((each) => each.name === field.name))
-        .map((event) => event.id),
-    });
-    const fallbackText = fallback === undefined ? "" : valueText(field, fallback);
-    const input = html(doc, "input", {
-      type: "text",
-      "data-value": field.name,
-      "aria-label": field.name,
-    });
-    input.value = set === undefined ? fallbackText : valueText(field, set);
-    input.addEventListener("change", () => {
-      const value = parseValue(field, input.value);
-      if (value === undefined) input.value = fallbackText;
-      live.setValue(field.name, value);
-    });
-    return html(doc, "label", { class: "explore-field" }, [
-      html(doc, "strong", {}, [field.name]),
-      input,
-    ]);
-  });
-  return html(doc, "div", { class: "explore-values", "data-values": "" }, [...rows]);
-}
-
 /** What a Send press sent: the event, who got it, and its values when there are any. */
 export type SentEvent = {
   event: string;
   actor?: VizActorRef;
   payload: VizJson | null;
   edge?: string;
+  /** Why the guard blocked the arrow when it was sent. */
+  blocked?: string;
 };
 
 export function sentEventLine(doc: Document, sent: SentEvent): Array<Node | string> {
@@ -377,7 +331,7 @@ function runList(
   return html(doc, "div", { class: "explore-live" }, [
     total === 0
       ? html(doc, "p", { class: "muted", "data-live-empty": "" }, [
-          "No steps yet. Click an arrow on the board to send an event.",
+          "No steps yet. Click an arrow on the board to send its event. Its ? opens Details, where you can change what it sends.",
         ])
       : html(doc, "ol", { class: "explore-run" }, items),
     state.last !== null && state.last !== lasts[total - 1] ? errorLine(doc, state.last) : null,
@@ -385,10 +339,10 @@ function runList(
 }
 
 export interface ExploreParts {
-  /** Where the walk is and what can happen next; null without a driver. */
-  step: HTMLElement | null;
-  /** Live only: the values events send; null when the machine's events carry no fields. */
-  context: HTMLElement | null;
+  /** Where the walk is and what can happen next; undefined without a driver. */
+  step: HTMLElement | undefined;
+  /** The live context, read only; without a driver, the declared context fields. Undefined when there is neither. */
+  context: HTMLElement | undefined;
 }
 
 /** Live Step tab, below the root's state: regions, held effects, outcome, time. */
@@ -413,7 +367,7 @@ function liveParts(
 /** The walk, split for the panel's tabs. */
 export function explorePanel(doc: Document, context: ExploreContext): ExploreParts {
   const { machine, live } = context;
-  if (live === undefined) return { step: null, context: null };
+  if (live === undefined) return { step: undefined, context: contextView(doc, { machine }) };
   const current = live.state.state;
   const final = machine.states.find((state) => state.id === current)?.final === true;
   const length = live.state.steps.length;
@@ -443,13 +397,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       ]),
     ],
   );
-  return {
-    step,
-    context: valuesList(doc, {
-      machine: context.zoom === null ? machine : partMachine(machine, context.zoom),
-      live,
-    }),
-  };
+  return { step, context: contextView(doc, { machine, live: live.state.context }) };
 }
 
 /** Mark the walk on the drawn graph: current state and possible next steps. */
@@ -502,15 +450,15 @@ function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
 const LOCK_WIDTH = 8;
 const LOCK_HEIGHT = 10;
 
-/** A blocked arrow: grey lock left of the label's first line, and `aria-disabled`. */
+/** A blocked arrow: grey lock left of the label's first line, and the reason as its accessible description (a click still sends it). */
 function markBlocked(element: SVGGElement, reason: string | undefined): void {
   element.classList.toggle("blocked", reason !== undefined);
   element.querySelector(":scope > .blocked-lock")?.remove();
   if (reason === undefined) {
-    element.removeAttribute("aria-disabled");
+    element.removeAttribute("aria-description");
     return;
   }
-  element.setAttribute("aria-disabled", "true");
+  element.setAttribute("aria-description", reason);
   const doc = element.ownerDocument;
   const text = element.querySelector("text");
   const first = text?.querySelector("tspan");

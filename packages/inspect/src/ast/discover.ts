@@ -177,7 +177,7 @@ function samplesFromTypes(
   return Object.fromEntries(entries);
 }
 
-/** The Context tab's fields per event, from the same payload types as the samples. */
+/** The send form's fields per event, from the same payload types as the samples. */
 function fieldsFromTypes(
   checker: ts.TypeChecker,
   context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },

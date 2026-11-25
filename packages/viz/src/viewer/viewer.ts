@@ -1,7 +1,7 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
 import { drawCallbacks, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
-import { eventSender, stepSender, valueSetter } from "./mount/event-send.ts";
+import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
 import type { GraphCallbacks, Selection } from "./graph.ts";
 import { layoutOf, listenFullscreen } from "./mount/frame.ts";
 import { liveOf, panelTabs, replaceKeepingSteps, screenOf } from "./mount/panel-tabs.ts";
@@ -27,7 +27,7 @@ export function mountViewer(
 ): void {
   const doc = root.ownerDocument;
   const first = viz.machines.find((machine) => machine.id === options.machine) ?? viz.machines[0];
-  const view = initialView(options);
+  const view = initialView(options, { events: viz.machines.flatMap((machine) => machine.events) });
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
   const redraws: Redraws = { redraw: () => undefined, refit: () => undefined };
@@ -86,22 +86,17 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     dropGonePick(view);
     const stepTab = explorePanel(doc, {
       machine,
-      zoom: view.zoom,
       rewind,
-      ...liveOf(view, {
-        send,
-        pick: pickRow,
-        setValue,
-        routes: options.routes,
-      }),
+      ...liveOf(view, { send, pick: pickRow, routes: options.routes }),
     });
-    const details = renderPanel(doc, shown(), {
+    const details = renderPanel(doc, {
+      machine: shown(),
       selection: view.selection,
       select: showDetails,
       ...(parts.length > 0 && view.zoom === null
         ? { hint: "Click a machine to see its states." }
         : {}),
-      send: sendFor({ root, doc, machine, view, driver }, { sendEvent }),
+      send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }),
     });
     const screen = screenOf(doc, { options, machine, view, driver });
     const tabs = panelTabs(doc, { view, parts: stepTab, details, screen, refresh });
@@ -133,9 +128,9 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     navigated(options, { machine, view });
     follow();
   }
-  const setValue = valueSetter({ options, machine, view, mark });
+  const edit = payloadSetter({ options, machine, view, mark });
   const send = stepSender({ view, driver, walked });
-  const sendEvent = eventSender({ machine, view, send });
+  const sendEvent = eventSender({ machine, view, driver, send });
   function rewind(length: number): void {
     rewindView(view, { driver, length });
     walked();

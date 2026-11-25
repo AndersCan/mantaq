@@ -27,7 +27,7 @@ Hand-rolling a queue with workers means wiring the inbox, the idle and busy trac
 ### Try it
 
 1. Open the run [Four items, three workers](?machine=teamInbox&run=Four%20items%2C%20three%20workers). Three workers take one item each; the fourth, `d`, waits: the inbox box reads `1 waiting` with `d`.
-2. In the **Context** tab set `item` to `e` and click the `team.ITEM_ARRIVED` arrow; do the same with `f` and `g`. The box reads `4 waiting`, `d e f g`: the leftmost goes next.
+2. Open the Details of the `team.ITEM_ARRIVED` arrow with its `?`. Set `item` to `e` and press **Send**. Do the same with `f` and `g`. The box reads `4 waiting`, `d e f g`: the leftmost goes next.
 3. Press **advance 1000 ms** in the **Step** tab. The three workers finish together and take `d`, `e` and `f`; the box reads `1 waiting` with `g`.
 
 ### The code
@@ -46,8 +46,8 @@ Return your machine and the pool's two parts from one `create`, and the diagram 
 
 </div>
 
-1. Click the `ORDER_PLACED` arrow twice, with a dish each time (set it in the **Context** tab). `orders` reads `workersBusy`; both cooks are working.
-2. Set `count` to `1` in the **Context** tab, click the `orders.WORKERS_RESIZED` arrow, then advance 1000 ms. One cook is left and `orders` reads `allWorkersFree`.
+1. Open the Details of the `ORDER_PLACED` arrow with its `?`, set a dish and press **Send**. Do it twice. `orders` reads `workersBusy`; both cooks are working.
+2. Open the Details of the `orders.WORKERS_RESIZED` arrow, set `count` to `1` and press **Send**. Then advance 1000 ms. One cook is left and `orders` reads `allWorkersFree`.
 
 <Code code={kitchenSource} lang="ts" title="kitchen.ts" />
 

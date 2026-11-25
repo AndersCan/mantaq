@@ -31,7 +31,7 @@ A box is a state, an arrow is one target of a `to` list labelled with its event.
 
 The panel runs the real machine in your browser. Moving accent arrows are the steps the walk can take next.
 
-1. Click the `submitBasicInfo` arrow: it is sent with the example values (change them in the **Context** tab). The walk moves to `shippingAddress`.
+1. Click the `submitBasicInfo` arrow: it is sent with the example values. Its `?` opens Details, where you can change them. The walk moves to `shippingAddress`.
 2. Click `submitShipping`, then `submitPayment`. Effects do not run here: the arrows out of `submitting` are what `chargeCard` reports.
 3. Click `paymentOk`. The walk ends in `success`.
 

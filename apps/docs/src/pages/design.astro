@@ -20,6 +20,7 @@ const headings = [
   { depth: 2, slug: "buttons-and-cards", text: "Buttons and cards" },
   { depth: 2, slug: "diagram", text: "Diagram" },
   { depth: 2, slug: "tutorial-step", text: "Tutorial step: start marker and self-transitions" },
+  { depth: 2, slug: "send-form", text: "Send form and Context tab" },
   { depth: 2, slug: "ai-page-label", text: "AI-written page label" },
   { depth: 2, slug: "overlap-warning", text: "Overlap warning" },
   { depth: 2, slug: "machine-node", text: "Machine node" },
@@ -143,14 +144,25 @@ const headings = [
   <h2 id="blocked-arrow">Blocked arrow</h2>
   <p><strong>Awaiting approval</strong></p>
   <p>
-    New: an arrow whose guard the current context does not meet is grey with a lock; clicking it
-    sends nothing. Here <code>eat</code> is blocked until <code>serve</code> puts a plate
-    on the table.
+    New: an arrow whose guard the current context does not meet is grey with a lock. Changed: a click
+    on it sends the event, and the walk stays where the guard keeps it. Here <code>eat</code> is
+    blocked until <code>serve</code> puts a plate on the table.
   </p>
   <Step n={6}>
     A guard is a plain if in the handler: no plates, no full. With no plates, eat is blocked: press
     serve first.
   </Step>
+
+  <h2 id="send-form">Send form and Context tab</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: a click on an arrow always sends its event. The <code>?</code> on an arrow opens Details with
+    a send form: one box per payload field, holding the values a click sends, and a Send button. A
+    change stays for later sends of that event. Changed: the Context tab shows the actor's context,
+    read only. Open the <code>?</code> of <code>submitBasicInfo</code> and change
+    <code>email</code>.
+  </p>
+  <Machine src="src/content/docs/checkout.ts" />
 
   <h2 id="ai-page-label">AI-written page label</h2>
   <p><strong>Awaiting approval</strong></p>

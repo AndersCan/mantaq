@@ -66,7 +66,7 @@ const machine: VizMachine = {
   fuzz: null,
 };
 
-test("after p1 started a child, the Context box shows p2, the key Send sends", () => {
+test("after p1 started a child, the send form shows p2, the key Send sends", () => {
   const live = (): VizLiveState => ({
     state: "showingQueue",
     steps: [{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }],
@@ -84,6 +84,10 @@ test("after p1 started a child, the Context box shows p2, the key Send sends", (
   const root = document.createElement("div");
   document.body.append(root);
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
-  root.querySelector<HTMLElement>('[data-tab="context"]')?.click();
-  expect(root.querySelector<HTMLInputElement>('[data-value="photoId"]')?.value).toBe("p2");
+  root
+    .querySelector('[data-details-edge="showingQueue-photoAdded-showingQueue"]')
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(
+    root.querySelector<HTMLInputElement>('[data-send-form] [data-value="photoId"]')?.value,
+  ).toBe("p2");
 });

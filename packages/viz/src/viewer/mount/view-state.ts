@@ -1,8 +1,9 @@
-import type { VizJson, VizLiveState, VizLiveStep } from "../../schema.ts";
+import { decodePayloads, legacyPayloads } from "../send/payloads.ts";
+import type { VizEvent, VizJson, VizLiveState, VizLiveStep } from "../../schema.ts";
 import { decodeValues } from "../fill.ts";
+import type { Payloads } from "../send/payloads.ts";
 import type { Selection } from "../graph.ts";
 import type { SentEvent } from "../explore.ts";
-import type { Values } from "../fill.ts";
 import type { ViewerOptions } from "./viewer-options.ts";
 
 export type PanelTab = "screen" | "step" | "context" | "details";
@@ -34,15 +35,20 @@ export interface ViewState {
   notice: string | undefined;
   /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
   blocked: Map<string, string>;
-  /** Live: edge id → the payload a click on that arrow sends (see `blockedEdges`); none = the default. */
+  /** Live: edge id → the payload a click on that arrow sends, the one its dry run tried (see `blockedEdges`); none = the default. Its send form shows it. */
   chosen: Map<string, VizJson>;
-  /** Field name → the value set in the Context tab; events are sent with it (kept in `?value=`). */
-  values: Values;
+  /** The payload fields changed in the send forms; every send and dry run of the event uses them (kept in `?payload=`). */
+  payloads: Payloads;
   /** What `blocked` was computed for; it is recomputed when any of it changes. */
-  blockedFor: { live: VizLiveState; picked: ViewState["picked"]; values: Values } | undefined;
+  blockedFor: { live: VizLiveState; picked: ViewState["picked"]; payloads: Payloads } | undefined;
 }
 
-export function initialView(options: ViewerOptions): ViewState {
+export interface InitialViewOptions {
+  /** Every event of the document: an old `?value=` field applies to each event with that field. */
+  events: ReadonlyArray<VizEvent>;
+}
+
+export function initialView(options: ViewerOptions, document: InitialViewOptions): ViewState {
   return {
     selection: null,
     zoom: null,
@@ -56,7 +62,10 @@ export function initialView(options: ViewerOptions): ViewState {
     notice: undefined,
     blocked: new Map(),
     chosen: new Map(),
-    values: decodeValues(options.values ?? []),
+    payloads: {
+      ...legacyPayloads(decodeValues(options.values ?? []), document.events),
+      ...decodePayloads(options.payloads ?? []),
+    },
     blockedFor: undefined,
   };
 }

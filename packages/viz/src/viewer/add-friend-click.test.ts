@@ -256,11 +256,11 @@ describe("addFriend clicked from the start", () => {
     expect(now().at).toBe(SHOWING);
   });
 
-  test("with no friends set in Context, the arrow to choosingFriends is locked", () => {
-    const { root, sent } = mount(addFriend, ["friends=[]"]);
+  test("an old link with no friends locks the arrow to choosingFriends, and its click stays", () => {
+    const { root, sent, now } = mount(addFriend, ["friends=[]"]);
     const to = arrow(root, `${SHOWING}-openPicker-choosingFriends`);
     expect(to?.classList.contains("blocked")).toBe(true);
     click(root, `${SHOWING}-openPicker-choosingFriends`);
-    expect(sent).toHaveLength(0);
+    expect({ sent: sent.length, at: now().at }).toEqual({ sent: 1, at: SHOWING });
   });
 });

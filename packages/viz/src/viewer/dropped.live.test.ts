@@ -274,7 +274,7 @@ describe("the Step tab lists the whole walk", () => {
   test("no steps says so", () => {
     const { root } = mount();
     expect(text(root, "[data-live-empty]")).toBe(
-      "No steps yet. Click an arrow on the board to send an event.",
+      "No steps yet. Click an arrow on the board to send its event. Its ? opens Details, where you can change what it sends.",
     );
     expect(root.querySelector("[data-step]")).toBeNull();
   });
