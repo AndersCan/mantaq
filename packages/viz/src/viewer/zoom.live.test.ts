@@ -112,7 +112,7 @@ const press = (element: Element | null) =>
 const box = (root: HTMLElement, part: string) =>
   root.querySelector<SVGGElement>(`g.part[data-part="${part}"]`);
 function crumbs(root: HTMLElement) {
-  return [...root.querySelectorAll(".focus-path button")].map((crumb) => crumb.textContent);
+  return [...root.querySelectorAll(".focus-path li > *")].map((crumb) => crumb.textContent);
 }
 function boardCrumb(root: HTMLElement) {
   return root.querySelector(".focus-path button");

@@ -32,7 +32,7 @@ The viewer shows one machine: the `machine` option picks it (default: the first 
 
 What each mark means and how to walk it: [How the visualizer works](https://anderscan.github.io/mantaq/guides/visualizer/). Without a `driver` the viewer draws the diagram and Details; nothing can be sent.
 
-**Live** (`mountViewer(root, doc, { driver })`, or the `@mantaq/inspect` Vite page): steps run the real actor through `createDriver` from `@mantaq/inspect/drive`. Effects are held, except the initial state's, which core runs while the actor is built. An embed that forwards inputs or keeps its child snapshot still builds its child, with the child's effects held. `VizLiveState` carries what the panel shows: `effectMode`, `waiting`, `payload`, `context`, `timers`, `embeds` (each current state that embeds a machine, and the child's state when the embed has `keep`) and `after` (results an effect sends back later, offered through the driver's optional `listen(onChange)`).
+**Live** (`mountViewer(root, doc, { driver })`, or the `@mantaq/inspect` Vite page): steps run the real actor through `createDriver` from `@mantaq/inspect/drive`. Effects are held, except the initial state's, which core runs while the actor is built. `VizLiveState` carries what the panel shows: `effectMode`, `waiting`, `payload`, `context`, `timers` and `after` (results an effect sends back later, offered through the driver's optional `listen(onChange)`).
 
 ## Schema
 

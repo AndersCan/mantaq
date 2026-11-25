@@ -237,7 +237,7 @@ describe("a click on an arrow", () => {
     });
   });
 
-  test("on a blocked arrow sends the payload its dry run was tried with", () => {
+  test("on a blocked arrow sends nothing; its Details Send sends the payload its dry run was tried with", () => {
     const { driver, sent, tried } = fakeDriver();
     const root = mount({ driver });
     openDetails(root, { event: "pay" });
@@ -245,16 +245,20 @@ describe("a click on an arrow", () => {
     const locked = root.querySelector('g.edge[data-edge-id="cart-pay-paid"]')?.classList;
     const note = root.querySelector("[data-send-form] [data-blocked-note]")?.textContent;
     clickArrow(root, { event: "pay" });
+    const clicked = sent.length;
+    press(root.querySelector('[data-send-edge="cart-pay-paid"]'));
     const step = { kind: "event", event: "pay", payload: { coupon: "nope" } };
     expect({
       blocked: locked?.contains("blocked"),
       note,
+      clicked,
       sent,
       tried: tried.some((each) => JSON.stringify(each) === JSON.stringify(step)),
       current: root.querySelector(".explore")?.getAttribute("data-current"),
     }).toEqual({
       blocked: true,
       note: "pay is blocked: items is 0",
+      clicked: 0,
       sent: [step],
       tried: true,
       current: "cart",
@@ -338,7 +342,7 @@ describe("the send form", () => {
 });
 
 describe("payloads in the address", () => {
-  test("an old bare entry opens the send form, and onNavigate reports each change qualified by machine", () => {
+  test("open the send form with them, and onNavigate reports each change", () => {
     const { driver, sent } = fakeDriver();
     const seen: string[][] = [];
     const root = mount({
@@ -352,7 +356,7 @@ describe("payloads in the address", () => {
     clickArrow(root, { event: "add" });
     expect({ shown, seen: seen.at(-1), sent: sent.map(fieldsOf) }).toEqual({
       shown: "5",
-      seen: ['cart:add={"qty":5,"item":"fig"}'],
+      seen: ['add={"qty":5,"item":"fig"}'],
       sent: [{ item: "fig", qty: 5 }],
     });
   });
@@ -362,7 +366,7 @@ describe("payloads in the address", () => {
     const root = mount({
       driver,
       values: ['coupon="free"', "qty=4"],
-      payloads: ['cart:add={"qty":6}'],
+      payloads: ['add={"qty":6}'],
     });
     openDetails(root, { event: "add" });
     const qty = box(root, { field: "qty" })?.value;

@@ -108,8 +108,12 @@ function mount(drawn: VizMachine = machine, blocking = false) {
 }
 
 const shared = (root: HTMLElement) => root.querySelector<SVGElement>("g.edge[data-members]");
-const press = (element: Element | null) =>
+function help(root: HTMLElement): SVGElement | undefined {
+  return root.querySelector<SVGElement>("g.edge-help[data-members]") ?? undefined;
+}
+function press(element: Element | null | undefined): void {
   element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+}
 const details = (root: HTMLElement) => root.querySelector(".details");
 
 describe("an arrow three states share on an event named with a space", () => {
@@ -126,9 +130,12 @@ describe("an arrow three states share on an event named with a space", () => {
     );
   });
 
-  test("from another state, a click opens the details listing every source", () => {
+  test("from another state, the arrow is plain and its ? opens the details listing every source", () => {
     const { root, sent } = mount();
     press(shared(root));
+    const button = shared(root)?.getAttribute("role") === "button";
+    expect({ button, details: details(root) !== null }).toEqual({ button: false, details: false });
+    press(help(root));
     expect(sent).toHaveLength(0);
     expect(details(root)?.querySelector("h2")?.textContent).toBe("3 states —go now→ home");
     expect(
@@ -163,7 +170,7 @@ describe("an arrow three states share on an event named with a space", () => {
 
   test("the details show the first member's doc line", () => {
     const { root } = mount();
-    press(shared(root));
+    press(help(root));
     expect(root.querySelector('[data-doc="edge"]')?.textContent).toBe("Goes home.");
   });
 
@@ -194,7 +201,7 @@ describe("an arrow three states share on an event named with a space", () => {
 
   test("selecting a member marks the shared arrow", () => {
     const { root } = mount();
-    press(shared(root));
+    press(help(root));
     press(root.querySelector('[data-edge-link="c-go now-home"]'));
     expect(shared(root)?.classList.contains("selected")).toBe(true);
   });

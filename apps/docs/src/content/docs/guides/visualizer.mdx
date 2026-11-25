@@ -21,11 +21,11 @@ The checkout machine: the thick border is the state the walk is on, moving accen
 
 ### Walking the graph
 
-The viewer keeps a cursor on one state, starting at the initial one. Moving accent arrows are the steps the walk can take next. A click on a state selects it and shows it in Details. A click on an arrow that leaves the state the walk is in sends its event, also when a lock shows that its guard blocks it. A click on any other arrow opens Details with one line that says why it can't be sent. The `?` beside an arrow's label opens its Details without sending. The **Context** tab shows the actor's context as the walk changes it. Without a live run it lists the context fields that the machine declares. **Full screen**, above the diagram, fills the screen with the viewer; Escape returns. Browsers without element full screen (iPhone Safari) show no button.
+The viewer keeps a cursor on one state, starting at the initial one. Moving accent arrows are the steps the walk can take next. When the panel is shown, a click on a state selects it and shows it in Details. An arrow is a button only while a click on it sends its event and moves the walk. A click on any other arrow does nothing. Its hover title says why it can't be sent, and so do its Details. An arrow that a guard blocks keeps its lock. The `?` beside an arrow's label opens its Details without sending. The **Context** tab shows the actor's context as the walk changes it. Without a live run it lists the context fields that the machine declares. **Full screen**, above the diagram, fills the screen with the viewer; Escape returns. Browsers without element full screen (iPhone Safari) show no button.
 
-In an actor map the diagram shows the child machine once. Live, each child is a chip with its key on the state it is in, and the Step tab lists every child with its state. Click a chip or a row to follow that child: its row is marked, and a click on an arrow in the map sends to it.
+In an actor map the diagram shows the child machine once. Live, each child is a chip with its key on the state it is in, and the Step tab lists every child with its state. Click a chip or a row to follow that child: its row is marked, and a click on an arrow in the map that the child can take sends to it.
 
-The selected arrow's Details has a send form when a click on the arrow sends: one box per payload field and a **Send** button. The boxes hold the values that a click sends: the values last sent, else the examples. A change stays for every later send of that event. The lock on a blocked arrow is worked out with the same values. If the arrow can't be sent, one line says why. After a send, Details say what was sent, with its values, and where it went. Links keep the changed values in `?payload=`, and old `?value=` links still open with their values. An arrow responds wherever its line is clicked, dashed and dotted ones included.
+The selected arrow's Details has a send form when the arrow leaves the state the walk is in, also when a guard blocks it: one box per payload field and a **Send** button. The boxes hold the values that a click sends: the values last sent, else the examples. A change stays for every later send of that event. The lock on a blocked arrow is worked out with the same values. If the arrow can't be sent, one line says why. After a send, Details say what was sent, with its values, and where it went. Links keep the changed values in `?payload=`, and old `?value=` links still open with their values. An arrow responds wherever its line is clicked, dashed and dotted ones included.
 
 Effects do not run on the live page: the answers of `submitting` (`paymentOk`, `paymentFail`, `paymentTimeout`) are the arrows out of it. The initial state's effects run while the machine is built.
 
@@ -59,5 +59,6 @@ On the live page (the Vite plugin) each step runs the real actor, so guards are 
 | Dotted self-loop    | The event is handled and the state does not change |
 | Dashed orange arrow | Undetermined target                                |
 | Moving accent arrow | A step the walk can take next                      |
+| Still accent arrow  | A next step that another part sends, not a click   |
 | Teal arrow          | The arrow last clicked or shown in Details         |
 | `?` beside a label  | Opens that arrow's Details                         |

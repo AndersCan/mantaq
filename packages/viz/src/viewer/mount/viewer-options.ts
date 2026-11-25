@@ -13,7 +13,7 @@ export interface ViewerOptions {
   driver?: VizDriver;
   /** Name of a run in the shown machine's `runs` to open on (from `?run=`). Wins over `steps`. Replays only with a `driver`. */
   run?: string;
-  /** Payload fields changed in the send forms, as `machine:event=<json object>` (from `?payload=`); a bare `event=<json object>` of an old link is an event of the machine shown. They win over `values`. */
+  /** Payload fields changed in the send forms, as `event=<json object>` (from `?payload=`); they win over `values`. */
   payloads?: ReadonlyArray<string>;
   /** Old links: a field value by name, as `name=<json>` (from `?value=`), for every event with a field of that name. */
   values?: ReadonlyArray<string>;

@@ -1,7 +1,7 @@
 // Opens each Getting started page of the built docs site (apps/docs/dist) in Chromium
 // and checks its diagram runs live: a current state, a moving next arrow where the
-// diagram has arrows, on events a click on `eat` moves the walk to `full`, and on guards a
-// click on `eat` at 0 plates says why under the diagram, on timers
+// diagram has arrows, on events a click on `eat` moves the walk to `full`, and on guards the
+// blocked `eat` arrow at 0 plates is no button and its hover title says why, on timers
 // `cook`, then the `overcooked` arrow (a click sends it now), brings the walk back to `hungry`.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { existsSync } from "node:fs";
@@ -62,15 +62,17 @@ for (const page of pages) {
     if (after.join() !== "full") failures.push(`${page}: clicking eat leaves the walk in ${after}`);
   }
   if (page === "getting-started/guards/") {
-    await tab
-      .locator('.mantaq-tutorial g.edge[data-edge-id="hungry-eat-full"]')
-      .dispatchEvent("click");
-    await tab.waitForTimeout(200);
-    const said = await tab.locator(".mantaq-tutorial .viz-main > .blocked-note").textContent();
-    const controls = await tab.locator(".mantaq-tutorial [data-show-controls]").count();
-    if (said !== "eat is blocked: plates is 0" || controls === 0) {
+    const eat = tab.locator('.mantaq-tutorial g.edge[data-edge-id="hungry-eat-full"]');
+    const [role, said, controls] = await Promise.all([
+      eat.getAttribute("role"),
+      eat.locator(":scope > title").textContent(),
+      tab.locator(".mantaq-tutorial [data-show-controls]").count(),
+    ]);
+    const looks = role === "button" ? "button" : "plain";
+    const honest = looks === "plain" && said === "eat is blocked: plates is 0";
+    if (!honest || controls === 0) {
       failures.push(
-        `guards: clicking eat at 0 plates says "${said}", not "eat is blocked: plates is 0"`,
+        `guards: eat at 0 plates is a ${looks} arrow whose title says "${said}", not a plain arrow titled "eat is blocked: plates is 0"`,
       );
     }
   }

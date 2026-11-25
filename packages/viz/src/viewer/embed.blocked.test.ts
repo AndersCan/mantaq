@@ -184,22 +184,34 @@ describe("with only the diagram shown", () => {
     expect(root.querySelector(".panel")).toBeNull();
   });
 
-  test("a click on a blocked arrow sends it, says why, and keeps the controls hidden", () => {
+  test("a blocked arrow is no button: a click sends nothing and its hover title says why", () => {
     const { driver, sent } = fakeDriver();
     const root = mountDiagram(driver);
+    const pay = root.querySelector('g.edge[data-edge-id="cart-pay-payment"]');
     clickArrow(root, "cart-pay-payment");
-    expect(sent.map(eventName)).toEqual(["pay"]);
-    expect(line(root)?.textContent).toContain("is blocked:");
-    expect(root.querySelector("[data-show-controls]")).not.toBeNull();
+    expect({
+      sent: sent.map(eventName),
+      button: pay?.getAttribute("role") === "button",
+      title: pay?.querySelector(":scope > title")?.textContent,
+      line: line(root)?.textContent,
+      controls: root.querySelector("[data-show-controls]") !== null,
+    }).toEqual({
+      sent: [],
+      button: false,
+      title: "pay is blocked: items is 0",
+      line: "",
+      controls: true,
+    });
   });
 
-  test("a click that sends empties the line", () => {
+  test("a click that sends leaves the line empty", () => {
     const { driver, sent } = fakeDriver();
     const root = mountDiagram(driver);
-    clickArrow(root, "cart-pay-payment");
     clickArrow(root, "cart-addItem-cart");
-    expect(sent).toHaveLength(2);
-    expect(line(root)?.textContent).toBe("");
+    expect({ sent: sent.map(eventName), line: line(root)?.textContent }).toEqual({
+      sent: ["addItem"],
+      line: "",
+    });
   });
 
   test("without diagramOnly there is no line under the diagram", () => {
@@ -222,17 +234,17 @@ describe("a blocked arrow", () => {
     expect(root.querySelector(".graph .selected")).not.toBeNull();
   });
 
-  test("a click on a blocked arrow sends its event, and the walk stays where the guard keeps it", () => {
+  test("a click on a blocked arrow sends nothing: it is no button, and its title says why", () => {
     const { driver, sent } = fakeDriver();
     const root = mount(driver);
-    root
-      .querySelector('[data-edge-id="cart-pay-payment"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const pay = root.querySelector('[data-edge-id="cart-pay-payment"]');
+    pay?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect({
       sent: sent.map(eventName),
       current: root.querySelector(".explore")?.getAttribute("data-current"),
-      note: root.querySelector("[data-blocked-note]")?.textContent,
-    }).toEqual({ sent: ["pay"], current: "cart", note: "pay is blocked: items is 0" });
+      button: pay?.hasAttribute("role") || pay?.hasAttribute("tabindex"),
+      title: pay?.querySelector(":scope > title")?.textContent,
+    }).toEqual({ sent: [], current: "cart", button: false, title: "pay is blocked: items is 0" });
   });
 
   test("follows a value changed in its send form, so its lock matches what a send does", () => {
