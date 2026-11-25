@@ -51,6 +51,11 @@ export function whyOf(click: ArrowClick): string | undefined {
   return click.kind === "plain" ? click.why : undefined;
 }
 
+/** Why a click on the drawn arrow sends nothing now: the panel's line under an arrow's title. */
+export function drawnWhy(from: ArrowSendContext, options: DrawnArrowOptions): string | undefined {
+  return whyOf(drawnArrowClick(from, options).click);
+}
+
 export interface DrawHandlers {
   root: HTMLElement;
   shown: VizMachine;
