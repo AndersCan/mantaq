@@ -3,9 +3,6 @@
 // diagram has arrows, on events a click on `eat` moves the walk to `full`, and on guards a
 // click on `eat` at 0 plates says why under the diagram, on timers
 // `cook`, then the `overcooked` arrow (a click sends it now), brings the walk back to `hungry`.
-// On the Split a big machine guide, entering `payingForOrder` draws `payment` under the path
-// `order` > `payment`, and inside `delivery` a click on the forwarded `signForParcel` arrow
-// delivers the order.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -118,78 +115,10 @@ try {
 }
 await pool.close();
 
-failures.push(...(await checkSplitGuide({ browser, origin })));
-
 await browser.close();
 server.close();
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   process.exit(1);
 }
-console.log(
-  `docs-live-check: ${pages.length} Getting started pages, the pool box and the split guide run live`,
-);
-
-/** Steps into the machines of the Split a big machine guide; returns what failed. */
-async function checkSplitGuide(site) {
-  const page = await site.browser.newPage();
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(`split: page error: ${error.message}`));
-  await page.goto(`${site.origin}${base}guides/split-a-big-machine/`);
-  const failed = [];
-  await stepThroughOrder({ page, failed }).then(undefined, (error) => {
-    failed.push(`split: the guide diagram does not step into its machines: ${error.message}`);
-  });
-  await page.close();
-  return [...failed, ...errors];
-}
-
-/** The node ids of the states that `states` matches. */
-function nodeIds(states) {
-  return states.evaluateAll((nodes) => nodes.map((node) => node.dataset.nodeId));
-}
-
-/** Enters `payment`, then walks `delivery` to the door and signs; pushes what differs to `walk.failed`, so it survives a later timeout. */
-async function stepThroughOrder(walk) {
-  const { page, failed } = walk;
-  const machine = page.locator(".mantaq-machine").first();
-  const opened = machine.getByRole("navigation", { name: "Machines opened" });
-  await machine.locator("g.state.current").first().waitFor({ timeout: 10_000 });
-  const nodes = await machine.locator("g.state.machine").count();
-  if (nodes !== 2) failed.push(`split: the order diagram has ${nodes} machine nodes, not 2`);
-  await machine.getByRole("button", { name: "enter machine payment" }).click();
-  const payment = await nodeIds(machine.locator("g.state"));
-  const path = (await opened.innerText()).split("\n").join(" > ");
-  if (
-    payment.join() !== "chargingCard,couldNotChargeCard,paymentTaken" ||
-    path !== "order > payment"
-  ) {
-    failed.push(`split: entering payingForOrder draws ${payment} under ${path}, not payment`);
-  }
-  await page.keyboard.press("Escape");
-  await machine
-    .locator('g.edge[data-edge-id="reviewingOrder-placeOrder-payingForOrder"] text')
-    .click();
-  await machine
-    .locator('g.state.current[data-node-id="shippingOrder"]')
-    .waitFor({ timeout: 3_000 });
-  await machine.getByRole("button", { name: "enter machine delivery" }).click();
-  const packing = await nodeIds(machine.locator("g.state.current"));
-  await machine.getByRole("button", { name: "advance 1000 ms → parcelPacked" }).click();
-  await machine.getByRole("button", { name: "advance 2000 ms → courierArrived" }).click();
-  const door = await nodeIds(machine.locator("g.state.current"));
-  await machine
-    .locator('g.edge[data-edge-id="waitingAtDoor-signForParcel-parcelHandedOver"] text')
-    .click();
-  await opened.getByRole("button", { name: "order" }).click();
-  const end = await nodeIds(machine.locator("g.state.current"));
-  if ([packing, door, end].join(" ") !== "packingParcel waitingAtDoor orderDelivered") {
-    failed.push(
-      `split: stepping into delivery marks ${packing}, then ${door}, and signForParcel ends in ${end}`,
-    );
-  }
-  await page.goto(`${page.url().split("?")[0]}?machine=order&step=placeOrder&focus=shippingOrder`);
-  await machine
-    .locator('g.state.current[data-node-id="packingParcel"]')
-    .waitFor({ timeout: 10_000 });
-}
+console.log(`docs-live-check: ${pages.length} Getting started pages and the pool box run live`);

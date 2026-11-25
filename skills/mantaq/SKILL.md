@@ -45,7 +45,6 @@ One way to do things; don't invent competing patterns.
 - **Transition handler.** Pure decision: gets `(event, { context, state })`, where `state` is the typed current state. Read them, return the next state and/or events to emit. Registered per state (`m.on`) or for every state (`m.onAny`), with `to` listing every state it may return (compile-checked; omit `to` for a handler that only stays). `to` is what the diagram draws, and returning a state not in `to` fails to compile.
 - **Clock.** The only source of time, and only for a machine with timers. `create` receives `{ clock }`: real time in the app, a `VirtualClock` in tests and on the live page. A machine with a timer passes it on, `Actor({ clock, … })`; a machine with no timers takes no `clock` and its actor has no time. Forget it on a timer and the compiler stops: `Property 'clock' is missing in type '{ signal: AbortSignal; … }' but required in type '{ clock: Clock; }'`. Fix: `create: ({ clock }) => Actor({ clock, … })`. A `clock` in a machine with no timers is noise: remove it.
 - **Regions.** Child actors composed into a parent. Forwarding events into a child is manual.
-- **Embed.** `embed` from `@mantaq/sugar` runs a child machine while the parent is in one state, and maps the child's final states and `__error` to parent events. This is how a machine holds another machine: the viz draws the state as one machine node that the reader can enter. With `snapshot` and `keep`, the live page marks the child's state and sends its forwarded arrows. Needs `@mantaq/sugar` 3.1 or later (and `@mantaq/inspect` 0.49 for the machine node). With older sugar, keep one machine.
 - **Actor.** Build it with `Actor({...})` (a function, no `new`). Wires the above together: declared `inputs` (what callers send), `internal` events (emitted back to itself), `outputs` (emitted outward), states, initial state, context, clock, and a `setup` that registers handlers and effects.
 
 Everything runs synchronously in one call stack with `VirtualClock`. No awaits needed for timer work in tests.
@@ -79,7 +78,6 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 - **A failure the person can see gets its own state** (`couldNotCreateAlbum`). Never land back in the state that means things are fine with the error in context. Going back to the step the person retries from is fine when its JSDoc says the message shows there.
 - **One state is a store, not a flow.** Name it for what it holds (`holdingPreferences`) and do not draw a journey from it.
 - **Every journey ends in a named outcome**, success included. One state per way it can end. Never fall back to the start state to mean done. Mark the outcome final when the actor's work is over. An actor reused for the next attempt keeps it non-final and says so in its JSDoc. Exception: a cyclic controller (traffic light) has no outcome or final state; every state must be on the cycle, reachable back to the start.
-- **Split a machine that grows too big; never keep growing it.** More than about 12 states, the same handler registered in a loop over many states, or a group of states with one way in and no arrows to the rest except its ways out: move each group into its own machine and `embed` it in one parent state. Keep a group in the parent when its handlers read or write the parent context: the child cannot read it. See `patterns.md` "Big Machine".
 - Test with `VirtualClock` and the `@mantaq/test` harness. See `testing.md`.
 
 ## Hand a machine to a builder
@@ -109,6 +107,6 @@ A design ask that changes what the app does today: your FINAL answer to the pers
 
 - `designing.md`. Design a machine in the code, with the live page open
 - `sugar.md`. Sugar helpers: what exists and when to use each
-- `patterns.md`. Recipes: async effects, retries, regions, splitting a big machine with `embed`, event sourcing
+- `patterns.md`. Recipes: async effects, retries, regions, event sourcing
 - `testing.md`. Virtual clock, `@mantaq/test`, coverage, testing an app or a web page against its model
 - `reviewing.md`. Review your actor code against mantaq conventions
