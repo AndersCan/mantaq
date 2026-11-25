@@ -26,7 +26,6 @@ import type { VizEdge, VizMachine } from "../schema.ts";
 import { drawnNodeName } from "./groups/fold-groups.ts";
 import { Either } from "@mantaq/utils";
 import { isNever } from "../is-never.ts";
-import { localName } from "./compartments.ts";
 import { placeBoard } from "./board.ts";
 import type { Point } from "@dagrejs/dagre";
 
@@ -197,7 +196,8 @@ function stateGroup(placed: PlacedState | PlacedMachine, options: NodeOptions): 
 function stubTitle(state: string, options: NodeOptions): SVGTitleElement[] {
   const group = enteredGroupOf(options.drawn);
   if (group === undefined || group.states.includes(state)) return [];
-  const outside = `${localName(state)} is outside group ${group.name}.`;
+  const name = drawnNodeName(options.drawn, { node: state });
+  const outside = `${name} is outside group ${group.name}.`;
   const shown =
     options.callbacks.leave === undefined
       ? outside
@@ -328,7 +328,7 @@ function machineGroup(placed: PlacedMachine, options: NodeOptions): SVGGElement 
   );
   state.append(machineGlyph(placed, options), name);
   const names: string[] = [];
-  for (const id of holds.states) names.push(localName(id));
+  for (const node of holds.states) names.push(drawnNodeName(options.drawn, { node }));
   const listed = names.join(", ");
   state.setAttribute("aria-label", `group ${holds.group}, ${count}: ${listed}`);
   state.setAttribute("data-states", JSON.stringify(holds.states));

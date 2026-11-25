@@ -234,13 +234,19 @@ describe("a grouped machine in the viewer", () => {
     const links: string[] = [];
     for (const link of root.querySelectorAll("[data-edge-link]")) links.push(link.textContent);
     const shared = root.querySelector(".graph g.any-node")?.getAttribute("aria-label");
+    const rows: string[] = [];
+    for (const row of root.querySelectorAll(".details dd")) {
+      rows.push(row.getAttribute("data-field") ?? "");
+    }
     click(root.querySelector('[data-state-link="order.confirming"]'));
     expect({
       links,
       shared,
+      rows,
       title: root.querySelector(".details h2")?.textContent,
       ringed: root.querySelector(".graph g.selected[data-node-id]")?.getAttribute("data-node-id"),
     }).toStrictEqual({
+      rows: ["states", "outgoing", "incoming"],
       title: "State confirming",
       ringed: "order.@payment",
       links: [
