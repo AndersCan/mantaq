@@ -8,6 +8,13 @@
 /** The page of the guide, under the site's base. */
 export const GROUP_GUIDE = "guides/group-states/";
 
+/** The guide's viewer with a group entered, as a link opens it: the walk in `payment`, in `delivery`, and outside `payment`. */
+export const GROUP_GUIDE_ENTERED = [
+  `${GROUP_GUIDE}?machine=order&step=placeOrder&focus=%40payment`,
+  `${GROUP_GUIDE}?machine=order&step=placeOrder&step=charged&focus=%40delivery`,
+  `${GROUP_GUIDE}?machine=order&focus=%40payment`,
+];
+
 /** What the viewer shows after the walk leaves the payment group to packingParcel, with the path still in it. */
 const OUTSIDE = {
   current: ["packingParcel"],

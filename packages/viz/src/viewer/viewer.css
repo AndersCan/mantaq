@@ -21,6 +21,8 @@
   container-type: inline-size;
   font-size: 0.8125rem;
   line-height: 1.45;
+  /* A line that appears above the canvas must not make the browser scroll the page. */
+  overflow-anchor: none;
 }
 
 /* Host pages (docs themes, markdown styles) size and space these; the viewer

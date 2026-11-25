@@ -217,6 +217,35 @@ describe("with only the diagram shown", () => {
     });
   });
 
+  test("the ? of a blocked arrow says why, and the arrow keeps its blocked look, unlike an arrow just sent", () => {
+    const { driver } = fakeDriver();
+    const root = mountDiagram(driver);
+    clickEdge(root, "cart-pay-payment");
+    const pay = root.querySelector('g.edge[data-edge-id="cart-pay-payment"]');
+    const asked = { line: line(root)?.textContent, selected: pay?.classList.contains("selected") };
+    clickArrow(root, "cart-addItem-cart");
+    const add = root.querySelector('g.edge[data-edge-id="cart-addItem-cart"]');
+    expect({ asked, sent: add?.classList.contains("selected") }).toEqual({
+      asked: { line: "pay is blocked: items is 0", selected: false },
+      sent: true,
+    });
+  });
+
+  test("Escape clears the line under the diagram, and the arrow it spoke of", () => {
+    const { driver } = fakeDriver();
+    const root = mountDiagram(driver);
+    document.body.append(root);
+    clickArrow(root, "cart-addItem-cart");
+    const said = line(root)?.textContent;
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect({
+      said,
+      after: line(root)?.textContent,
+      selected: root.querySelectorAll(".graph .selected").length,
+    }).toEqual({ said: "Step 1: addItem: cart → cart", after: "", selected: 0 });
+    root.remove();
+  });
+
   test("without diagramOnly there is no line under the diagram", () => {
     const root = mount(fakeDriver().driver);
     expect(line(root)).toBeNull();

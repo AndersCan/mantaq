@@ -98,7 +98,7 @@ export function keepInView(root: HTMLElement, options: KeepInViewOptions): void 
   const node = canvas.querySelector(`.graph g[data-node-id="${CSS.escape(options.node)}"]`);
   if (!node) return;
   const own = areaOf(canvas, node);
-  const labels = options.with === "sendable" ? sendableLabels(canvas) : [];
+  const labels = options.with === "sendable" ? sendableLabels(canvas, options) : [];
   const across: Span[] = [];
   for (const label of labels) across.push({ left: label.left, right: label.right });
   const left = scrollToShowAround(
@@ -128,10 +128,27 @@ function areaOf(canvas: HTMLElement, element: Element): Area {
   };
 }
 
-/** The label of each arrow that a click sends now: what the reader clicks. */
-function sendableLabels(canvas: HTMLElement): Area[] {
+interface LeavesOptions {
+  /** The drawn node shown. */
+  node: string;
+}
+
+/** True for an arrow that leaves `node`, the `onAny` node that stands for every state, or a shared node that stands for the current state. */
+function leaves(arrow: Element, options: LeavesOptions): boolean {
+  const from = arrow.getAttribute("data-from") ?? "";
+  if (from === options.node) return true;
+  const shared = arrow
+    .closest(".graph")
+    ?.querySelector(`g.any-node[data-node-id="${CSS.escape(from)}"]`);
+  if (shared === null || shared === undefined) return false;
+  return !shared.hasAttribute("data-states") || shared.classList.contains("current");
+}
+
+/** The label of each arrow from `node` that a click sends now: what the reader clicks. Another current state, as in a region, has its own. */
+function sendableLabels(canvas: HTMLElement, options: LeavesOptions): Area[] {
   const labels: Area[] = [];
   for (const arrow of canvas.querySelectorAll('.graph g.edge.next[role="button"]')) {
+    if (!leaves(arrow, options)) continue;
     const lines = arrow.querySelectorAll(":scope > text");
     const parts: Area[] = [];
     for (const line of lines.length > 0 ? lines : [arrow]) parts.push(areaOf(canvas, line));

@@ -233,11 +233,13 @@ const FIX = "make it plain, or make the click do something (AGENTS.md, Docs and 
  * Sweeps every page built into `options.dist`, then plants dead elements on one
  * page and sweeps it again: a sweep that misses one is too weak to trust. Returns one
  * failure line per problem, and a summary of what was clicked. Each page of
- * `options.mustSweep` must have a viewer the sweep clicked.
+ * `options.mustSweep` must have a viewer the sweep clicked. An address there with
+ * a query, as a link that opens a group, is swept as a page of its own.
  */
 export async function clickFailures(options) {
   const site = { browser: options.browser, origin: options.origin, base: options.base };
-  const swept = await sweepViewers({ ...site, pages: builtPages(options.dist) });
+  const links = options.mustSweep.filter((page) => page.includes("?"));
+  const swept = await sweepViewers({ ...site, pages: [...builtPages(options.dist), ...links] });
   const failures = [];
   for (const problem of swept.problems) failures.push(`docs-live-check: ${problem}: ${FIX}`);
   const planted = await sweepViewers({ ...site, pages: [PLANTED_PAGE], plant: plantDeadElements });
@@ -265,7 +267,7 @@ export async function clickFailures(options) {
       failures.push(`docs-live-check: the click sweep found no viewer on /${page}`);
     }
   }
-  const pages = swept.pages.join(", ");
-  const summary = `${swept.clicks} clicks on ${swept.viewers} viewers on ${swept.pages.length} pages each change the page: ${pages}`;
+  const sweptPages = swept.pages.join(", ");
+  const summary = `${swept.clicks} clicks on ${swept.viewers} viewers on ${swept.pages.length} pages each change the page: ${sweptPages}`;
   return { failures, summary };
 }

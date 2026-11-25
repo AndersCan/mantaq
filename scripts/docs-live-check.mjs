@@ -9,8 +9,9 @@
 // On the group guide it replays the walk the guide describes at a docs-column and a phone
 // width: into the payment group, enter it, click arrows inside, leave it by an arrow, go
 // back by the path and by the browser's Back. No click needs a sideways scroll first.
+// The click sweep also opens the guide with a group entered, by a link.
 // Run after the docs build: node scripts/docs-live-check.mjs
-import { GROUP_GUIDE, groupWalkFailures } from "./lib/group-walk.mjs";
+import { GROUP_GUIDE, GROUP_GUIDE_ENTERED, groupWalkFailures } from "./lib/group-walk.mjs";
 import { clickFailures } from "./lib/viewer-sweep.mjs";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -127,7 +128,7 @@ await pool.close();
 
 failures.push(...(await groupWalkFailures({ browser, origin, base })));
 
-const mustSweep = [...pages, GROUP_GUIDE];
+const mustSweep = [...pages, GROUP_GUIDE, ...GROUP_GUIDE_ENTERED];
 const clicks = await clickFailures({ browser, origin, base, dist, mustSweep });
 failures.push(...clicks.failures);
 
