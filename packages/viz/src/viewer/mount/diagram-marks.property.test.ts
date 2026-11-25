@@ -166,7 +166,7 @@ function lookOf(element: Element): Look {
 const BUTTON: Look = { role: "button", tabindex: "0" };
 const PLAIN: Look = { role: undefined, tabindex: undefined };
 /** The current choice: Details show it already, so it keeps its tab stop and is no button. */
-const CURRENT: Look = { role: undefined, tabindex: "0" };
+const CURRENT: Look = { role: undefined, tabindex: undefined };
 
 function press(element: Element): void {
   element.dispatchEvent(new MouseEvent("click", { bubbles: true }));

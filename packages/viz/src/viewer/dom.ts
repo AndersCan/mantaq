@@ -49,10 +49,10 @@ export function activatable(element: Element, onActivate: () => void): void {
   affordance(element, "button");
 }
 
-/** How an element shows a click: as a button (pointer, tab stop, `role=button`), plain, or the current choice (a tab stop, `aria-current`, no pointer). */
+/** How an element shows a click: as a button (pointer, tab stop, `role=button`), plain, or the current choice (plain, with `aria-current`). */
 export type Affordance = "button" | "plain" | "current";
 
-/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order. The current choice, which a click would only choose again, keeps its tab stop like the open tab. */
+/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order, and so does the current choice, which a click would only choose again. */
 export function affordance(element: Element, look: Affordance): void {
   switch (look) {
     case "button":
@@ -61,19 +61,22 @@ export function affordance(element: Element, look: Affordance): void {
       element.removeAttribute("aria-current");
       return;
     case "plain":
-      element.removeAttribute("role");
+      leaveTabOrder(element);
       element.removeAttribute("aria-current");
-      if (element.ownerDocument.activeElement === element) element.setAttribute("tabindex", "-1");
-      else element.removeAttribute("tabindex");
       return;
     case "current":
-      element.setAttribute("tabindex", "0");
-      element.removeAttribute("role");
+      leaveTabOrder(element);
       element.setAttribute("aria-current", "true");
       return;
     default:
       return isNever(look);
   }
+}
+
+function leaveTabOrder(element: Element): void {
+  element.removeAttribute("role");
+  if (element.ownerDocument.activeElement === element) element.setAttribute("tabindex", "-1");
+  else element.removeAttribute("tabindex");
 }
 
 export interface ButtonPressOptions {
