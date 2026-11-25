@@ -97,6 +97,24 @@
   },
   {
     "rule": "label-clear",
+    "a": "label:folders.openingAlbum-SWITCH_FAILED-couldNotOpenAlbum",
+    "b": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:friendOffer.joiningFriendsAlbum-offerGone-showingFriendOffers",
+    "b": "path:friendOffer.showingFriendOffers-join-joiningFriendsAlbum",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:friends.friendSheetClosed-REMOVE-removingFriend",
+    "b": "path:friends.removingFriend-REMOVED-friendSheetClosed",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
     "a": "label:gallery.couldNotRemovePhoto-DISMISS_BATCH-stay",
     "b": "path:gallery.couldNotRemovePhoto-RETRY_FAILED-stay",
     "gap": 0
@@ -109,8 +127,56 @@
   },
   {
     "rule": "label-clear",
+    "a": "label:join.noInviteOpen-pasteFoundNothing-showingLinkProblem",
+    "b": "path:join.declinedByAdmin-dismissDecline-noInviteOpen",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.noInviteOpen-requestAnswered-albumDeletedByAdmin",
+    "b": "path:join.declinedByAdmin-dismissDecline-noInviteOpen",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.noInviteOpen-requestAnswered-declinedByAdmin",
+    "b": "path:join.declinedByAdmin-dismissDecline-noInviteOpen",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.noInviteOpen-requestAnswered-linkStoppedForUnknownReason",
+    "b": "path:join.declinedByAdmin-dismissDecline-noInviteOpen",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "b": "path:join.declinedByAdmin-dismissDecline-noInviteOpen",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.noInviteOpen-welcomeStarted-showingWelcome",
+    "b": "path:join.declinedByAdmin-dismissDecline-noInviteOpen",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
     "a": "label:join.showingLinkProblem-pasteFoundNothing-showingLinkProblem",
     "b": "path:join.showingLinkProblem-requestAnswered-showingLinkProblem",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.waitingForAdminToAccept-requestAnswered-joinedAlbum",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.waitingForAdminToAccept-requestAnswered-linkReplacedByAdmin",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-linkReplacedByAdmin",
     "gap": 0
   },
   {
@@ -127,6 +193,24 @@
   },
   {
     "rule": "label-clear",
+    "a": "label:join.waitingForAdminToAccept-whoMustUpdateChanged-waitingForYouToUpdate",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-linkReplacedByAdmin",
+    "gap": 7
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "gap": 7
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:onboarding.askingForName-SAVE_PROFILE-savingName",
+    "b": "path:onboarding.askingForName-SAVE_PROFILE-savingName",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
     "a": "label:prefs.*-DENSITY_CHOSEN-stay",
     "b": "path:prefs.*-SORT_CHOSEN-stay",
     "gap": 5
@@ -135,6 +219,30 @@
     "rule": "label-clear",
     "a": "label:requests.confirmingAcceptAll-DECLINE_FAILED-stay",
     "b": "path:requests.confirmingAcceptAll-DECLINE_SENT-stay",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:shared:folders.*4>CREATE_FOLDER#0",
+    "b": "path:shared:folders.*4>SET_NAME#0",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:shared:folders.*4>RESTORE_ALBUM#0",
+    "b": "path:shared:folders.*4>SET_NAME#0",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:shared:lightbox.*1>CLOSE#0",
+    "b": "path:shared:lightbox.*1>PHOTO_LIST_CHANGED#0",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:shared:lightbox.*1>PHOTO_LIST_CHANGED#0",
+    "b": "path:shared:lightbox.*1>PHOTO_LIST_CHANGED#0",
     "gap": 0
   },
   {

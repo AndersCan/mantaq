@@ -642,6 +642,31 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
   );
 }
 
+/** A label of `edge` drawn at `label` (centre and size) instead of where the layout put it. */
+export interface MovedLabel {
+  edge: string;
+  label: Box;
+}
+
+/** Counts what a label moved in `layout` comes too near, as `overlapsOf` would report it. */
+export function labelClashCounter(layout: MachineLayout): (moved: MovedLabel) => number {
+  const shapes = shapesOf(layout);
+  function count(moved: MovedLabel): number {
+    const one = shapes.edges.find((each) => each.id === moved.edge);
+    if (one === undefined) return 0;
+    let found = 0;
+    labelOverlaps({ ...one, label: moved.label }, shapes, () => {
+      found += 1;
+    });
+    for (const other of shapes.edges) {
+      if (other.id >= one.id || other.label === null) continue;
+      if (boxToBox(moved.label, other.label) < LABEL_PAD) found += 1;
+    }
+    return found;
+  }
+  return count;
+}
+
 /** One line per overlap, for a failing assertion's message. */
 export function overlapLines(overlaps: ReadonlyArray<Overlap>): string[] {
   return overlaps.map((o) => `${o.rule}: ${o.a} / ${o.b} (${o.gap}px)`);
