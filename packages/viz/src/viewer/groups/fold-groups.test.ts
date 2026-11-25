@@ -218,6 +218,30 @@ describe("foldGroups labels", () => {
     expect(foldGroups(leaving).edges.map((edge) => edgeLines(edge))).toEqual([["e", "!x"]]);
   });
 
+  test("an arrow reads its own guard when its partner merged with another handler", () => {
+    const branches = [
+      { conditions: ["x"], target: { kind: "state" as const, state: "c" } },
+      { conditions: ["!(x)"], target: { kind: "state" as const, state: "d" } },
+    ];
+    const partnered = machineOf({
+      states: [
+        stateOf("b1", { group: "g" }),
+        stateOf("b2", { group: "g" }),
+        stateOf("c"),
+        stateOf("d"),
+      ],
+      edges: [
+        readEdge(edgeOf("b1", { event: "e", to: "c" }), { branches }),
+        readEdge(edgeOf("b1", { event: "e", to: "d" }), { branches }),
+        edgeOf("b2", { event: "e", to: "c" }),
+      ],
+    });
+    expect(foldGroups(partnered).edges.map((edge) => edgeLines(edge))).toEqual([
+      ["e"],
+      ["e", "!x"],
+    ]);
+  });
+
   test("an arrow into a group keeps its condition beside its else", () => {
     const branches = [
       { conditions: ["ready"], target: { kind: "state" as const, state: "listing" } },

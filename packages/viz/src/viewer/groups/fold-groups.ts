@@ -188,8 +188,12 @@ interface FirstMember {
   first: VizEdge;
 }
 
+/** Unread targets by handler key. */
+type Unread = ReadonlyMap<string, ReadonlySet<string>>;
+
 interface Arrowing extends FirstMember {
   nodes: ReadonlyArray<GroupNode>;
+  unread: Unread;
 }
 
 interface DrawnId extends Arrowing {
@@ -198,22 +202,26 @@ interface DrawnId extends Arrowing {
 
 interface Renames {
   names: ReadonlyMap<string, string>;
-  /** The local name of the drawn source node. */
-  source: string;
+  /** Local names of the targets whose arrow the fold drops or draws without this handler's reading. */
+  unread: ReadonlySet<string>;
 }
 
-/** A branch that went to a member goes to its group node instead; to the arrow's own group node, it stays. */
+/**
+ * A branch that went to a member goes to its group node instead. A branch
+ * whose arrow shows no reading of this handler stays, so no label reads
+ * "else" beside an arrow that does not say what it is the else of.
+ */
 function renamedBranch(branch: VizBranch, options: Renames): VizBranch {
   if (branch.target.kind !== "state") return branch;
+  if (options.unread.has(branch.target.state)) return { ...branch, target: { kind: "stay" } };
   const state = options.names.get(branch.target.state);
-  if (state === undefined) return branch;
-  if (state === options.source) return { ...branch, target: { kind: "stay" } };
-  return { ...branch, target: { kind: "state", state } };
+  return state === undefined ? branch : { ...branch, target: { kind: "state", state } };
 }
 
 interface EdgeEnds {
   nodes: ReadonlyArray<GroupNode>;
   ends: ReadonlyArray<string>;
+  unread: ReadonlySet<string>;
 }
 
 /** The edge with its handler reading pointed at the group nodes of its ends, so its condition label holds. */
@@ -225,8 +233,8 @@ function renamedEdge(edge: VizEdge, options: EdgeEnds): VizEdge {
     if (!options.ends.includes(node.id)) continue;
     for (const state of node.states) names.set(localName(state), localName(node.id));
   }
-  const source = localName(edge.from);
-  const branches = explanation.branches.map((branch) => renamedBranch(branch, { names, source }));
+  const { unread } = options;
+  const branches = explanation.branches.map((branch) => renamedBranch(branch, { names, unread }));
   return { ...edge, explanation: { ...explanation, branches } };
 }
 
@@ -244,7 +252,8 @@ function drawnEdge(bucket: Bucket, options: DrawnId): VizEdge {
   const coverage = summed(members.map((member) => member.coverage));
   const tested = summed(members.map((member) => member.tested));
   const oneHandler = members.every((member) => member.from === first.from);
-  const read = oneHandler ? renamedEdge(moved, { nodes: options.nodes, ends }) : moved;
+  const unread = options.unread.get(handlerKey(first)) ?? new Set<string>();
+  const read = oneHandler ? renamedEdge(moved, { nodes: options.nodes, ends, unread }) : moved;
   if (oneHandler) return { ...read, coverage, tested };
   return { ...read, explanation: null, doc: null, coverage, tested };
 }
@@ -258,11 +267,36 @@ function arrowOf(bucket: Bucket, options: Arrowing): GroupArrow {
   return { id, members, drawn: drawnEdge(bucket, { ...options, id }) };
 }
 
-function drawnArrows(edges: ReadonlyArray<VizEdge>, options: NodeIndex): GroupArrow[] {
-  const arrows: GroupArrow[] = [];
-  for (const bucket of bucketsOf(edges, options)) {
+/** The real source and event of an edge: one handler. */
+function handlerKey(edge: VizEdge): string {
+  return `${edge.from}\u0000${edge.event}`;
+}
+
+/** Each handler's targets, by local name, whose edge the fold drops or merges with edges of other handlers. */
+function unreadTargets(edges: ReadonlyArray<VizEdge>, buckets: ReadonlyArray<Bucket>): Unread {
+  const read = new Set<VizEdge>();
+  for (const bucket of buckets) {
     const [first] = bucket.members;
-    if (first !== undefined) arrows.push(arrowOf(bucket, { first, nodes: options.nodes }));
+    const oneHandler = bucket.members.every((member) => member.from === first?.from);
+    if (oneHandler) for (const member of bucket.members) read.add(member);
+  }
+  const unread = new Map<string, Set<string>>();
+  for (const edge of edges) {
+    if (read.has(edge) || edge.to === null) continue;
+    const targets = unread.get(handlerKey(edge)) ?? new Set<string>();
+    targets.add(localName(edge.to));
+    unread.set(handlerKey(edge), targets);
+  }
+  return unread;
+}
+
+function drawnArrows(edges: ReadonlyArray<VizEdge>, options: NodeIndex): GroupArrow[] {
+  const buckets = bucketsOf(edges, options);
+  const unread = unreadTargets(edges, buckets);
+  const arrows: GroupArrow[] = [];
+  for (const bucket of buckets) {
+    const [first] = bucket.members;
+    if (first !== undefined) arrows.push(arrowOf(bucket, { first, nodes: options.nodes, unread }));
   }
   return arrows;
 }
