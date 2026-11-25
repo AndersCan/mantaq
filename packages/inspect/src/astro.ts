@@ -17,7 +17,7 @@ import { serializeViz } from "@mantaq/viz";
 import type { VizMachine } from "@mantaq/viz";
 import type { AstroIntegration } from "astro";
 import type { Plugin } from "vite";
-import { vizDocument } from "./inspect.ts";
+import { modulesDocument } from "./embeds/modules-document.ts";
 import type { FuzzSettings } from "./inspect.ts";
 import { layoutOverview, machineLinks, outputRoutes } from "./astro/overview.ts";
 import { scanAppCode } from "./ast/wires.ts";
@@ -109,7 +109,7 @@ async function documentsSource(
     }
     reported.push({
       rel: relative(context.root, file).split(sep).join("/"),
-      machines: loaded.machines,
+      machines: [...loaded.machines, ...loaded.embedded],
       warnings: loaded.warnings,
     });
     for (const warning of loaded.warnings) plugin.warn(`[mantaq-viz] ${warning}`);
@@ -124,7 +124,7 @@ async function documentsSource(
       all.push({ file, machine });
     }
     documents[file] = {
-      text: serializeViz(vizDocument(loaded.machines)),
+      text: serializeViz(modulesDocument([loaded]).document),
       machines: loaded.machines.map((machine) => machine.id),
     };
   }

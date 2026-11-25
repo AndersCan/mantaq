@@ -104,15 +104,17 @@ const cart = defineMachine("cart", {
     }),
 });
 
-const { machine, warnings } = inspect({
+const { machine, embedded, warnings } = inspect({
   machine: cart, // inspect builds a fresh actor on its own virtual clock every call
   source: { file: "/abs/src/cart.ts", root: "/abs" }, // optional: explanations + payloads from types
   tests: [
     { name: "add an item", steps: [{ kind: "event", event: "addItem", payload: { sku: "A1" } }] },
   ], // optional: named runs for "example tests" coverage
 });
-const json = serializeViz(vizDocument([machine]));
+const json = serializeViz(vizDocument([machine, ...embedded]));
 ```
+
+`embedded` holds the machines that the states of `machine` embed with `embed` from `@mantaq/sugar`. Each one is inspected and fuzzed as if a file exported it. Put them in the same document: a state's `machine` must name a machine in the document. `inspectModule` returns them as `embedded` too. `toVizMachine` and `fuzzedMachine` also set `machine` on such a state, but they do not build the embedded machine. In a custom pipeline, use `toViz` or `inspect` to get it.
 
 `inspectFile(file)` / `inspectModule(file, { load })` do the discovery the Vite plugin does, and read recorded runs from `__runs__/*.json` next to the machine file (`{ [machineId]: { name, end, steps }[] }`). A run is replayed on a fresh actor; internal events the replay already produces (timers, synchronous emits) are dropped, and a run that replays to a different state than `end` is dropped with a warning. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
 

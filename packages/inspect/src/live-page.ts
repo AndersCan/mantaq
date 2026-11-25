@@ -5,20 +5,24 @@
  * new code.
  */
 import { mountViewer, showIssues } from "@mantaq/viz/viewer";
-import type { ViewerOptions } from "@mantaq/viz/viewer";
-import { linkOptions } from "@mantaq/viz/page";
-import { parseViz } from "@mantaq/viz";
 import type { VizDocument, VizDriver, VizOutputRoutes } from "@mantaq/viz";
-import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
+import { Either } from "@mantaq/utils";
 import type { FuzzTarget } from "./fuzz/run.ts";
+import { linkOptions } from "@mantaq/viz/page";
+import { machineWithEmbeds } from "./embeds/machine-with-embeds.ts";
+import { parseViz } from "@mantaq/viz";
+import type { ViewerOptions } from "@mantaq/viz/viewer";
 
 export type LiveTargets = Readonly<Record<string, FuzzTarget["create"]>>;
 
-/** A document holding only `machine`, so the viewer shows the machine its driver runs. */
+/** A document holding `machine` and the machines it embeds, so the viewer shows the machine its driver runs. */
 function only(viz: VizDocument, machine: string | null): VizDocument {
   const chosen = viz.machines.find((each) => each.id === machine) ?? viz.machines[0];
-  return { ...viz, machines: chosen === undefined ? [] : [chosen] };
+  return {
+    ...viz,
+    machines: chosen === undefined ? [] : machineWithEmbeds(viz, { machine: chosen }),
+  };
 }
 
 /**
