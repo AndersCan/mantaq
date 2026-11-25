@@ -2,7 +2,9 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { layoutMachine, placeMachine } from "./layout.ts";
 import { Either } from "@mantaq/utils";
+import { mountViewer } from "./viewer.ts";
 import { renderGraph } from "./graph.ts";
+import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizMachine } from "../schema.ts";
 
 vi.mock("./overlaps.ts", async (original) => ({
@@ -63,16 +65,29 @@ describe("a layout that overlaps itself", () => {
     );
   });
 
-  test("renderGraph draws the machine anyway, with a warning row under it", () => {
+  test("renderGraph draws the machine anyway and counts the overlaps", () => {
     const shown = renderGraph(document, machine, { select: () => undefined });
-    expect(shown.getAttribute("class")).toBe("graph");
-    expect(shown.querySelectorAll("g.state")).toHaveLength(2);
-    expect(shown.getAttribute("data-overlaps")).toBe("1");
-    const warning = shown.querySelector(".overlap-warning");
-    expect(warning?.textContent).toBe("1 overlap: some labels or lines touch.");
     const placed = layoutMachine(machine)[1]?.layout;
-    const height = Math.ceil((placed?.height ?? 0) + 20);
-    expect(shown.getAttribute("height")).toBe(String(height));
-    expect(Number(warning?.getAttribute("y"))).toBeGreaterThan(placed?.height ?? Infinity);
+    expect({
+      kind: shown.getAttribute("class"),
+      states: shown.querySelectorAll("g.state").length,
+      overlaps: shown.getAttribute("data-overlaps"),
+      inside: shown.querySelector(".overlap-warning") ?? undefined,
+      height: shown.getAttribute("height"),
+    }).toStrictEqual({
+      kind: "graph",
+      states: 2,
+      overlaps: "1",
+      inside: undefined,
+      height: String(Math.ceil(placed?.height ?? 0)),
+    });
+  });
+
+  test("the viewer says so in the bar above the drawing", () => {
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] });
+    expect(root.querySelector(".viz-bar .overlap-warning")?.textContent).toBe(
+      "1 overlap: some labels or lines touch.",
+    );
   });
 });

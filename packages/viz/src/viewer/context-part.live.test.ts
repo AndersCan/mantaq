@@ -116,7 +116,7 @@ test("in an opened machine, an arrow's send form lists its own event's fields", 
   press(root.querySelector('g.part[data-part="p"]'));
   press(root.querySelector('[data-details-edge="p.one-x-p.two"]'));
   expect(fields(root)).toEqual(["code"]);
-  press(root.querySelector(".part-title"));
+  press(root.querySelector(".focus-path button"));
   press(root.querySelector('g.part[data-part="q"]'));
   press(root.querySelector('[data-details-edge="q.one-y-q.two"]'));
   expect(fields(root)).toEqual(["why"]);

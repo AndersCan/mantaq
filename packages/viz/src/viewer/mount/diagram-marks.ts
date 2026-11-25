@@ -12,11 +12,14 @@ export interface MarkDiagramContext {
   view: ViewState;
   driver: VizDriver | undefined;
   pick: (child: PickedChild) => void;
+  /** Static: an entered machine, drawn without the walk; only the selection is marked. */
+  walk: "live" | "static";
 }
 
 /** Everything drawn over the graph: walk marks and selection. */
 export function markDiagram(root: HTMLElement, context: MarkDiagramContext): void {
   const { machine, view } = context;
+  if (context.walk === "static") return markSelection(root, { selection: view.selection });
   updateBlocked(view, { machine, driver: context.driver });
   markExplore(root, { machine, blocked: view.blocked, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>(".graph");

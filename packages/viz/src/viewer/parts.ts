@@ -14,8 +14,26 @@ export function partName(machine: VizMachine, part: string): string {
   return part === "" ? machine.id : part;
 }
 
+/** Each board's parts as drawn, so a part opened again is the same machine and keeps its layout. */
+const cutParts = new WeakMap<VizMachine, Map<string, VizMachine>>();
+
 /** The machine as one part draws it: its own states, regions, maps and arrows, and no actors. */
 export function partMachine(machine: VizMachine, part: string): VizMachine {
+  const cut = cutParts.get(machine) ?? new Map<string, VizMachine>();
+  cutParts.set(machine, cut);
+  const known = cut.get(part);
+  if (known !== undefined) return known;
+  const drawn = cutPart(machine, { part });
+  cut.set(part, drawn);
+  return drawn;
+}
+
+interface CutOptions {
+  part: string;
+}
+
+function cutPart(machine: VizMachine, options: CutOptions): VizMachine {
+  const { part } = options;
   const inPart = (id: string): boolean => partOf(machine, id) === part;
   const messages = machine.fuzz?.messages.filter(
     (message) => inPart(message.from) && inPart(message.to),

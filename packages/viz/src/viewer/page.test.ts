@@ -15,6 +15,7 @@ describe("the address bar", () => {
       machine: "answer",
       steps: ["ask", "answered"],
       payloads: ['ask={"code":"c2"}'],
+      focus: [],
     });
     const params = new URLSearchParams(location.search);
     expect(params.getAll("payload")).toEqual(['ask={"code":"c2"}']);
@@ -25,14 +26,19 @@ describe("the address bar", () => {
     history.replaceState(undefined, "", "?machine=answer&value=code%3D%22c1%22&value=n%3D2");
     const options = linkOptions();
     expect(options.values).toEqual(['code="c1"', "n=2"]);
-    options.onNavigate?.({ machine: "answer", steps: [], payloads: ['ask={"code":"c1"}'] });
+    options.onNavigate?.({
+      machine: "answer",
+      steps: [],
+      payloads: ['ask={"code":"c1"}'],
+      focus: [],
+    });
     const params = new URLSearchParams(location.search);
     expect([params.has("value"), params.getAll("payload")]).toEqual([false, ['ask={"code":"c1"}']]);
   });
 
   test("clearing the last payload removes it from the address", () => {
     history.replaceState(undefined, "", "?machine=answer&payload=ask%3D%7B%7D");
-    linkOptions().onNavigate?.({ machine: "answer", steps: [], payloads: [] });
+    linkOptions().onNavigate?.({ machine: "answer", steps: [], payloads: [], focus: [] });
     expect(new URLSearchParams(location.search).has("payload")).toBe(false);
   });
 });

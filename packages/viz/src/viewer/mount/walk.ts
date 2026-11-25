@@ -1,6 +1,7 @@
 import { decodeLiveSteps, encodeLiveStep } from "../../moves.ts";
 import type { VizDriver, VizLiveState, VizLiveStep, VizMachine, VizStep } from "../../schema.ts";
 import { encodePayloads } from "../send/payloads.ts";
+import { focusTokens } from "./focus.ts";
 import type { ViewerOptions } from "./viewer-options.ts";
 import type { ViewState } from "./view-state.ts";
 
@@ -85,6 +86,7 @@ export function navigated(options: ViewerOptions, now: NavigatedOptions): void {
     machine: machine.id,
     steps: view.live?.steps.map(encodeLiveStep) ?? [],
     payloads: encodePayloads(view.payloads),
+    focus: focusTokens(view.focus),
   });
 }
 

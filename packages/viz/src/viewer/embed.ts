@@ -12,7 +12,7 @@ import { Either } from "@mantaq/utils";
 
 export { mountViewer };
 export type { ViewerOptions };
-export type { Selection as ViewerSelection } from "./graph.ts";
+export type { EnteredMachine, Selection as ViewerSelection } from "./graph.ts";
 
 /** Replace `root` with a list of reasons `source` cannot be shown. */
 export function showIssues(

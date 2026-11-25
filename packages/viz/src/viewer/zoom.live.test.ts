@@ -111,6 +111,12 @@ const press = (element: Element | null) =>
   element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 const box = (root: HTMLElement, part: string) =>
   root.querySelector<SVGGElement>(`g.part[data-part="${part}"]`);
+function crumbs(root: HTMLElement) {
+  return [...root.querySelectorAll(".focus-path button")].map((crumb) => crumb.textContent);
+}
+function boardCrumb(root: HTMLElement) {
+  return root.querySelector(".focus-path button");
+}
 const viewBox = (root: HTMLElement) => root.querySelector("svg")?.getAttribute("viewBox");
 const viewBoxWidth = (root: HTMLElement) => Number(viewBox(root)?.split(" ")[2]);
 
@@ -154,14 +160,14 @@ describe("a board of three machines", () => {
     expect(root.querySelector("svg[data-zoom='p']")).not.toBeNull();
   });
 
-  test("the machine's name at the top leads back to the board", () => {
+  test("the path at the top leads back to the board", () => {
     const root = mount(["p", "q"]);
     press(box(root, ""));
     expect(root.querySelector("g[data-node-id='idle']")).not.toBeNull();
-    expect(root.querySelector(".part-title")?.textContent).toBe("app");
-    press(root.querySelector(".part-title"));
+    expect(crumbs(root)).toEqual(["app", "app"]);
+    press(boardCrumb(root));
     expect(root.querySelectorAll("g.part")).toHaveLength(3);
-    expect(root.querySelector(".part-title")).toBeNull();
+    expect(root.querySelector(".focus-path")).toBeNull();
   });
 
   test("a step keeps the machine shown, and Back and Reset do too", () => {
@@ -260,12 +266,12 @@ describe("a board of two machines", () => {
     const root = mount(["p"]);
     expect(root.querySelectorAll("g.part")).toHaveLength(0);
     expect(root.querySelectorAll("g[data-node-id]").length).toBeGreaterThan(2);
-    expect(root.querySelector(".part-title")).toBeNull();
+    expect(root.querySelector(".focus-path")).toBeNull();
   });
 });
 
 describe("repro: Show controls while a machine is shown", () => {
-  test("the machine's name still leads back", () => {
+  test("the path still leads back", () => {
     const actors = ["p", "q"];
     const root = document.createElement("div");
     document.body.append(root);
@@ -275,10 +281,10 @@ describe("repro: Show controls while a machine is shown", () => {
       { driver: fakeDriver(actors), diagramOnly: true },
     );
     press(box(root, "p"));
-    expect(root.querySelector(".part-title")?.textContent).toBe("p");
+    expect(crumbs(root)).toEqual(["app", "p"]);
     press(root.querySelector("[data-show-controls]"));
     expect(root.querySelector("g[data-node-id='p.one']")).not.toBeNull();
-    press(root.querySelector(".part-title"));
+    press(boardCrumb(root));
     expect(root.querySelectorAll("g.part")).toHaveLength(3);
   });
 });
@@ -354,7 +360,7 @@ describe("repro: Back and Reset, and the Details hint, in a shown machine", () =
     const hint = () => root.querySelector("[data-tab-panel=details] .muted")?.textContent;
     press(box(root, "p"));
     expect(hint()).toBe("Click a state or an arrow in the diagram.");
-    press(root.querySelector(".part-title"));
+    press(boardCrumb(root));
     expect(hint()).toBe("Click a machine to see its states.");
   });
 });

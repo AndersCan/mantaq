@@ -1,6 +1,7 @@
 import { decodePayloads, legacyPayloads } from "../send/payloads.ts";
 import type { VizEvent, VizJson, VizLiveState, VizLiveStep } from "../../schema.ts";
 import { decodeValues } from "../fill.ts";
+import type { FocusStep } from "./focus.ts";
 import type { Payloads } from "../send/payloads.ts";
 import type { Selection } from "../graph.ts";
 import type { SentEvent } from "../explore.ts";
@@ -15,8 +16,8 @@ export interface PickedChild {
 
 export interface ViewState {
   selection: Selection | null;
-  /** The machine of a big board shown on its own; null = the board of boxes. Not saved. */
-  zoom: string | null;
+  /** The machines opened from the root, in order: one of a board, or the one a state embeds (kept in `?focus=`). Replaced, never changed in place. */
+  focus: FocusStep[];
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
@@ -51,7 +52,7 @@ export interface InitialViewOptions {
 export function initialView(options: ViewerOptions, document: InitialViewOptions): ViewState {
   return {
     selection: null,
-    zoom: null,
+    focus: [],
     live: null,
     afters: [],
     lasts: [],

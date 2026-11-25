@@ -28,7 +28,7 @@ export default defineConfig({
 });
 ```
 
-Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the string in `machine("<id>", …)`.
+Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the string in `machine("<id>", …)`. The picker lists the machines that no other machine embeds; enter a machine node to reach the others.
 
 The live page runs the real actor, built by `create({ clock })` on a virtual clock the page owns. A machine whose actor runs on another clock shows the diagram and Details, with no Send.
 
