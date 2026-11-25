@@ -9,7 +9,7 @@
 export const VISUALIZER_GUIDE = "guides/visualizer/";
 
 /** The widths the walks run at: a docs column and a phone. */
-export const WALK_SCREENS = [
+const WALK_SCREENS = [
   { name: "docs column", viewport: { width: 1280, height: 900 } },
   { name: "phone", viewport: { width: 390, height: 844 } },
 ];
@@ -32,7 +32,7 @@ const STEP_MS = 3_000;
 const MOUNT_MS = 10_000;
 
 /** Runs in the page: the name of each next arrow whose label is not inside the canvas's view. */
-export function labelsOutOfView() {
+function labelsOutOfView() {
   const out = [];
   for (const arrow of document.querySelectorAll('.viz .graph g.edge.next[role="button"]')) {
     const canvas = arrow.closest(".canvas");
