@@ -206,7 +206,8 @@ const headings = [
     <code>chargingCard</code> and <code>confirming</code> are the group <code>payment</code>, and
     the walk is in <code>confirming</code>.
   </p>
-  <div class="viz">
+  <p>A picture of the block: a click on it does nothing.</p>
+  <div class="viz design-sample" inert>
     <svg class="graph" viewBox="0 0 886 170" width="886" height="170" role="group" aria-label="group node sample">
     <defs>
     <marker id="viz-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
@@ -290,7 +291,8 @@ const headings = [
     Here the reader opened <code>till</code> on the <code>shop</code> board, then entered the group
     <code>payment</code>.
   </p>
-  <div class="viz">
+  <p>A picture of the block: a click on it does nothing.</p>
+  <div class="viz design-sample" inert>
     <div class="viz-bar">
       <div class="viz-bar-start">
         <nav class="focus-path" aria-label="focus path sample">
@@ -314,6 +316,13 @@ const headings = [
 </StarlightPage>
 
 <style>
+  .design-sample {
+    pointer-events: none;
+  }
+  .viz.design-sample .machine-enter,
+  .viz.design-sample .focus-path button {
+    cursor: default;
+  }
   .design-phone {
     max-width: 22.5rem;
     border: 1px dashed var(--mq-hairline);

@@ -100,6 +100,59 @@ m.onAny({
 });
 ```
 
+## Big Machine → Group States
+
+If a machine has more than about 12 states, and some of them are one step of the journey (one way in, few ways out), tag each state of that step with `@group <name>` in its JSDoc (`@mantaq/inspect` 0.49 and `@mantaq/viz` 0.42 or later). The viewer draws the group as one node. The reader clicks `enter` on it to see its states, and `?focus=@payment` links there. Only the drawing changes: one actor, one context, one walk, and every arrow from the current state still sends.
+
+```ts
+import { Actor, event, state } from "@mantaq/core";
+
+const reviewingOrder = state("reviewingOrder")();
+/** The card provider charges the card. @group payment */
+const chargingCard = state("chargingCard")();
+/** The card provider declined the card. @group payment */
+const cardDeclined = state("cardDeclined")();
+const packingParcel = state("packingParcel")();
+
+const placeOrder = event("placeOrder")();
+const declined = event("declined")();
+const retryCard = event("retryCard")();
+const charged = event("charged")();
+
+Actor({
+  inputs: [placeOrder, declined, retryCard, charged],
+  states: [reviewingOrder, chargingCard, cardDeclined, packingParcel],
+  initial: reviewingOrder,
+  setup: (m) => {
+    m.on(reviewingOrder, {
+      event: placeOrder,
+      to: [chargingCard],
+      handler: () => ({ state: chargingCard }),
+    });
+    m.on(chargingCard, {
+      event: declined,
+      to: [cardDeclined],
+      handler: () => ({ state: cardDeclined }),
+    });
+    m.on(cardDeclined, {
+      event: retryCard,
+      to: [chargingCard],
+      handler: () => ({ state: chargingCard }),
+    });
+    m.on(chargingCard, {
+      event: charged,
+      to: [packingParcel],
+      handler: () => ({ state: packingParcel }),
+    });
+  },
+});
+```
+
+- If the states share the data of the machine and only this machine sends to them, group them.
+- If the part runs at the same time as the rest, other code sends to it directly, or several machines use it, split it into another machine. Use a region, or `return { actor, other }` (designing.md section 11). Each machine gets its own walk.
+- Limits: one group per state, no `.` in the name, all states of a group in one region, none in an actor map.
+- Full example: [`order/order.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/order/order.ts); guide: https://anderscan.github.io/mantaq/guides/group-states/
+
 ## Other Recipes
 
 Worked, tested examples in [`packages/examples/`](https://github.com/AndersCan/mantaq/tree/main/packages/examples). Read the one that matches:

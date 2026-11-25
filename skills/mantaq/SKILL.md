@@ -107,6 +107,6 @@ A design ask that changes what the app does today: your FINAL answer to the pers
 
 - `designing.md`. Design a machine in the code, with the live page open
 - `sugar.md`. Sugar helpers: what exists and when to use each
-- `patterns.md`. Recipes: async effects, retries, regions, event sourcing
+- `patterns.md`. Recipes: async effects, retries, regions, groups for a big machine, event sourcing
 - `testing.md`. Virtual clock, `@mantaq/test`, coverage, testing an app or a web page against its model
 - `reviewing.md`. Review your actor code against mantaq conventions

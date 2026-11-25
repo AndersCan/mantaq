@@ -33,6 +33,18 @@ A final state ends the walk. **Back** and **Reset** undo steps. `?machine=checko
 
 On the live page (the Vite plugin) each step runs the real actor, so guards are evaluated.
 
+### Moving around
+
+The viewer can draw a machine at more than one level. The path above the canvas shows the level that it draws now. The path starts with the name of the machine, and each level in adds one name, for example `order › payment`.
+
+- Board: if `create` returns two or more other machines next to its actor, the viewer first draws a board. A board has one box per machine, and a dotted line between two machines that send messages to each other. Click a box to open that machine. Its name is added to the path.
+- Group: if states of the machine have a `@group` tag, the viewer draws each group as one node. Click `enter` on a group node to draw the states of that group. Its name is added to the path. [Group the states of a big machine](/mantaq/guides/group-states/) shows this on a live diagram.
+- Path: click a name in the path to go back to that level. Press Escape to go back one level. The last name is the level that the canvas draws, and a click on it does nothing.
+
+A move along the path does not change the walk or the Step log. An arrow from the state that the walk is in sends at every level, because the machine has one walk. Inside a group, a dashed box is a state outside the group. Click it to go back one level and show that state there.
+
+The address keeps the path in `?focus=`: the name of a machine on a board, then the id of a group node, such as `@payment`. A link with `?focus=` opens the same level. For example, `?machine=order&focus=@payment` opens the group `payment` of the machine `order`.
+
 ### Nodes
 
 | Style                                                              | Meaning                                                                                       |
@@ -47,6 +59,9 @@ On the live page (the Vite plugin) each step runs the real actor, so guards are 
 | Dashed circle `?`                                                  | An unknown target                                                                             |
 | Shaded rectangle                                                   | A region: its own start arrow and current state                                               |
 | Box titled with the map's name                                     | An actor map: its child machine drawn once, each live child a chip                            |
+| Box with a box-in-a-box mark and `enter`                           | A group: its states drawn as one node, with the count of its states or `now in <state>`       |
+| Dashed box while a group is entered                                | A state outside the group. A click on it goes back one level and shows it there               |
+| Box with a machine's name on a board                               | One machine of the board. A click on it opens that machine                                    |
 | `3 waiting` and outlined pills at the bottom of a pool's own state | The items waiting in a `createPool` inbox, the next one on the left; `+N` more past the edge  |
 | Dark chip with a key at the bottom of a state                      | A live child of an actor map, by key                                                          |
 
