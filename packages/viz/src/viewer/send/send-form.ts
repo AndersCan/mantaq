@@ -42,11 +42,17 @@ export function sendForm(doc: Document, options: SendFormOptions): HTMLElement {
     });
     input.addEventListener("change", () => {
       if (input.dataset["sent"] !== undefined) return;
+      input.removeAttribute("aria-invalid");
       options.edit({ event: edge.event, field: field.name, value: parseValue(field, input.value) });
       refill();
     });
     input.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
+      if (event.key !== "Enter" || event.isComposing) return;
+      const unreadable = input.value.trim() !== "" && parseValue(field, input.value) === undefined;
+      if (unreadable) {
+        input.setAttribute("aria-invalid", "true");
+        return;
+      }
       input.dispatchEvent(new Event("change"));
       input.dataset["sent"] = "";
       options.send();

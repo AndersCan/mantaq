@@ -306,6 +306,21 @@ describe("the send form", () => {
     expect(sent).toEqual([{ kind: "event", event: "add", payload: { item: "pear", qty: 1 } }]);
   });
 
+  test("Enter on text the box cannot read sends nothing and marks the box", () => {
+    const { driver, sent } = fakeDriver();
+    const root = mount({ driver });
+    openDetails(root, { event: "add" });
+    const input = box(root, { field: "qty" });
+    if (input === undefined) throw new Error("no qty box");
+    input.value = "3x";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect({ sent, invalid: input.getAttribute("aria-invalid"), text: input.value }).toEqual({
+      sent: [],
+      invalid: "true",
+      text: "3x",
+    });
+  });
+
   test("a change refills the other boxes in place, so the box typed in stays", () => {
     const { driver } = fakeDriver();
     const root = mount({ driver });

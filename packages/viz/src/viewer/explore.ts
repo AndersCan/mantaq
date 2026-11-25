@@ -450,15 +450,15 @@ function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
 const LOCK_WIDTH = 8;
 const LOCK_HEIGHT = 10;
 
-/** A blocked arrow: grey lock left of the label's first line, and `aria-disabled`. */
+/** A blocked arrow: grey lock left of the label's first line, and the reason as its accessible description (a click still sends it). */
 function markBlocked(element: SVGGElement, reason: string | undefined): void {
   element.classList.toggle("blocked", reason !== undefined);
   element.querySelector(":scope > .blocked-lock")?.remove();
   if (reason === undefined) {
-    element.removeAttribute("aria-disabled");
+    element.removeAttribute("aria-description");
     return;
   }
-  element.setAttribute("aria-disabled", "true");
+  element.setAttribute("aria-description", reason);
   const doc = element.ownerDocument;
   const text = element.querySelector("text");
   const first = text?.querySelector("tspan");

@@ -209,12 +209,12 @@ describe("with only the diagram shown", () => {
 });
 
 describe("a blocked arrow", () => {
-  test("is grey with a lock, not a next step, and a click on it sends nothing", () => {
+  test("is grey with a lock, not a next step, says why to a screen reader, and its ? sends nothing", () => {
     const { driver, sent } = fakeDriver();
     const root = mount(driver);
     const pay = root.querySelector('[data-edge-id="cart-pay-payment"]');
     expect(pay?.classList.contains("blocked")).toBe(true);
-    expect(pay?.getAttribute("aria-disabled")).toBe("true");
+    expect(pay?.getAttribute("aria-description")).toBe("pay is blocked: items is 0");
     expect(pay?.classList.contains("next")).toBe(false);
     expect(pay?.querySelector(".blocked-lock")).not.toBeNull();
     clickEdge(root, "cart-pay-payment");
@@ -278,7 +278,7 @@ describe("a blocked arrow", () => {
     sendEvent(root, "addItem");
     const pay = root.querySelector('[data-edge-id="cart-pay-payment"]');
     expect(pay?.classList.contains("blocked")).toBe(false);
-    expect(pay?.hasAttribute("aria-disabled")).toBe(false);
+    expect(pay?.hasAttribute("aria-description")).toBe(false);
     expect(pay?.querySelector(".blocked-lock")).toBeNull();
     expect(pay?.classList.contains("next")).toBe(true);
     sendEvent(root, "pay");
