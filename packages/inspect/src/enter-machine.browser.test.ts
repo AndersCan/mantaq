@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "vite-plus/test";
-import type { Browser } from "playwright";
+import type { Browser, Page } from "playwright";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { join } from "node:path";
@@ -16,7 +16,7 @@ beforeAll(async () => {
     configFile: false,
     logLevel: "silent",
     server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
-    plugins: [mantaqViz({ machines: ["clean.ts"], fuzz: false })],
+    plugins: [mantaqViz({ machines: ["grouped.ts"], fuzz: false })],
   });
   await server.listen();
   const address = server.httpServer?.address();
@@ -30,50 +30,59 @@ afterAll(async () => {
   await server.close();
 });
 
-interface ServedState {
-  id: string;
+/** The drawn nodes marked current, the path above the canvas and the `?focus=` of the address bar. */
+async function where(page: Page) {
+  const path = page.getByRole("navigation", { name: "Path" });
+  const crumbs =
+    (await path.count()) === 0 ? [] : await path.getByRole("listitem").allTextContents();
+  const current = await page.evaluate(() => {
+    const ids: string[] = [];
+    for (const node of document.querySelectorAll(".graph g.current[data-node-id]")) {
+      ids.push(node.getAttribute("data-node-id") ?? "");
+    }
+    return ids;
+  });
+  const focus = await page.evaluate(() => new URLSearchParams(location.search).getAll("focus"));
+  return { crumbs, current, focus };
 }
 
-/** The served document plus `outer`, whose `handlingRequest` embeds `clean`, and `other`, a copy of `clean`. */
-async function embedDocument(): Promise<unknown> {
-  const served = await fetch(`${origin}/__mantaq/viz.json`);
-  const viz = await served.json();
-  const [clean] = viz.machines;
-  const states = clean.states.map((state: ServedState) =>
-    state.id === "handlingRequest" ? { ...state, machine: "clean" } : state,
-  );
-  const outer = { ...clean, id: "outer", states };
-  return { ...viz, machines: [clean, outer, { ...clean, id: "other" }] };
-}
-
-/** Skipped: the live page no longer keeps embedded machines, and the state-groups work rewrites this test. */
-test.skip("enter opens the embedded machine, a link keeps it open, and Escape leaves", async () => {
+test("a group is entered, walked inside by its arrows until one leaves it, left by crumb and Escape, and reopened from a link", async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  const viz = await embedDocument();
-  await page.route("**/__mantaq/viz.json", (route) => route.fulfill({ json: viz }));
-  function focusInAddress(): Promise<string[]> {
-    return page.evaluate(() => new URLSearchParams(location.search).getAll("focus"));
-  }
-  await page.goto(`${origin}/__mantaq/`);
-  const picker = page.getByRole("navigation", { name: "Machines", exact: true });
-  await picker.getByRole("button", { name: "outer" }).waitFor();
-  const listed = await picker.getByRole("button").allTextContents();
-  await page.getByRole("button", { name: "enter machine clean" }).click();
-  const path = page.getByRole("navigation", { name: "Machines opened" });
-  await path.getByRole("button", { name: "clean" }).waitFor();
-  const entered = {
-    path: await path.getByRole("button").allTextContents(),
-    focus: await focusInAddress(),
-  };
-  await page.reload();
-  await path.getByRole("button", { name: "clean" }).focus();
+  await page.goto(`${origin}/__mantaq/?machine=grouped`);
+  await page.getByRole("button", { name: "enter group payment", exact: true }).click();
+  await page.getByRole("button", { name: "grouped", exact: true }).waitFor();
+  const entered = await where(page);
+  await page
+    .getByRole("button", { name: "inCart on checkout to chargingCard", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "chargingCard on charged to confirming", exact: true })
+    .click();
+  const inside = await where(page);
+  await page
+    .getByRole("button", { name: "confirming on confirmed to packing", exact: true })
+    .click();
+  await page.getByText("The walk is in packing, outside group payment.").waitFor();
+  const left = await where(page);
+  await page.getByRole("button", { name: "grouped", exact: true }).click();
+  await page.getByRole("button", { name: "enter group payment", exact: true }).waitFor();
+  const back = await where(page);
+  await page.getByRole("button", { name: "enter group payment", exact: true }).click();
+  await page.getByRole("button", { name: "grouped", exact: true }).waitFor();
   await page.keyboard.press("Escape");
-  await path.waitFor({ state: "detached" });
-  await page.getByRole("button", { name: "enter machine clean" }).waitFor();
-  expect({ listed, entered, left: await focusInAddress() }).toStrictEqual({
-    listed: ["outer", "other"],
-    entered: { path: ["outer", "clean"], focus: ["handlingRequest"] },
-    left: [],
+  await page.getByRole("button", { name: "enter group payment", exact: true }).waitFor();
+  const escaped = await where(page);
+  await page.goto(`${origin}/__mantaq/?machine=grouped&step=checkout&focus=%40payment`);
+  await page
+    .getByRole("button", { name: "chargingCard on charged to confirming", exact: true })
+    .waitFor();
+  expect({ entered, inside, left, back, escaped, linked: await where(page) }).toStrictEqual({
+    entered: { crumbs: ["grouped", "payment"], current: ["inCart"], focus: ["@payment"] },
+    inside: { crumbs: ["grouped", "payment"], current: ["confirming"], focus: ["@payment"] },
+    left: { crumbs: ["grouped", "payment"], current: ["packing"], focus: ["@payment"] },
+    back: { crumbs: [], current: ["@shipping"], focus: [] },
+    escaped: { crumbs: [], current: ["@shipping"], focus: [] },
+    linked: { crumbs: ["grouped", "payment"], current: ["chargingCard"], focus: ["@payment"] },
   });
   await page.close();
 }, 60_000);

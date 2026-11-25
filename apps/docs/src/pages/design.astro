@@ -23,7 +23,7 @@ const headings = [
   { depth: 2, slug: "send-form", text: "Send form and Context tab" },
   { depth: 2, slug: "ai-page-label", text: "AI-written page label" },
   { depth: 2, slug: "overlap-warning", text: "Overlap warning" },
-  { depth: 2, slug: "machine-node", text: "Machine node" },
+  { depth: 2, slug: "group-node", text: "Group node" },
   { depth: 2, slug: "focus-path", text: "Focus path" },
   { depth: 2, slug: "phone-width", text: "Phone width" },
 ];
@@ -197,75 +197,86 @@ const headings = [
     </div>
   </div>
 
-  <h2 id="machine-node">Machine node</h2>
+  <h2 id="group-node">Group node</h2>
   <p><strong>Awaiting approval</strong></p>
   <p>
-    New: a state that embeds another machine. It is one state with its arrows in and out, a
-    box-in-a-box glyph and the embedded machine's id under its name, and an enter control. Its
-    states are not drawn here. Here <code>paying</code> embeds the <code>payment</code> machine.
+    New: the states of one group drawn as one node, with its arrows in and out. Under the group name
+    it has a box-in-a-box glyph, a row and an enter control. The row says how many states the group
+    holds, or which of them the walk is in. Enter draws the states of the group. Here
+    <code>chargingCard</code> and <code>confirming</code> are the group <code>payment</code>, and
+    the walk is in <code>confirming</code>.
   </p>
   <div class="viz">
-    <svg class="graph" viewBox="0 0 702 122" width="702" height="122" role="group" aria-label="machine node sample">
+    <svg class="graph" viewBox="0 0 886 170" width="886" height="170" role="group" aria-label="group node sample">
     <defs>
     <marker id="viz-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
     <path d="M0,0 L10,5 L0,10 z" class="arrow-head">
     </path>
     </marker>
     </defs>
-    <g class="edge" data-edge-id="cart-pay-paying" data-from="cart" data-to="paying" aria-label="cart on pay to paying">
-    <path class="hit" d="M170.0,61.0 L185.0,61.0 L196.0,61.0 L270.0,61.0 L281.0,61.0 L296.0,61.0" aria-hidden="true">
+    <g class="edge" data-edge-id="inCart-checkout-chargingCard" data-from="inCart" data-to="@payment" aria-label="inCart on checkout to group payment">
+    <path class="hit" d="M170.0,85.0 L185.0,85.0 L196.0,85.0 L306.0,85.0 L318.0,85.0 L318.0,109.0 L330.0,109.0 L345.0,109.0" aria-hidden="true">
     </path>
-    <path d="M170.0,61.0 L185.0,61.0 L196.0,61.0 L270.0,61.0 L281.0,61.0 L296.0,61.0" marker-end="url(#viz-arrow)">
+    <path d="M170.0,85.0 L185.0,85.0 L196.0,85.0 L306.0,85.0 L318.0,85.0 L318.0,109.0 L330.0,109.0 L345.0,109.0" marker-end="url(#viz-arrow)">
     </path>
-    <text x="233" y="82" text-anchor="middle">
-    <tspan x="233" dy="0">pay</tspan>
+    <text x="251" y="106" text-anchor="middle">
+    <tspan x="251" dy="0">checkout</tspan>
     </text>
     </g>
-    <g class="edge" data-edge-id="paying-paid-done" data-from="paying" data-to="done" aria-label="paying on paid to done">
-    <path class="hit" d="M444.0,61.0 L459.0,61.0 L470.0,61.0 L548.0,61.0 L559.0,61.0 L574.0,61.0" aria-hidden="true">
+    <g class="edge" data-edge-id="chargingCard-charged-confirming" data-from="@payment" data-to="@payment" aria-label="group payment on charged to group payment">
+    <path class="hit" d="M449.0,80.0 L449.0,64.0 L473.0,64.0 L473.0,80.0" aria-hidden="true">
     </path>
-    <path d="M444.0,61.0 L459.0,61.0 L470.0,61.0 L548.0,61.0 L559.0,61.0 L574.0,61.0" marker-end="url(#viz-arrow)">
+    <path d="M449.0,80.0 L449.0,64.0 L473.0,64.0 L473.0,80.0" marker-end="url(#viz-arrow)">
     </path>
-    <text x="509" y="82" text-anchor="middle">
-    <tspan x="509" dy="0">paid</tspan>
+    <text x="461" y="52" text-anchor="middle">
+    <tspan x="461" dy="0">charged</tspan>
+    </text>
+    </g>
+    <g class="edge" data-edge-id="confirming-confirmed-done" data-from="@payment" data-to="done" aria-label="group payment on confirmed to done">
+    <path class="hit" d="M577.0,109.0 L592.0,109.0 L604.0,109.0 L604.0,85.0 L616.0,85.0 L732.0,85.0 L743.0,85.0 L758.0,85.0" aria-hidden="true">
+    </path>
+    <path d="M577.0,109.0 L592.0,109.0 L604.0,109.0 L604.0,85.0 L616.0,85.0 L732.0,85.0 L743.0,85.0 L758.0,85.0" marker-end="url(#viz-arrow)">
+    </path>
+    <text x="674" y="106" text-anchor="middle">
+    <tspan x="674" dy="0">confirmed</tspan>
     </text>
     </g>
     <g class="entry" aria-hidden="true">
-    <circle cx="62" cy="61" r="6">
+    <circle cx="62" cy="85" r="6">
     </circle>
-    <path d="M62,61 L90,61" marker-end="url(#viz-arrow)">
+    <path d="M62,85 L90,85" marker-end="url(#viz-arrow)">
     </path>
     </g>
-    <g class="state initial" data-node-id="cart" aria-label="state cart">
-    <rect x="90" y="43" width="80" height="36" rx="8" class="frame">
+    <g class="state initial" data-node-id="inCart" aria-label="state inCart">
+    <rect x="90" y="67" width="80" height="36" rx="8" class="frame">
     </rect>
-    <text x="130" y="65" text-anchor="middle">cart</text>
+    <text x="130" y="89" text-anchor="middle">inCart</text>
     </g>
-    <g class="machine-node" data-machine="payment">
-    <g class="state machine" data-node-id="paying" aria-label="state paying, embeds machine payment">
-    <rect x="296" y="32" width="148" height="58" rx="8" class="frame">
+    <g class="machine-node" data-group="payment">
+    <g class="state machine current" data-node-id="@payment" aria-label="group payment, 2 states: chargingCard, confirming" data-states="[&quot;chargingCard&quot;,&quot;confirming&quot;]" data-current-state="confirming">
+    <rect x="345" y="80" width="232" height="58" rx="8" class="frame">
     </rect>
-    <text x="370" y="53" text-anchor="middle">paying</text>
+    <text x="461" y="101" text-anchor="middle">payment</text>
     <g class="machine-glyph" aria-hidden="true">
-    <rect x="308" y="68" width="12" height="12" rx="2">
+    <rect x="357" y="116" width="12" height="12" rx="2">
     </rect>
-    <rect class="core" x="311" y="71" width="6" height="6">
+    <rect class="core" x="360" y="119" width="6" height="6">
     </rect>
     </g>
-    <text class="machine-name" x="354" y="78" text-anchor="middle">payment</text>
+    <text class="machine-name" data-count="2 states" x="445" y="126" text-anchor="middle">now in confirming</text>
     </g>
-    <g class="machine-enter" data-enter-machine="payment" aria-label="enter machine payment">
-    <rect x="388" y="66" width="44" height="16" rx="8">
+    <g class="machine-enter" data-enter-group="@payment" aria-label="enter group payment" tabindex="0" role="button">
+    <rect x="521" y="114" width="44" height="16" rx="8">
     </rect>
-    <text x="410" y="78" text-anchor="middle">enter</text>
+    <text x="543" y="126" text-anchor="middle">enter</text>
     </g>
     </g>
     <g class="state final" data-node-id="done" aria-label="state done (final)">
-    <rect x="574" y="39" width="80" height="44" rx="8" class="frame">
+    <rect x="758" y="63" width="80" height="44" rx="8" class="frame">
     </rect>
-    <rect x="578" y="43" width="72" height="36" rx="5" class="frame inner">
+    <rect x="762" y="67" width="72" height="36" rx="5" class="frame inner">
     </rect>
-    <text x="614" y="65" text-anchor="middle">done</text>
+    <text x="798" y="89" text-anchor="middle">done</text>
     </g>
     </svg>
   </div>
@@ -273,21 +284,20 @@ const headings = [
   <h2 id="focus-path">Focus path</h2>
   <p><strong>Awaiting approval</strong></p>
   <p>
-    New: the path of machines the reader opened, in the bar above the drawing. It starts at the
-    machine the viewer opened on. Each machine node entered, or each machine of a board opened,
-    adds one crumb. A click on a crumb goes back to that machine, and Escape goes back one. The
-    last crumb is the machine drawn now. It replaces the machine name that led back to the board.
-    Here the reader entered <code>payment</code> from <code>checkout</code>, then
-    <code>fraud</code>.
+    New: the path in the bar above the drawing. It starts at the machine the viewer opened on. A
+    machine of a board opened adds one crumb, and a group entered adds one more. A click on a crumb
+    goes back there, and Escape goes back one level. The last crumb is what the canvas draws now.
+    Here the reader opened <code>till</code> on the <code>shop</code> board, then entered the group
+    <code>payment</code>.
   </p>
   <div class="viz">
     <div class="viz-bar">
       <div class="viz-bar-start">
         <nav class="focus-path" aria-label="focus path sample">
           <ol>
-            <li><button type="button">checkout</button></li>
-            <li><button type="button">payment</button></li>
-            <li><span aria-current="location">fraud</span></li>
+            <li><button type="button">shop</button></li>
+            <li><button type="button">till</button></li>
+            <li><span aria-current="location">payment</span></li>
           </ol>
         </nav>
       </div>

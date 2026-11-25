@@ -16,7 +16,7 @@ export interface PickedChild {
 
 export interface ViewState {
   selection: Selection | undefined;
-  /** The machines opened from the root, in order: one of a board, or the one a state embeds (kept in `?focus=`). Replaced, never changed in place. */
+  /** The path from the root, in order: a machine of a board, then a group entered (kept in `?focus=`). Replaced, never changed in place. */
   focus: FocusStep[];
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
