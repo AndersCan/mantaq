@@ -1,8 +1,8 @@
+import { OUTLINE_ONLY, SHOWN_ATTRIBUTES } from "./shown.ts";
 import type { VizDocument, VizDriver, VizLiveState } from "@mantaq/viz";
 import { createDriver } from "../drive.ts";
 import type { FuzzTarget } from "../fuzz/run.ts";
 import { mountViewer } from "@mantaq/viz/viewer";
-import { SHOWN_ATTRIBUTES } from "./shown.ts";
 import { Window } from "happy-dom";
 
 /** One machine to sweep: its document, how to run it, and the walks to stand on. */
@@ -246,10 +246,11 @@ async function clickAt(sweepCase: SweepCase, at: ClickAtOptions): Promise<Click>
   const errors: string[] = [];
   window.addEventListener("error", (event) => errors.push(errorText(event)));
   const before = sight(mounted.root);
+  const name = element === undefined ? undefined : nameOf(element);
   element?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   const click: Click = {
     count: found.length,
-    element: element === undefined ? undefined : nameOf(element),
+    element: name,
     changed: sight(mounted.root) !== before,
     errors,
     focus: mounted.focus(),
@@ -279,13 +280,25 @@ function looksClickable(element: Element): boolean {
   return element.matches("a[href], button:not([disabled])");
 }
 
+interface ShownOptions {
+  attribute: string;
+}
+
+/** An attribute as the reader sees it: a state's selection outline without a panel shows nothing. */
+function shownValue(element: Element, options: ShownOptions): string | null {
+  const shown = element.getAttribute(options.attribute);
+  const outlineOnly = options.attribute === "class" && element.matches(OUTLINE_ONLY);
+  if (shown === null || !outlineOnly) return shown;
+  return shown.replace(/\bselected\b/u, "").trim();
+}
+
 /** What the reader sees of the viewer: the text and the attributes that change how it looks. */
 function sight(root: Element): string {
   const parts: string[] = [];
   for (const element of [root, ...root.querySelectorAll("*")]) {
     parts.push(`<${element.tagName}`);
     for (const name of SHOWN_ATTRIBUTES) {
-      const shown = element.getAttribute(name);
+      const shown = shownValue(element, { attribute: name });
       if (shown !== null) parts.push(` ${name}="${shown}"`);
     }
     for (const node of element.childNodes) {

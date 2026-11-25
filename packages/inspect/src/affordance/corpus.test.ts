@@ -6,7 +6,7 @@ import { failureLines, sweep } from "./sweep.ts";
 /** The whole corpus takes about 20 s; a case gets room for a loaded CI runner. */
 const CASE_TIMEOUT_MS = 120_000;
 
-/** What each case sweeps today, at least: a sweep that loses stands (focus, walks) or clicks fails. Raise a floor when the viewer offers more. */
+/** What each case sweeps today, at least: a sweep that loses stands (focus, walks) or clicks fails. Raise a floor when the viewer offers more; lower it when a fix makes a dead element plain. */
 const FLOORS: Record<string, { stands: number; clicks: number }> = {
   checkout: { stands: 18, clicks: 197 },
   auth: { stands: 28, clicks: 304 },

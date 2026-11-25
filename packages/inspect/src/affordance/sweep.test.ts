@@ -55,6 +55,15 @@ function throwingButton(root: HTMLElement): void {
   root.querySelector(".panel")?.append(button);
 }
 
+/** States that show as buttons in a diagram-only viewer, where a click only outlines them: no panel shows what was selected. */
+function everyStateAButton(root: HTMLElement): void {
+  if (!root.classList.contains("diagram-only")) return;
+  for (const node of root.querySelectorAll(".graph g.state")) {
+    node.setAttribute("role", "button");
+    node.setAttribute("tabindex", "0");
+  }
+}
+
 test("the viewer as it is has no dead element", async () => {
   expect(failureLines(await sweep(plain))).toEqual([]);
 });
@@ -95,5 +104,17 @@ test("a walk that does not replay is reported", async () => {
   expect(failureLines(report)).toEqual([
     "plain: walk [start, nope=[1], driver, with panel, focus []: the walk replays only 1 of 2 steps",
     "plain: walk [start, nope=[1], driver, diagram only, focus []: the walk replays only 1 of 2 steps",
+  ]);
+});
+
+test("a state that only gets outlined, with no panel to open, is reported", async () => {
+  const report = await sweep(plain, { afterMount: everyStateAButton });
+  expect(failureLines(report)).toEqual([
+    'plain: walk [], no driver, diagram only, focus []: g.state[data-node-id="busy"] changes nothing',
+    'plain: walk [], no driver, diagram only, focus []: g.state.initial[data-node-id="idle"] changes nothing',
+    'plain: walk [], driver, diagram only, focus []: g.state[data-node-id="busy"] changes nothing',
+    'plain: walk [], driver, diagram only, focus []: g.state.initial.current[data-node-id="idle"] changes nothing',
+    'plain: walk [start], driver, diagram only, focus []: g.state.current[data-node-id="busy"] changes nothing',
+    'plain: walk [start], driver, diagram only, focus []: g.state.initial[data-node-id="idle"] changes nothing',
   ]);
 });

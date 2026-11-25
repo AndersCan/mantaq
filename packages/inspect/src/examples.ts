@@ -60,31 +60,37 @@ const FIXTURES = join(import.meta.dirname, "fixtures");
 /** An example machine: fuzz target plus the file that registers its handlers. */
 export interface Example extends FuzzTarget {
   source: string;
+  machine: Machine<string, object, AnyActor<unknown>>;
 }
 
+interface TargetOptions {
+  payloads: Record<string, VizJson[]>;
+}
+
+/** An example machine, from `fixtures/<id>.ts`, run on a clock of its own. */
 function target(
-  id: string,
   machine: Machine<string, object, AnyActor<unknown>>,
-  payloads: Record<string, VizJson[]>,
+  options: TargetOptions,
 ): Example {
   return {
-    id,
-    source: join(FIXTURES, `${id}.ts`),
+    id: machine.id,
+    source: join(FIXTURES, `${machine.id}.ts`),
+    machine,
     create: () => {
       const clock = VirtualClock();
       return { actor: machine.create({ clock }), clock };
     },
-    payloads,
+    payloads: options.payloads,
   };
 }
 
 export function exampleTargets(): Example[] {
   return [
-    target("checkout", checkout, checkoutPayloads),
-    target("auth", auth, authPayloads),
-    target("saga", saga, sagaPayloads),
-    target("credit", credit, creditPayloads),
-    target("retry", retry, retryPayloads),
+    target(checkout, { payloads: checkoutPayloads }),
+    target(auth, { payloads: authPayloads }),
+    target(saga, { payloads: sagaPayloads }),
+    target(credit, { payloads: creditPayloads }),
+    target(retry, { payloads: retryPayloads }),
   ];
 }
 

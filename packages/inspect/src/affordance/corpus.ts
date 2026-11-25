@@ -1,8 +1,5 @@
 import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "../examples.ts";
 import type { VizActorRef, VizDocument, VizJson, VizStep } from "@mantaq/viz";
-import { auth } from "../fixtures/auth.ts";
-import { checkout } from "../fixtures/checkout.ts";
-import { credit } from "../fixtures/credit.ts";
 import type { FuzzTarget } from "../fuzz/run.ts";
 import { grouped } from "../fixtures/grouped.ts";
 import { inspect } from "../inspect.ts";
@@ -12,8 +9,6 @@ import { lockedDoor } from "../fixtures/locked-door.ts";
 import type { Machine } from "@mantaq/core";
 import { parts } from "../fixtures/parts.ts";
 import { photoQueue } from "../fixtures/photo-queue.ts";
-import { retry } from "../fixtures/retry.ts";
-import { saga } from "../fixtures/saga.ts";
 import { sharedGo } from "../fixtures/shared-go.ts";
 import type { SweepCase } from "./sweep.ts";
 import { teamInbox } from "../fixtures/pool.ts";
@@ -78,15 +73,12 @@ function actorText(actor: VizActorRef): string {
 
 /** The example machines, walked along their hand-written tests. */
 export function exampleCases(): SweepCase[] {
-  const machines: Record<string, Machine> = { checkout, auth, saga, credit, retry };
   const baselines = handWrittenBaselines();
   const cases: SweepCase[] = [];
   for (const target of exampleTargets()) {
-    const machine = machines[target.id];
-    if (machine === undefined) continue;
     const walks: string[][] = [];
     for (const walk of baselines[target.id] ?? []) walks.push(walk.map((step) => stepText(step)));
-    cases.push(caseOf(machine, { source: target.source, walks, payloads: target.payloads }));
+    cases.push(caseOf(target.machine, { source: target.source, walks, payloads: target.payloads }));
   }
   return cases;
 }

@@ -3,15 +3,18 @@
  * (a `pointer` cursor or role=button), each in a fresh tab, and reports the clicks
  * that changed nothing on the page (no text, mark, panel or URL moved) or threw.
  */
+import { OUTLINE_ONLY, SHOWN_ATTRIBUTES } from "../../packages/inspect/src/affordance/shown.ts";
 import { relative, sep } from "node:path";
 import { readdirSync } from "node:fs";
-import { SHOWN_ATTRIBUTES } from "../../packages/inspect/src/affordance/shown.ts";
 
 /** How long a click may take to show, for an effect or a redraw on the next frame. */
 const SETTLE_MS = 100;
 
 /** A viewer the page mounted; the design page's static samples of its parts have no canvas. */
 const VIEWER = ".viz:has(.canvas)";
+
+/** What `inPage` needs to read the page as the reader sees it. */
+const SIGHT = { action: "sight", shown: SHOWN_ATTRIBUTES, outlineOnly: OUTLINE_ONLY };
 
 /** Tabs open at the same time. */
 const TABS = 6;
@@ -66,12 +69,19 @@ function inPage(options) {
     const selector = classes === "" ? tag : `${tag}.${classes}`;
     return `viewer ${viewer}: ${selector} "${id}"`;
   }
+  function shownValue(attribute) {
+    const { element, name } = attribute;
+    const shownNow = element.getAttribute(name);
+    const outlineOnly = name === "class" && element.matches(options.outlineOnly);
+    if (shownNow === null || !outlineOnly) return shownNow;
+    return shownNow.replace(/\bselected\b/u, "").trim();
+  }
   function sight() {
     const parts = [location.href];
     for (const element of document.body.querySelectorAll("*")) {
       parts.push(`<${element.tagName}`);
       for (const name of shown) {
-        const attribute = element.getAttribute(name);
+        const attribute = shownValue({ element, name });
         if (attribute !== null) parts.push(` ${name}="${attribute}"`);
       }
       for (const node of element.childNodes) {
@@ -88,8 +98,9 @@ function inPage(options) {
     case "click": {
       const element = targets()[options.index];
       if (element === undefined) return { name: undefined };
+      const name = nameOf(element);
       element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      return { name: nameOf(element) };
+      return { name };
     }
     default:
       return {};
@@ -129,17 +140,23 @@ async function countOn(options) {
 async function clickOn(options) {
   const { tab, errors } = await openPage(options);
   const loaded = errors.length;
-  const before = await tab.evaluate(inPage, { action: "sight", shown: SHOWN_ATTRIBUTES });
+  const before = await tab.evaluate(inPage, SIGHT);
   const clicked = { action: "click", index: options.index, viewer: VIEWER };
   const { name } = await tab.evaluate(inPage, clicked);
   await tab.waitForTimeout(SETTLE_MS);
-  const after = await tab.evaluate(inPage, { action: "sight", shown: SHOWN_ATTRIBUTES });
+  const after = await tab.evaluate(inPage, SIGHT);
   await tab.close();
   const where = `/${options.page} ${name}`;
+  if (name === undefined) {
+    return {
+      clicked: false,
+      problems: [`/${options.page} element ${options.index} is gone on a fresh load`],
+    };
+  }
   const problems = [];
   for (const error of errors.slice(loaded)) problems.push(`${where} throws: ${error}`);
   if (before.sight === after.sight) problems.push(`${where} changes nothing`);
-  return { clicked: name !== undefined, problems };
+  return { clicked: true, problems };
 }
 
 /** Runs `tasks` (functions that return a promise), `TABS` at a time. */
@@ -175,13 +192,13 @@ async function sweepViewers(options) {
   }
   for (const click of await inBatches(clicks)) {
     if (click.clicked) report.clicks += 1;
-    if (click.clicked) problems.push(...click.problems);
+    problems.push(...click.problems);
   }
   problems.sort((left, right) => left.localeCompare(right));
   return report;
 }
 
-/** Two dead elements in the first viewer of a page, one per way to look clickable: the sweep must report both. */
+/** Dead elements in the first viewer of a page, one per way to look clickable, and one whose click throws: the sweep must report each. */
 async function plantDeadElements(tab) {
   await tab.evaluate(() => {
     const canvas = document.querySelector(".viz .canvas");
@@ -191,7 +208,11 @@ async function plantDeadElements(tab) {
     const pointer = document.createElement("span");
     pointer.style.cursor = "pointer";
     pointer.textContent = "planted pointer";
-    canvas?.prepend(button, pointer);
+    const throwing = document.createElement("span");
+    throwing.setAttribute("role", "button");
+    throwing.textContent = "planted throw";
+    throwing.addEventListener("click", () => reportError(new Error("planted")));
+    canvas?.prepend(button, pointer, throwing);
   });
 }
 
@@ -202,9 +223,10 @@ const PLANTED_PAGE = "getting-started/events/";
 const FIX = "make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks)";
 
 /**
- * Sweeps every page built into `options.dist`, then plants two dead elements on one
+ * Sweeps every page built into `options.dist`, then plants dead elements on one
  * page and sweeps it again: a sweep that misses one is too weak to trust. Returns one
- * failure line per problem, and a summary of what was clicked.
+ * failure line per problem, and a summary of what was clicked. Each page of
+ * `options.mustSweep` must have a viewer the sweep clicked.
  */
 export async function clickFailures(options) {
   const site = { browser: options.browser, origin: options.origin, base: options.base };
@@ -212,12 +234,19 @@ export async function clickFailures(options) {
   const failures = [];
   for (const problem of swept.problems) failures.push(`docs-live-check: ${problem}: ${FIX}`);
   const planted = await sweepViewers({ ...site, pages: [PLANTED_PAGE], plant: plantDeadElements });
-  for (const name of ["planted button", "planted pointer"]) {
-    const caught = planted.problems.some((problem) =>
-      problem.endsWith(`"${name}" changes nothing`),
-    );
-    if (!caught) {
+  const caught = [
+    { name: "planted button", says: '"planted button" changes nothing' },
+    { name: "planted pointer", says: '"planted pointer" changes nothing' },
+    { name: "planted throw", says: '"planted throw" throws: planted' },
+  ];
+  for (const { name, says } of caught) {
+    if (!planted.problems.some((problem) => problem.includes(says))) {
       failures.push(`docs-live-check: the click sweep missed a ${name} on ${PLANTED_PAGE}`);
+    }
+  }
+  for (const page of options.mustSweep) {
+    if (!swept.pages.includes(`/${page}`)) {
+      failures.push(`docs-live-check: the click sweep found no viewer on /${page}`);
     }
   }
   const pages = swept.pages.join(", ");

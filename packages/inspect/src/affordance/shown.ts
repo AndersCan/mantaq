@@ -13,3 +13,6 @@ export const SHOWN_ATTRIBUTES = [
   "aria-current",
   "data-current",
 ];
+
+/** States whose `selected` outline is no visible answer to a click: a diagram-only viewer has no panel to show what was selected. An arrow keeps it, as the sign that a stay arrow was sent. */
+export const OUTLINE_ONLY = ".diagram-only .state";

@@ -121,7 +121,7 @@ try {
 }
 await pool.close();
 
-const clicks = await clickFailures({ browser, origin, base, dist });
+const clicks = await clickFailures({ browser, origin, base, dist, mustSweep: pages });
 failures.push(...clicks.failures);
 
 await browser.close();
