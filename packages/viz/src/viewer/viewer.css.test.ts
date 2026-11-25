@@ -195,3 +195,7 @@ test("the crumb shown now is plain text: no frame, no pointer and no focus ring"
     ring: expect.stringMatching(/outline:\s*none/),
   });
 });
+
+test("a line that appears above the canvas does not scroll the page", () => {
+  expect(listed(".viz")).toMatch(/overflow-anchor:\s*none/);
+});
