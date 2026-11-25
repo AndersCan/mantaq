@@ -1,14 +1,14 @@
-import { foldGroups, groupNodeAt } from "../groups/fold-groups.ts";
+import { enteredGroupOf, groupMachine } from "../groups/group-machine.ts";
 import { partMachine, partName, partsOf } from "../parts.ts";
 import type { EnteredGroup } from "../graph.ts";
-import { groupMachine } from "../groups/group-machine.ts";
+import { foldGroups } from "../groups/fold-groups.ts";
 import { isNever } from "../../is-never.ts";
 import type { VizMachine } from "../../schema.ts";
 
 /** One step in from the root: open one machine of a board, or enter a group of the machine drawn. */
 export type FocusStep =
   | { kind: "part"; part: string; name: string }
-  | { kind: "enter"; group: string; name: string };
+  | { kind: "enter"; node: string; name: string };
 
 /** A crumb of the path: its label and how many steps a click on it keeps. */
 interface Crumb {
@@ -28,15 +28,15 @@ export interface Focus {
   drawn: VizMachine;
   /** The board machine shown alone (`""` for the machine's own); undefined when none is. */
   part: string | undefined;
-  /** The group node entered; undefined when none is. */
-  group: string | undefined;
+  /** The id of the group node entered (`@payment`); undefined when none is. */
+  groupNode: string | undefined;
   crumbs: Crumb[];
 }
 
 interface Level {
   machine: VizMachine;
   part: string | undefined;
-  group: string | undefined;
+  groupNode: string | undefined;
 }
 
 /** The machine or the one board machine a level draws, before groups fold. */
@@ -48,7 +48,8 @@ function cutOf(level: Level): VizMachine {
 /** What the canvas draws for a level: the group entered, or the cut with each group folded into one node. */
 function drawnOf(level: Level): VizMachine {
   const cut = cutOf(level);
-  const entered = level.group === undefined ? undefined : groupMachine(cut, { group: level.group });
+  const { groupNode } = level;
+  const entered = groupNode === undefined ? undefined : groupMachine(cut, { group: groupNode });
   return entered ?? foldGroups(cut);
 }
 
@@ -63,7 +64,7 @@ export interface FocusOptions {
 /** Walks `steps` from the root; the first step that does not resolve ends the path. */
 export function focusOf(steps: ReadonlyArray<FocusStep>, options: FocusOptions): Focus {
   const { root } = options;
-  let level: Level = { machine: root, part: undefined, group: undefined };
+  let level: Level = { machine: root, part: undefined, groupNode: undefined };
   const kept: FocusStep[] = [];
   const crumbs: Crumb[] = [{ label: root.id, keep: 0 }];
   for (const step of steps) {
@@ -79,7 +80,7 @@ export function focusOf(steps: ReadonlyArray<FocusStep>, options: FocusOptions):
     machine: level.machine,
     drawn: drawnOf(level),
     part: level.part,
-    group: level.group,
+    groupNode: level.groupNode,
     crumbs,
   };
 }
@@ -98,11 +99,12 @@ function stepInto(level: Level, step: FocusStep): Stepped | undefined {
       return { level: { ...level, part: step.part }, step: part };
     }
     case "enter": {
-      if (isBoard(level) || level.group !== undefined) return undefined;
-      const node = groupNodeAt(foldGroups(cutOf(level)), { node: step.group });
+      if (isBoard(level) || level.groupNode !== undefined) return undefined;
+      const view = groupMachine(cutOf(level), { group: step.node });
+      const node = view === undefined ? undefined : enteredGroupOf(view);
       if (node === undefined) return undefined;
-      const entered = { kind: "enter", group: node.id, name: node.name } as const;
-      return { level: { ...level, group: node.id }, step: entered };
+      const entered = { kind: "enter", node: node.id, name: node.name } as const;
+      return { level: { ...level, groupNode: node.id }, step: entered };
     }
     default:
       return isNever(step);
@@ -122,7 +124,7 @@ export function decodeFocus(tokens: ReadonlyArray<string>, options: FocusOptions
 }
 
 function stepOf(token: string, focus: Focus): FocusStep | undefined {
-  if (focus.canvas === "graph") return { kind: "enter", group: token, name: token };
+  if (focus.canvas === "graph") return { kind: "enter", node: token, name: token };
   const { machine } = focus;
   if (machine.actors.includes(token)) return { kind: "part", part: token, name: token };
   return token === machine.id ? { kind: "part", part: "", name: token } : undefined;
@@ -131,7 +133,7 @@ function stepOf(token: string, focus: Focus): FocusStep | undefined {
 /** The address-bar value of each step (`?focus=`): a machine's name on a board, else the group node entered. */
 export function focusTokens(steps: ReadonlyArray<FocusStep>): string[] {
   const tokens: string[] = [];
-  for (const step of steps) tokens.push(step.kind === "part" ? step.name : step.group);
+  for (const step of steps) tokens.push(step.kind === "part" ? step.name : step.node);
   return tokens;
 }
 
@@ -164,5 +166,5 @@ export function enteredBy(move: FocusMove): EnteredGroup | undefined {
   const { before, after } = move;
   const step = after.steps.at(-1);
   if (after.steps.length <= before.steps.length || step?.kind !== "enter") return undefined;
-  return { group: step.group, name: step.name };
+  return { node: step.node, name: step.name };
 }

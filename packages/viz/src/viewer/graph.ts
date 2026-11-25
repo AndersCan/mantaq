@@ -46,7 +46,7 @@ export interface GraphCallbacks {
 
 /** A group entered from its node: the node's id (`@payment`) and the group's name. */
 export interface EnteredGroup {
-  group: string;
+  node: string;
   name: string;
 }
 
@@ -204,7 +204,9 @@ function stubTitle(state: string, options: NodeOptions): SVGTitleElement[] {
   if (group === undefined || group.states.includes(state)) return [];
   const outside = `${localName(state)} is outside group ${group.name}.`;
   const shown =
-    options.callbacks.leave === undefined ? outside : `${outside} Click to go back to it.`;
+    options.callbacks.leave === undefined
+      ? outside
+      : `${outside} Click to go back and show it there.`;
   return [svg(options.doc, "title", {}, [shown])];
 }
 
@@ -285,13 +287,13 @@ interface EnterOptions {
 /** The group node's enter control: it sits beside the node's own button so the two never nest. */
 function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
   const { doc, enter, box } = options;
-  const entered = { group: placed.state.id, name: placed.holds.group };
+  const entered = { node: placed.state.id, name: placed.holds.group };
   const group = svg(
     doc,
     "g",
     {
       class: "machine-enter",
-      "data-enter-group": entered.group,
+      "data-enter-group": entered.node,
       "aria-label": `enter group ${entered.name}`,
     },
     [
@@ -350,14 +352,19 @@ export interface GroupStateOptions {
   walk: WalkInside;
 }
 
-/** Writes on a group node's row which of its states the walk is in, or its size when it is in none. */
+/** Writes on a group node's row, and in its accessible description, which of its states the walk is in; its size when it is in none. */
 export function markGroupState(node: Element, options: GroupStateOptions): void {
   const row = node.querySelector(":scope > .machine-name");
   if (row === null) return;
   const { state, walk } = options;
-  row.textContent =
-    state === undefined ? row.getAttribute("data-count") : currentRowText(state, { walk });
-  node.classList.toggle("ended", state !== undefined && walk === "ended");
+  if (state === undefined) {
+    row.textContent = row.getAttribute("data-count");
+    node.removeAttribute("aria-description");
+    return;
+  }
+  const text = currentRowText(state, { walk });
+  row.textContent = text;
+  node.setAttribute("aria-description", text);
 }
 
 function nodeGroup(node: PlacedNode, options: NodeOptions): SVGGElement {

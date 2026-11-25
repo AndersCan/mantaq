@@ -8,7 +8,7 @@ import { localName } from "./compartments.ts";
 import { isSharedNode, shareArrows } from "./shared.ts";
 import type { Shared } from "./shared.ts";
 import type { Overlap } from "./overlaps.ts";
-import { groupNodeAt } from "./groups/fold-groups.ts";
+import { groupNodeAt, realMachineOf } from "./groups/fold-groups.ts";
 import { realMembersOf } from "./groups/acting-member.ts";
 import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
@@ -34,6 +34,8 @@ export interface PlacedState {
 export interface Holds {
   group: string;
   states: string[];
+  /** The states of `states` that are final: the walk can end there. */
+  finals: string[];
 }
 
 /** A group drawn as one node: a row under its name for a glyph, its size or the state the walk is in, and its enter control. Its states are never drawn here. */
@@ -258,7 +260,12 @@ function hasRow(machine: VizMachine, state: VizState): boolean {
 /** What a group node of the drawn machine holds; undefined for a plain state. */
 function holdsOf(machine: VizMachine, state: VizState): Holds | undefined {
   const node = groupNodeAt(machine, { node: state.id });
-  return node === undefined ? undefined : { group: node.name, states: node.states };
+  if (node === undefined) return undefined;
+  const finals: string[] = [];
+  for (const real of realMachineOf(machine).states) {
+    if (real.final && node.states.includes(real.id)) finals.push(real.id);
+  }
+  return { group: node.name, states: node.states, finals };
 }
 
 /** The text of a group node's row while the walk is elsewhere: the group's size. */
@@ -284,7 +291,8 @@ export function currentRowText(state: string, options: CurrentRowOptions): strin
 function rowTextWidth(holds: Holds): number {
   let widest = textWidth(rowText(holds), CHIP_FONT);
   for (const state of holds.states) {
-    const text = currentRowText(state, { walk: "ended" });
+    const walk = holds.finals.includes(state) ? "ended" : "going";
+    const text = currentRowText(state, { walk });
     widest = Math.max(widest, textWidth(text, CHIP_FONT));
   }
   return widest;

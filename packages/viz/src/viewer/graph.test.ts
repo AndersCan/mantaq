@@ -500,7 +500,7 @@ describe("renderGraph group node", () => {
     const enter = graph.querySelector(".machine-enter");
     enter?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     enter?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    const payment = { group: "@payment", name: "payment" };
+    const payment = { node: "@payment", name: "payment" };
     expect({ entered, selected }).toEqual({ entered: [payment, payment], selected: [] });
   });
 
@@ -553,7 +553,7 @@ describe("mountViewer onEnterGroup", () => {
     mountViewer(root, viz, { onEnterGroup: (group) => entered.push(group) });
     root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     root.remove();
-    expect(entered).toEqual([{ group: "@payment", name: "payment" }]);
+    expect(entered).toEqual([{ node: "@payment", name: "payment" }]);
   });
 });
 

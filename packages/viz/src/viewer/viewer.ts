@@ -13,6 +13,7 @@ import { explorePanel } from "./explore.ts";
 import type { FocusMove } from "./mount/focus.ts";
 import { html } from "./dom.ts";
 import { markDiagram } from "./mount/diagram-marks.ts";
+import { realMachineOf } from "./groups/fold-groups.ts";
 import { renderPanel } from "./panel.ts";
 import { sendFor } from "./mount/send-details.ts";
 import type { ViewerOptions } from "./mount/viewer-options.ts";
@@ -159,7 +160,9 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     return drawCallbacks({ machine, view, driver }, handlers);
   }
   function moved(move: FocusMove): void {
-    if (move.before.drawn !== move.after.drawn) view.selection = undefined;
+    if (!drawsSelection(move.after.drawn, { selection: view.selection })) {
+      view.selection = undefined;
+    }
     navigated(options, { machine, view });
     const entered = enteredBy(move);
     if (entered !== undefined) options.onEnterGroup?.(entered);
@@ -170,4 +173,20 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   canvas.framed();
   canvas.refit();
   follow();
+}
+
+interface DrawsSelectionOptions {
+  selection: Selection | undefined;
+}
+
+/** True when `drawn` or the real machine it draws has the selected state or edge, so its Details still read true there. */
+function drawsSelection(drawn: VizMachine, options: DrawsSelectionOptions): boolean {
+  const { selection } = options;
+  if (selection === undefined) return true;
+  const ids = new Set<string>();
+  for (const machine of [drawn, realMachineOf(drawn)]) {
+    const selectable = selection.kind === "state" ? machine.states : machine.edges;
+    for (const selected of selectable) ids.add(selected.id);
+  }
+  return ids.has(selection.id);
 }

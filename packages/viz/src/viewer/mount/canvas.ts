@@ -65,7 +65,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (focus.steps.length === 0) return [];
     const path = breadcrumbOf(doc, { focus, moveTo: (keep) => moveTo(focus.steps.slice(0, keep)) });
     path.addEventListener("keydown", leaveOnEscape);
-    if (focus.group === undefined) return [path];
+    if (focus.groupNode === undefined) return [path];
     return [path, html(doc, "p", { class: "walk-outside muted", role: "status" })];
   }
   function walked(): void {
@@ -111,7 +111,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     const selector =
       left.kind === "part"
         ? `.graph g.part[data-part="${CSS.escape(left.part)}"]`
-        : `.graph g.machine-enter[data-enter-group="${CSS.escape(left.group)}"]`;
+        : `.graph g.machine-enter[data-enter-group="${CSS.escape(left.node)}"]`;
     root.querySelector<SVGGElement>(selector)?.focus({ preventScroll: true });
   }
   function leaveOnEscape(event: KeyboardEvent): void {
@@ -125,8 +125,8 @@ export function canvasOf(options: CanvasOptions): Canvas {
     moveTo([...options.focus().steps, { kind: "part", part, name: partName(machine, part) }]);
   }
   function enter(entered: EnteredGroup): void {
-    const { group, name } = entered;
-    moveTo([...options.focus().steps, { kind: "enter", group, name }]);
+    const { node, name } = entered;
+    moveTo([...options.focus().steps, { kind: "enter", node, name }]);
   }
   function leave(state: string): void {
     moveTo(options.focus().steps.slice(0, -1), { onto: state });
@@ -219,7 +219,9 @@ function outsideText(from: KeepCurrentOptions): string | undefined {
   const names: string[] = [];
   for (const state of currents) names.push(localName(state));
   const listed = names.join(", ");
-  return `The walk is in ${listed}, outside group ${group.name}.`;
+  const drawn = currents.some((state) => from.focus.drawn.states.some((each) => each.id === state));
+  const hint = drawn ? "" : " Go back to walk on.";
+  return `The walk is in ${listed}, outside group ${group.name}.${hint}`;
 }
 
 export interface ListenWidthOptions {

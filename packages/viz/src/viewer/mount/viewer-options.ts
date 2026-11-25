@@ -32,6 +32,6 @@ export interface ViewerOptions {
   screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
-  /** Called when the reader enters a group, before the viewer draws it: the group node's id and the group's name. The viewer shows the group itself. */
+  /** Called when the reader enters a group, before the viewer draws it: the group node's id (`node`) and the group's name. The viewer shows the group itself. */
   onEnterGroup?: (entered: EnteredGroup) => void;
 }

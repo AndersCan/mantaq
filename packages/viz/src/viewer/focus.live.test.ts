@@ -139,10 +139,10 @@ describe("entering a group", () => {
         sends: ["inCart-checkout-chargingCard"],
         outside: "The walk is in inCart, outside group payment.",
       },
-      entered: [{ group: "@payment", name: "payment" }],
+      entered: [{ node: "@payment", name: "payment" }],
       stub: {
         aria: "state packing, outside group payment",
-        title: "packing is outside group payment. Click to go back to it.",
+        title: "packing is outside group payment. Click to go back and show it there.",
         button: "button",
       },
       focused: true,
@@ -215,10 +215,8 @@ describe("entering a group", () => {
 describe("a folded group node", () => {
   function row(root: HTMLElement, options: Named) {
     const group = node(root, options);
-    return {
-      text: group?.querySelector(".machine-name")?.textContent,
-      ended: group?.classList.contains("ended"),
-    };
+    const text = group?.querySelector(".machine-name")?.textContent;
+    return { text, description: group?.getAttribute("aria-description") ?? undefined };
   }
 
   test("names the state of the group the walk is in, and says so when it ended there", () => {
@@ -235,10 +233,10 @@ describe("a folded group node", () => {
       payment: row(root, { id: "@payment" }),
       shipping: row(root, { id: "@shipping" }),
     }).toStrictEqual({
-      before: { text: "2 states", ended: false },
-      inside: { text: "now in chargingCard", ended: false },
-      payment: { text: "2 states", ended: false },
-      shipping: { text: "ended in sent", ended: true },
+      before: { text: "2 states", description: undefined },
+      inside: { text: "now in chargingCard", description: "now in chargingCard" },
+      payment: { text: "2 states", description: undefined },
+      shipping: { text: "ended in sent", description: "ended in sent" },
     });
   });
 });
@@ -260,6 +258,13 @@ describe("the path in the address bar", () => {
       sends: ["chargingCard-charged-confirming"],
       outside: "",
     });
+  });
+
+  test("a link into a group the walk is not near says how to walk on", () => {
+    const { root } = mount({ focus: ["@shipping"] });
+    expect(shown(root).outside).toBe(
+      "The walk is in inCart, outside group shipping. Go back to walk on.",
+    );
   });
 
   test("a link whose path does not resolve opens as far as it does", () => {

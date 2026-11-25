@@ -38,7 +38,7 @@ describe("the path in the address bar on a board", () => {
         tokens: focusTokens(entered.steps),
         states,
         crumbs: entered.crumbs,
-        group: entered.group,
+        group: entered.groupNode,
       },
     }).toStrictEqual({
       own: { tokens: ["app"], drawn: "app", canvas: "graph" },

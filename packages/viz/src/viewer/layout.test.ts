@@ -731,7 +731,7 @@ describe("placeMachine group node", () => {
     });
   });
 
-  test("under its name: the glyph, a row wide enough for any state the walk ends in, and enter, each LABEL_PAD apart", () => {
+  test("under its name: the glyph, a row wide enough for any state the walk is in, and enter, each LABEL_PAD apart", () => {
     const node = placeMachine(folded).nodes.find((each) => each.id === "@payment");
     const shown =
       node?.kind === "machine"
@@ -746,9 +746,9 @@ describe("placeMachine group node", () => {
           }
         : undefined;
     expect(shown).toEqual({
-      holds: { group: "payment", states: ["chargingCard", "confirming"] },
+      holds: { group: "payment", states: ["chargingCard", "confirming"], finals: [] },
       height: 2 * LABEL_PAD + 18 + LABEL_PAD + 16,
-      rowWidth: textWidth("ended in chargingCard", 11),
+      rowWidth: textWidth("now in chargingCard", 11),
       nameToRow: LABEL_PAD,
       glyphToName: LABEL_PAD,
       nameToEnter: LABEL_PAD,
