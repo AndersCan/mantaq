@@ -150,9 +150,21 @@ function sends(machine: VizMachine, options: SendsOptions): boolean {
   return decision.kind === "send" && decision.blocked === undefined;
 }
 
-function isButton(element: Element): boolean {
-  return element.getAttribute("role") === "button" && element.getAttribute("tabindex") === "0";
+/** How an element looks to a reader: its role and its place in the tab order, each undefined when unset. */
+interface Look {
+  role: string | undefined;
+  tabindex: string | undefined;
 }
+
+function lookOf(element: Element): Look {
+  return {
+    role: element.getAttribute("role") ?? undefined,
+    tabindex: element.getAttribute("tabindex") ?? undefined,
+  };
+}
+
+const BUTTON: Look = { role: "button", tabindex: "0" };
+const PLAIN: Look = { role: undefined, tabindex: undefined };
 
 function press(element: Element): void {
   element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -177,7 +189,7 @@ interface ObserveOptions {
 /** What a reader meets on one element: whether it looks like a button, and whether a click on it acted. */
 interface Met {
   id: string;
-  looked: boolean;
+  looked: Look;
   acted: boolean;
 }
 
@@ -186,7 +198,7 @@ function arrowsMet(options: ObserveOptions): Met[] {
   const met: Met[] = [];
   for (const arrow of options.root.querySelectorAll(".graph g.edge[data-edge-id]")) {
     const before = options.sent();
-    const looked = isButton(arrow);
+    const looked = lookOf(arrow);
     press(arrow);
     met.push({
       id: arrow.getAttribute("data-edge-id") ?? "",
@@ -202,7 +214,7 @@ function statesMet(options: ObserveOptions): Met[] {
   const met: Met[] = [];
   for (const state of options.root.querySelectorAll(".graph g.state")) {
     const id = state.getAttribute("data-node-id") ?? "";
-    const looked = isButton(state);
+    const looked = lookOf(state);
     press(state);
     const selected = options.root.querySelector(".details[data-selected-state]");
     met.push({ id, looked, acted: selected?.getAttribute("data-selected-state") === id });
@@ -216,7 +228,11 @@ interface ExpectedOptions {
 }
 
 function expectedOf(met: ReadonlyArray<Met>, options: ExpectedOptions): Met[] {
-  return met.map(({ id }) => ({ id, looked: options.acts(id), acted: options.acts(id) }));
+  return met.map(({ id }) => ({
+    id,
+    looked: options.acts(id) ? BUTTON : PLAIN,
+    acted: options.acts(id),
+  }));
 }
 
 describe("a state or an arrow is a button exactly when a click on it acts", () => {
