@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, expect, test } from "vite-plus/test";
 import type { Browser, Page } from "playwright";
+import { mkdtempSync, rmSync } from "node:fs";
 import { browserTestEnv } from "../viewport/env.ts";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { ViteDevServer } from "vite";
 
 declare global {
@@ -18,11 +20,15 @@ declare global {
 let server: ViteDevServer;
 let browser: Browser;
 let origin = "";
+let cacheDir = "";
 
 beforeAll(async () => {
+  // Its own dependency cache: another Vite in the same run that bundles dagre would make this one's copy outdated (a 504).
+  cacheDir = mkdtempSync(join(tmpdir(), "viz-navigate-"));
   server = await createServer({
     root: join(import.meta.dirname, ".."),
     configFile: false,
+    cacheDir,
     optimizeDeps: { include: ["@dagrejs/dagre"] },
     logLevel: "silent",
     server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
@@ -35,6 +41,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser.close();
   await server.close();
+  rmSync(cacheDir, { recursive: true, force: true });
 });
 
 /** A shop order that runs through ten states, one event each, so its drawing runs wide. */
