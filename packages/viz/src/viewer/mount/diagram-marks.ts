@@ -42,7 +42,7 @@ export function markDiagram(root: HTMLElement, context: MarkDiagramContext): voi
     const state = drawnNodeOf(context.shown, { state: view.live.state });
     drawQueue(graph, { state, queue: queueOf(machine, view.live.context) });
   }
-  markSelection(root, { selection: drawnSelection(view.selection, { shown: context.shown }) });
+  markSelection(root, { selection: markedSelection(context) });
 }
 
 interface ShownOptions {
@@ -56,6 +56,16 @@ function drawnSelection(
 ): Selection | undefined {
   if (selection?.kind !== "state") return selection;
   return { kind: "state", id: drawnNodeOf(options.shown, { state: selection.id }) };
+}
+
+/** The selection as the canvas marks it. With only the diagram, a selected arrow is marked while it is the one just sent; the `?` of a blocked arrow marks itself, not the arrow. */
+function markedSelection(context: MarkDiagramContext): Selection | undefined {
+  const { machine, view, driver, shown } = context;
+  const { selection } = view;
+  if (!view.diagramOnly || selection?.kind !== "edge") return drawnSelection(selection, { shown });
+  const { edge } = drawnArrowClick({ machine, view, driver }, { shown, id: selection.id });
+  const sentNow = edge !== undefined && view.sent?.edge === edge.id;
+  return sentNow ? selection : undefined;
 }
 
 /** A state is a button while a click opens its Details in a panel that is shown, and the current choice while they show; an arrow, while a click sends it. Every other arrow says why on hover. A stub's look is its own: it goes back where it can. */

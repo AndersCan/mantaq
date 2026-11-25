@@ -205,7 +205,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     choose,
   });
   context.redraws.refit = canvas.refit;
-  context.redraws.escape = () => closeDetails(panel, { view, refresh }) || canvas.back();
+  context.redraws.escape = () => closeSelection(panel, { view, refresh }) || canvas.back();
   context.redraws.follow = (tokens) => canvas.follow(decodeFocus(tokens, { root: machine }));
   root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
   canvas.framed();
@@ -213,17 +213,17 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   follow();
 }
 
-interface CloseDetailsOptions {
+interface CloseSelectionOptions {
   view: ViewState;
   refresh: () => void;
 }
 
-/** Escape first closes the Details of a selection while the Details tab shows; focus that was in it moves to the tab. False when none is open. */
-function closeDetails(panel: HTMLElement, options: CloseDetailsOptions): boolean {
+/** Escape first closes what a selection shows: its Details while the Details tab shows, or, with only the diagram, the line under it. Focus that was in Details moves to the tab. False when none is open. */
+function closeSelection(panel: HTMLElement, options: CloseSelectionOptions): boolean {
   const { view } = options;
   const tab = panel.querySelector('[data-tab-panel="details"]:not([hidden])');
-  const open = !view.diagramOnly && tab !== null && view.selection !== undefined;
-  if (!open) return false;
+  const shows = view.diagramOnly || tab !== null;
+  if (!shows || view.selection === undefined) return false;
   const focused = panel.contains(panel.ownerDocument.activeElement);
   view.selection = undefined;
   options.refresh();
