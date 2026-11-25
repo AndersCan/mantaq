@@ -117,3 +117,18 @@ test("a driver push scrolls to the new state, and leaves a hand scroll alone whi
   push(live("error"));
   expect(canvas.scrollLeft).toBe(2900);
 });
+
+test("a resize that keeps the width leaves a hand scroll alone, and a new width shows the current state again", () => {
+  stubGeometry();
+  const { canvas } = mountWide("error");
+  canvas.scrollLeft = 0;
+  window.dispatchEvent(new Event("resize"));
+  const sameWidth = canvas.scrollLeft;
+  const wider = window.innerWidth + 100;
+  vi.spyOn(window, "innerWidth", "get").mockReturnValue(wider);
+  window.dispatchEvent(new Event("resize"));
+  expect({ sameWidth, newWidth: canvas.scrollLeft }).toEqual({
+    sameWidth: 0,
+    newWidth: 3000 + 120 + 16 - 300,
+  });
+});

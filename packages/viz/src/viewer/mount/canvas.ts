@@ -288,11 +288,16 @@ export interface ListenWidthOptions {
   refit: () => void;
 }
 
-/** Calls `refit` when the window width changes, which entering full screen does too. */
+/** Calls `refit` when the window width changes, and on entering or leaving full screen; a change of height alone, as when a phone's address bar hides, calls nothing. */
 export function listenWidth(root: HTMLElement, options: ListenWidthOptions): void {
+  const host = root.ownerDocument.defaultView;
+  let width = host?.innerWidth;
   function refitHere(): void {
+    width = host?.innerWidth;
     if (root.isConnected) options.refit();
   }
-  root.ownerDocument.defaultView?.addEventListener("resize", refitHere);
+  host?.addEventListener("resize", () => {
+    if (host.innerWidth !== width) refitHere();
+  });
   root.addEventListener("fullscreenchange", refitHere);
 }
