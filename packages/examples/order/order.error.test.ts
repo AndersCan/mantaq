@@ -1,0 +1,34 @@
+import { describe, expect, test } from "vite-plus/test";
+import { order, placeOrder } from "./order.ts";
+import type { PaymentPort } from "./payment.ts";
+import { retryPayment } from "./payment.ts";
+import { VirtualClock } from "@mantaq/core";
+
+/** A card provider with a bug: it throws instead of answering. */
+const brokenProvider: PaymentPort = {
+  chargeCard: () => {
+    throw new Error("card provider bug");
+  },
+};
+
+describe("an order whose child machine breaks", () => {
+  test("a payment machine that enters __error sends paymentBroke, so the order cannot complete", () => {
+    const actor = order.create({ clock: VirtualClock(), port: brokenProvider });
+    actor.send(placeOrder.create());
+    const { path, context } = actor.snapshot();
+    expect({ order: path, payment: context.payment?.path }).toStrictEqual({
+      order: ["couldNotCompleteOrder"],
+      payment: ["__error"],
+    });
+  });
+
+  test("retryPayment before the order is placed has no payment machine to reach, so nothing changes", () => {
+    const actor = order.create({ clock: VirtualClock() });
+    actor.send(retryPayment.create());
+    const { path, context } = actor.snapshot();
+    expect({ order: path, payment: context.payment }).toStrictEqual({
+      order: ["reviewingOrder"],
+      payment: undefined,
+    });
+  });
+});
