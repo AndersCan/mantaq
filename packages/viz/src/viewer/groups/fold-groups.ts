@@ -1,13 +1,5 @@
 import { actorMapOf, groupNameProblem, scopeOf } from "../../schema.ts";
-import type {
-  VizBranch,
-  VizCoverage,
-  VizEdge,
-  VizFuzzMessage,
-  VizMachine,
-  VizState,
-} from "../../schema.ts";
-import { localName } from "../compartments.ts";
+import type { VizCoverage, VizEdge, VizFuzzMessage, VizMachine, VizState } from "../../schema.ts";
 
 /** A group drawn as one node: `<scope>.@<name>`, or `@<name>` at the root, so `scopeOf` stays the members' scope. */
 export interface GroupNode {
@@ -23,7 +15,7 @@ export interface GroupArrow {
   id: string;
   /** The real edges, in document order. */
   members: VizEdge[];
-  /** What is drawn: the first member, pointed at the group nodes, with no handler reading that only one member has. */
+  /** What is drawn: the first member, pointed at the group nodes, with the event and no condition. */
   drawn: VizEdge;
 }
 
@@ -53,12 +45,12 @@ export function foldGroups(machine: VizMachine): VizMachine {
   return foldedOf(machine).machine;
 }
 
-/** The group nodes of the real machine; its fold gives the same. */
 /** The real machine of a fold, or the machine itself. */
 export function realMachineOf(machine: VizMachine): VizMachine {
   return foldedOf(machine).real;
 }
 
+/** The group nodes of the real machine; its fold gives the same. */
 export function groupNodesOf(machine: VizMachine): ReadonlyArray<GroupNode> {
   return foldedOf(machine).nodes;
 }
@@ -188,74 +180,50 @@ interface FirstMember {
   first: VizEdge;
 }
 
-/** Unread targets by handler key. */
-type Unread = ReadonlyMap<string, ReadonlySet<string>>;
-
 interface Arrowing extends FirstMember {
-  nodes: ReadonlyArray<GroupNode>;
-  unread: Unread;
+  /** Handlers with an edge the fold moves or drops, by `handlerKey`. */
+  touched: ReadonlySet<string>;
 }
 
 interface DrawnId extends Arrowing {
   id: string;
 }
 
-interface Renames {
-  names: ReadonlyMap<string, string>;
-  /** Local names of the targets whose arrow the fold drops or draws without this handler's reading. */
-  unread: ReadonlySet<string>;
+/** The real source and event of an edge: one handler. */
+function handlerKey(edge: VizEdge): string {
+  return `${edge.from}\u0000${edge.event}`;
+}
+
+/** The handlers with an edge that has an end in a group, so the fold moves or drops it. */
+function touchedHandlers(edges: ReadonlyArray<VizEdge>, options: NodeIndex): Set<string> {
+  const { nodeOfState } = options;
+  const touched = edges.filter(
+    (edge) => nodeOfState.has(edge.from) || (edge.to !== null && nodeOfState.has(edge.to)),
+  );
+  return new Set(touched.map((edge) => handlerKey(edge)));
 }
 
 /**
- * A branch that went to a member goes to its group node instead. A branch
- * whose arrow shows no reading of this handler stays, so no label reads
- * "else" beside an arrow that does not say what it is the else of.
- */
-function renamedBranch(branch: VizBranch, options: Renames): VizBranch {
-  if (branch.target.kind !== "state") return branch;
-  if (options.unread.has(branch.target.state)) return { ...branch, target: { kind: "stay" } };
-  const state = options.names.get(branch.target.state);
-  return state === undefined ? branch : { ...branch, target: { kind: "state", state } };
-}
-
-interface EdgeEnds {
-  nodes: ReadonlyArray<GroupNode>;
-  ends: ReadonlyArray<string>;
-  unread: ReadonlySet<string>;
-}
-
-/** The edge with its handler reading pointed at the group nodes of its ends, so its condition label holds. */
-function renamedEdge(edge: VizEdge, options: EdgeEnds): VizEdge {
-  const { explanation } = edge;
-  if (explanation === null || explanation.status !== "analyzed") return edge;
-  const names = new Map<string, string>();
-  for (const node of options.nodes) {
-    if (!options.ends.includes(node.id)) continue;
-    for (const state of node.states) names.set(localName(state), localName(node.id));
-  }
-  const { unread } = options;
-  const branches = explanation.branches.map((branch) => renamedBranch(branch, { names, unread }));
-  return { ...edge, explanation: { ...explanation, branches } };
-}
-
-/**
- * The edge drawn for a bucket, with the coverage of all its members. Members
- * from one source share one handler and keep its reading. Members from several
- * sources have several handlers, so the arrow drops the reading and the doc.
+ * The edge drawn for a bucket, with the coverage of all its members. A
+ * handler that the fold touches draws its event only: a condition read from
+ * real targets says nothing true about group nodes, and an "else" needs every
+ * partner to show its condition. The entered group draws the real reading.
  */
 function drawnEdge(bucket: Bucket, options: DrawnId): VizEdge {
-  const { first, id } = options;
+  const { first, id, touched } = options;
   const { from, target, members } = bucket;
-  if (from === first.from && target === first.to) return first;
-  const moved = { ...first, id, from, to: target };
-  const ends = [from, target ?? ""];
-  const coverage = summed(members.map((member) => member.coverage));
-  const tested = summed(members.map((member) => member.tested));
-  const oneHandler = members.every((member) => member.from === first.from);
-  const unread = options.unread.get(handlerKey(first)) ?? new Set<string>();
-  const read = oneHandler ? renamedEdge(moved, { nodes: options.nodes, ends, unread }) : moved;
-  if (oneHandler) return { ...read, coverage, tested };
-  return { ...read, explanation: null, doc: null, coverage, tested };
+  if (!touched.has(handlerKey(first))) return first;
+  const oneHandler = members.every((member) => handlerKey(member) === handlerKey(first));
+  return {
+    ...first,
+    id,
+    from,
+    to: target,
+    explanation: null,
+    doc: oneHandler ? first.doc : null,
+    coverage: summed(members.map((member) => member.coverage)),
+    tested: summed(members.map((member) => member.tested)),
+  };
 }
 
 function arrowOf(bucket: Bucket, options: Arrowing): GroupArrow {
@@ -267,36 +235,13 @@ function arrowOf(bucket: Bucket, options: Arrowing): GroupArrow {
   return { id, members, drawn: drawnEdge(bucket, { ...options, id }) };
 }
 
-/** The real source and event of an edge: one handler. */
-function handlerKey(edge: VizEdge): string {
-  return `${edge.from}\u0000${edge.event}`;
-}
-
-/** Each handler's targets, by local name, whose edge the fold drops or merges with edges of other handlers. */
-function unreadTargets(edges: ReadonlyArray<VizEdge>, buckets: ReadonlyArray<Bucket>): Unread {
-  const read = new Set<VizEdge>();
-  for (const bucket of buckets) {
-    const [first] = bucket.members;
-    const oneHandler = bucket.members.every((member) => member.from === first?.from);
-    if (oneHandler) for (const member of bucket.members) read.add(member);
-  }
-  const unread = new Map<string, Set<string>>();
-  for (const edge of edges) {
-    if (read.has(edge) || edge.to === null) continue;
-    const targets = unread.get(handlerKey(edge)) ?? new Set<string>();
-    targets.add(localName(edge.to));
-    unread.set(handlerKey(edge), targets);
-  }
-  return unread;
-}
-
 function drawnArrows(edges: ReadonlyArray<VizEdge>, options: NodeIndex): GroupArrow[] {
   const buckets = bucketsOf(edges, options);
-  const unread = unreadTargets(edges, buckets);
+  const touched = touchedHandlers(edges, options);
   const arrows: GroupArrow[] = [];
   for (const bucket of buckets) {
     const [first] = bucket.members;
-    if (first !== undefined) arrows.push(arrowOf(bucket, { first, nodes: options.nodes, unread }));
+    if (first !== undefined) arrows.push(arrowOf(bucket, { first, touched }));
   }
   return arrows;
 }

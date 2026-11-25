@@ -167,7 +167,16 @@ describe("foldGroups merges crossing edges", () => {
 });
 
 describe("foldGroups labels", () => {
-  test("a merged arrow shows no guard that only one member has", () => {
+  const split = [
+    { conditions: ["ready"], target: { kind: "state" as const, state: "listing" } },
+    { conditions: ["!(ready)"], target: { kind: "state" as const, state: "paying" } },
+  ];
+
+  function linesOf(machine: VizMachine): string[][] {
+    return foldGroups(machine).edges.map((edge) => edgeLines(edge));
+  }
+
+  test("a merged arrow shows its event and no guard of a member", () => {
     const guarded = readEdge(edgeOf("listing", { event: "pay", to: "paying" }), {
       branches: [
         { conditions: ["total > 0"], target: { kind: "state", state: "paying" } },
@@ -182,82 +191,56 @@ describe("foldGroups labels", () => {
       ],
       edges: [guarded, edgeOf("editing", { event: "pay", to: "paying" })],
     });
-    expect(foldGroups(merged).edges.map((edge) => edgeLines(edge))).toEqual([["pay"]]);
+    expect(linesOf(merged)).toEqual([["pay"]]);
   });
 
-  test("arrows from one handler into a group keep its condition beside its else", () => {
-    const branches = [
-      { conditions: ["x"], target: { kind: "state" as const, state: "b1" } },
-      { conditions: ["!(x)", "y"], target: { kind: "state" as const, state: "b2" } },
-      { conditions: ["!(x)", "!(y)"], target: { kind: "state" as const, state: "c" } },
-    ];
-    const handled = machineOf({
-      states: [
-        stateOf("a"),
-        stateOf("b1", { group: "g" }),
-        stateOf("b2", { group: "g" }),
-        stateOf("c"),
-      ],
-      edges: ["b1", "b2", "c"].map((to) => readEdge(edgeOf("a", { event: "e", to }), { branches })),
-    });
-    expect(foldGroups(handled).edges.map((edge) => edgeLines(edge))).toEqual([
-      ["e", "x || !x && y"],
-      ["e", "else"],
-    ]);
+  test("every arrow of a handler with an end in a group shows its event only, so no else loses its partner", () => {
+    const states = [stateOf("empty"), stateOf("listing", { group: "review" }), stateOf("paying")];
+    const edges = ["listing", "paying"].map((to) =>
+      readEdge(edgeOf("empty", { event: "pay", to }), { branches: split }),
+    );
+    expect(linesOf(machineOf({ states, edges }))).toEqual([["pay"], ["pay"]]);
   });
 
-  test("an arrow out of a group reads its own guard when the other branch stays inside", () => {
-    const branches = [
-      { conditions: ["x"], target: { kind: "state" as const, state: "b2" } },
-      { conditions: ["!(x)"], target: { kind: "state" as const, state: "c" } },
+  test("an arrow out of a group shows its event only", () => {
+    const states = [
+      stateOf("listing", { group: "review" }),
+      stateOf("paying", { group: "review" }),
+      stateOf("empty"),
     ];
-    const leaving = machineOf({
-      states: [stateOf("b1", { group: "g" }), stateOf("b2", { group: "g" }), stateOf("c")],
-      edges: ["b2", "c"].map((to) => readEdge(edgeOf("b1", { event: "e", to }), { branches })),
-    });
-    expect(foldGroups(leaving).edges.map((edge) => edgeLines(edge))).toEqual([["e", "!x"]]);
+    const branches = split.map((branch, index) =>
+      index === 0 ? branch : { ...branch, target: { kind: "state" as const, state: "empty" } },
+    );
+    const edges = ["listing", "empty"].map((to) =>
+      readEdge(edgeOf("paying", { event: "pay", to }), { branches }),
+    );
+    expect(linesOf(machineOf({ states, edges }))).toEqual([["pay"]]);
   });
 
-  test("an arrow reads its own guard when its partner merged with another handler", () => {
-    const branches = [
-      { conditions: ["x"], target: { kind: "state" as const, state: "c" } },
-      { conditions: ["!(x)"], target: { kind: "state" as const, state: "d" } },
+  test("a handler with no end in a group keeps its conditions", () => {
+    const states = [
+      stateOf("empty"),
+      stateOf("listing"),
+      stateOf("paying"),
+      stateOf("shipped", { group: "done" }),
     ];
-    const partnered = machineOf({
-      states: [
-        stateOf("b1", { group: "g" }),
-        stateOf("b2", { group: "g" }),
-        stateOf("c"),
-        stateOf("d"),
-      ],
-      edges: [
-        readEdge(edgeOf("b1", { event: "e", to: "c" }), { branches }),
-        readEdge(edgeOf("b1", { event: "e", to: "d" }), { branches }),
-        edgeOf("b2", { event: "e", to: "c" }),
-      ],
-    });
-    expect(foldGroups(partnered).edges.map((edge) => edgeLines(edge))).toEqual([
-      ["e"],
-      ["e", "!x"],
-    ]);
-  });
-
-  test("an arrow into a group keeps its condition beside its else", () => {
-    const branches = [
-      { conditions: ["ready"], target: { kind: "state" as const, state: "listing" } },
-      { conditions: ["!(ready)"], target: { kind: "state" as const, state: "paying" } },
-    ];
-    const split = machineOf({
-      states: [stateOf("empty"), stateOf("listing", { group: "review" }), stateOf("paying")],
-      edges: [
-        readEdge(edgeOf("empty", { event: "pay", to: "listing" }), { branches }),
-        readEdge(edgeOf("empty", { event: "pay", to: "paying" }), { branches }),
-      ],
-    });
-    expect(foldGroups(split).edges.map((edge) => edgeLines(edge))).toEqual([
+    const edges = ["listing", "paying"].map((to) =>
+      readEdge(edgeOf("empty", { event: "pay", to }), { branches: split }),
+    );
+    expect(linesOf(machineOf({ states, edges }))).toEqual([
       ["pay", "ready"],
       ["pay", "else"],
     ]);
+  });
+
+  test("a moved arrow keeps its doc, and arrowMembersOf gives the real reading", () => {
+    const states = [stateOf("empty"), stateOf("listing", { group: "review" }), stateOf("paying")];
+    const read = readEdge(edgeOf("empty", { event: "pay", to: "listing" }), { branches: split });
+    const edges = [{ ...read, doc: "Pays the cart." }];
+    const folded = foldGroups(machineOf({ states, edges }));
+    expect(folded.edges.map((edge) => edge.doc)).toEqual(["Pays the cart."]);
+    expect(folded.edges[0]?.explanation).toBeNull();
+    expect(arrowMembersOf(folded, { arrow: read.id })).toEqual(edges);
   });
 });
 

@@ -8,6 +8,7 @@ import {
 } from "./fold-groups.ts";
 import { describe, expect, test } from "vite-plus/test";
 import type { VizEdge, VizMachine, VizState } from "../../schema.ts";
+import { edgeCondition } from "../labels.ts";
 import fc from "fast-check";
 import { groupedArbitrary } from "./grouped.arbitrary.ts";
 import { groupMachine } from "./group-machine.ts";
@@ -125,6 +126,21 @@ function missingFromViews(machine: VizMachine): string[] {
   return problems;
 }
 
+/** Drawn conditions that are not the real edge's own, or whose handler has an edge the fold does not draw unchanged. */
+function labelProblems(machine: VizMachine): string[] {
+  const folded = foldGroups(machine);
+  const problems: string[] = [];
+  for (const drawn of folded.edges) {
+    if (edgeCondition(drawn) === null) continue;
+    const handler = machine.edges.filter(
+      (edge) => edge.from === drawn.from && edge.event === drawn.event,
+    );
+    const unchanged = handler.every((edge) => folded.edges.includes(edge));
+    if (!handler.includes(drawn) || !unchanged) problems.push(`${drawn.id} reads a moved handler`);
+  }
+  return problems;
+}
+
 describe("groups on generated machines", () => {
   test("G1: every real edge is inside a group, one drawn edge, or a member of one arrow", () => {
     fc.assert(
@@ -148,6 +164,15 @@ describe("groups on generated machines", () => {
     fc.assert(
       fc.property(groupedArbitrary, (machine) => {
         expect(coverage(machine)).toEqual([]);
+      }),
+      run,
+    );
+  });
+
+  test("G5: a condition on the fold is drawn only when its whole handler is drawn unchanged", () => {
+    fc.assert(
+      fc.property(groupedArbitrary, (machine) => {
+        expect(labelProblems(machine)).toEqual([]);
       }),
       run,
     );
