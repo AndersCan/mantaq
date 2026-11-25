@@ -16,7 +16,7 @@ export interface SweepCase {
 }
 
 /** Where a click starts: one state of one viewer. */
-export interface Stand {
+interface Stand {
   driving: "driver" | "no driver";
   layout: "diagram only" | "with panel";
   /** The walk so far, as `?step=` texts. */
@@ -26,7 +26,7 @@ export interface Stand {
 }
 
 /** An element that looks clickable, but a click on it changed nothing visible. */
-export interface DeadElement {
+interface DeadElement {
   machine: string;
   stand: Stand;
   element: string;
