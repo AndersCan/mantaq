@@ -156,7 +156,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   function walked(sent?: ViewState["sent"]): void {
     view.sent = sent;
     noticeCleared(root, view);
-    navigated(options, { machine, view });
+    navigated(options, { machine, view, by: "walk" });
     follow();
   }
   const edit = payloadSetter({ options, machine, view, mark });
@@ -189,7 +189,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     if (!drawsSelection(move.after.drawn, { selection: view.selection })) {
       view.selection = undefined;
     }
-    navigated(options, { machine, view });
+    navigated(options, { machine, view, by: move.by });
     const entered = enteredBy(move);
     if (entered !== undefined) options.onEnterGroup?.(entered);
   }

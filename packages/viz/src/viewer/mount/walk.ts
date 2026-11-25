@@ -1,8 +1,8 @@
 import { decodeLiveSteps, encodeLiveStep } from "../../moves.ts";
+import type { NavigatedBy, ViewerOptions } from "./viewer-options.ts";
 import type { VizDriver, VizLiveState, VizLiveStep, VizMachine, VizStep } from "../../schema.ts";
 import { encodePayloads } from "../send/payloads.ts";
 import { focusTokens } from "./focus.ts";
-import type { ViewerOptions } from "./viewer-options.ts";
 import type { ViewState } from "./view-state.ts";
 
 export interface RewindOptions {
@@ -77,12 +77,14 @@ export function watchDriver(view: ViewState, context: WatchDriverOptions): void 
 export interface NavigatedOptions {
   machine: VizMachine;
   view: ViewState;
+  by: NavigatedBy;
 }
 
 /** Tells the host where the walk and the changed payloads now are. */
 export function navigated(options: ViewerOptions, now: NavigatedOptions): void {
-  const { machine, view } = now;
+  const { machine, view, by } = now;
   options.onNavigate?.({
+    by,
     machine: machine.id,
     steps: view.live?.steps.map(encodeLiveStep) ?? [],
     payloads: encodePayloads(view.payloads),

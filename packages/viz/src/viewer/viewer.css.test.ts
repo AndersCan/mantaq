@@ -57,14 +57,14 @@ test("a dropped message's Step line uses the banner colour", () => {
   expect(bareRule(".viz [data-live-dropped]")).toMatch(/color:\s*var\(--banner-fg\)/);
 });
 
-test("the panel stays below the graph, never pinned over it, and the canvas leaves it room in one window", () => {
+test("the panel stays below the graph, never pinned over it, and inside a path the canvas leaves it room in one window", () => {
   expect(css).not.toContain("@container");
   const main = bare.split("}").find((b) => b.trim().startsWith(".viz .viz-main {")) ?? "";
   expect(main).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   const panel = rule(".viz .panel {");
   expect(panel).not.toMatch(/position:/);
   expect(panel).toMatch(/background:\s*var\(--bg\)/);
-  expect(listed(".viz .canvas")).toMatch(/max-height:\s*calc\(75dvh - 5rem\)/);
+  expect(listed(".viz:has(.focus-path) .canvas")).toMatch(/max-height:\s*calc\(75dvh - 5rem\)/);
   const tabPanel = rule(".viz .tab-panel {");
   expect(tabPanel).toMatch(/overflow:\s*auto/);
   expect(tabPanel).toMatch(/max-height:\s*25vh/);

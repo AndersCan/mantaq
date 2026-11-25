@@ -1,20 +1,19 @@
 /**
  * Options for a page that keeps `?machine=&step=&run=&payload=&focus=` (and reads old `?value=` links) in the address bar so a walk and the machine opened can be shared (`linkOptions`).
  */
-import type { FocusLink, ViewerOptions } from "./embed.ts";
+import type { FocusLink, NavigatedBy, ViewerOptions } from "./embed.ts";
 import "./viewer.css";
 
 interface Walk {
+  by: NavigatedBy;
   machine: string;
   steps: string[];
   payloads: string[];
   focus: string[];
 }
 
-/** A move along the focus path adds a history entry, so Back goes back one level; a step or a payload change replaces the entry, so a walk does not flood the history. */
+/** The reader's move along the focus path adds a history entry, so Back goes back one level; a step, a payload change or a move that follows Back replaces the entry, so a walk does not flood the history. */
 function rememberWalk(where: Walk): void {
-  const now = new URLSearchParams(location.search);
-  const moved = now.getAll("focus").join("\n") !== where.focus.join("\n");
   const next = new URLSearchParams(location.search);
   next.set("machine", where.machine);
   next.delete("step");
@@ -26,8 +25,8 @@ function rememberWalk(where: Walk): void {
   for (const step of where.steps) next.append("step", step);
   for (const opened of where.focus) next.append("focus", opened);
   const query = next.toString();
-  const address = `?${query}`;
-  if (moved) history.pushState(undefined, "", address);
+  const address = `?${query}${location.hash}`;
+  if (where.by === "path") history.pushState(undefined, "", address);
   else history.replaceState(undefined, "", address);
 }
 

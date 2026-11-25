@@ -7,6 +7,9 @@ export interface FocusLink {
   focus: string[];
 }
 
+/** Why the viewer tells the host where it is. */
+export type NavigatedBy = "path" | "walk" | "link";
+
 export interface ViewerOptions {
   /** Machine to show; defaults to the first. */
   machine?: string;
@@ -27,6 +30,8 @@ export interface ViewerOptions {
   focus?: ReadonlyArray<string>;
   /** Called after every walk, payload change or move along the focus path, e.g. to keep the URL shareable. */
   onNavigate?: (where: {
+    /** "path": the reader moved along the path; "walk": a step or a payload change; "link": the viewer followed `followFocus`. */
+    by: NavigatedBy;
     machine: string;
     steps: string[];
     payloads: string[];

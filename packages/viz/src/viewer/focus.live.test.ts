@@ -403,7 +403,7 @@ describe("the path in the address bar", () => {
     const { root } = mount({
       steps: ["checkout"],
       followFocus: (follow) => follows.push(follow),
-      onNavigate: (where) => told.push([...where.steps, "|", ...where.focus]),
+      onNavigate: (where) => told.push([where.by, ...where.steps, "|", ...where.focus]),
     });
     const follow = follows[0];
     follow?.({ focus: ["@payment"] });
@@ -421,8 +421,8 @@ describe("the path in the address bar", () => {
       other: ["shop", "payment"],
       back: [],
       told: [
-        ["checkout", "|", "@payment"],
-        ["checkout", "|"],
+        ["link", "checkout", "|", "@payment"],
+        ["link", "checkout", "|"],
       ],
     });
   });

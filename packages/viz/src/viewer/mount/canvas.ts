@@ -40,10 +40,12 @@ export interface Canvas {
   follow: (steps: FocusStep[]) => void;
 }
 
-/** Where focus lands after a move. */
+/** Where focus lands after a move, and who made it. */
 interface Landing {
   /** A state of the machine drawn now: focus goes to the node that draws it. Unset: the control that led here. */
   onto?: string;
+  /** Default "path": the reader. "link": the host, following an address. */
+  by?: FocusMove["by"];
 }
 
 /** What the canvas draws for the focus path (a board of boxes, one machine or a group entered), and every move along the path. */
@@ -79,12 +81,12 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (line !== null) line.textContent = outsideText({ focus: options.focus(), view }) ?? "";
   }
   function moveTo(steps: FocusStep[], landing: Landing = {}): void {
-    const { onto } = landing;
+    const { onto, by = "path" } = landing;
     const before = options.focus();
     view.focus = steps;
     view.focusNotice = undefined;
     const after = options.focus();
-    options.moved({ before, after });
+    options.moved({ before, after, by });
     swap();
     options.afterSwap();
     if (onto !== undefined) landOn(onto);
@@ -125,7 +127,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
   }
   function follow(steps: FocusStep[]): void {
     const shown = focusTokens(options.focus().steps).join("\n");
-    if (focusTokens(steps).join("\n") !== shown) moveTo(steps);
+    if (focusTokens(steps).join("\n") !== shown) moveTo(steps, { by: "link" });
   }
   function open(part: string): void {
     const { machine } = options.focus();

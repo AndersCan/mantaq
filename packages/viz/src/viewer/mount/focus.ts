@@ -187,10 +187,11 @@ export function focusReader(view: Focused, options: FocusOptions): () => Focus {
   };
 }
 
-/** A move along the focus path: what was shown, and what is shown now. */
+/** A move along the focus path: what was shown, what is shown now, and whether the reader made it ("path") or the host's link did ("link"). */
 export interface FocusMove {
   before: Focus;
   after: Focus;
+  by: "path" | "link";
 }
 
 /** The group a move entered; undefined for any other move. */
