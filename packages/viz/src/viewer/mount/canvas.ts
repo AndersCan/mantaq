@@ -1,4 +1,4 @@
-import { BOARD_PX_PER_UNIT, renderBoard, renderGraph } from "../graph.ts";
+import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../graph.ts";
 import type { EnteredMachine, GraphCallbacks, Selection } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
 import { currentsOf } from "../compartments.ts";
@@ -41,15 +41,27 @@ export function canvasOf(options: CanvasOptions): Canvas {
     root.querySelector(".canvas")?.replaceChildren(...drawn());
     titled();
   }
+  /** The start of the bar above the canvas: the path while a machine is opened, and the overlap warning of the drawing. */
   function titled(): void {
-    root.querySelector(".focus-path")?.remove();
-    const focus = options.focus();
-    if (focus.steps.length === 0) return;
+    root.querySelector(".viz-bar-start")?.remove();
+    const shown = [...pathOf(), ...warningLine()];
+    if (shown.length === 0) return;
     const bar = root.querySelector(".viz-bar") ?? html(doc, "div", { class: "viz-bar" });
     if (!bar.isConnected) root.prepend(bar);
+    bar.prepend(html(doc, "div", { class: "viz-bar-start" }, shown));
+  }
+  function pathOf(): HTMLElement[] {
+    const focus = options.focus();
+    if (focus.steps.length === 0) return [];
     const path = breadcrumbOf(doc, { focus, moveTo: (keep) => moveTo(focus.steps.slice(0, keep)) });
     path.addEventListener("keydown", leaveOnEscape);
-    bar.prepend(path);
+    return [path];
+  }
+  function warningLine(): HTMLElement[] {
+    const count = root.querySelector(".canvas .graph")?.getAttribute("data-overlaps");
+    const warning = overlapWarning(Number(count ?? 0));
+    if (warning === undefined) return [];
+    return [html(doc, "p", { class: "overlap-warning" }, [warning])];
   }
   function moveTo(steps: FocusStep[]): void {
     const before = options.focus();

@@ -24,6 +24,7 @@ const headings = [
   { depth: 2, slug: "ai-page-label", text: "AI-written page label" },
   { depth: 2, slug: "overlap-warning", text: "Overlap warning" },
   { depth: 2, slug: "machine-node", text: "Machine node" },
+  { depth: 2, slug: "focus-path", text: "Focus path" },
   { depth: 2, slug: "phone-width", text: "Phone width" },
 ];
 ---
@@ -184,12 +185,16 @@ const headings = [
   <p><strong>Awaiting approval</strong></p>
   <p>
     New: when the layout of a machine overlaps itself, the viewer still draws it and adds one
-    line under the drawing. Before, it showed only "Cannot draw" and the machine name.
+    line to the bar above the drawing. Before, it showed only "Cannot draw" and the machine name.
+    Changed: the line was inside the drawing, under it; now it is in the bar, so it does not
+    scroll away with the drawing.
   </p>
   <div class="viz">
-    <svg class="graph" viewBox="0 0 300 20" width="300" height="20" role="group" aria-label="overlap warning sample">
-      <text class="overlap-warning" x="8" y="14">2 overlaps: some labels or lines touch.</text>
-    </svg>
+    <div class="viz-bar">
+      <div class="viz-bar-start">
+        <p class="overlap-warning">2 overlaps: some labels or lines touch.</p>
+      </div>
+    </div>
   </div>
 
   <h2 id="machine-node">Machine node</h2>
@@ -263,6 +268,30 @@ const headings = [
     <text x="614" y="65" text-anchor="middle">done</text>
     </g>
     </svg>
+  </div>
+
+  <h2 id="focus-path">Focus path</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: the path of machines the reader opened, in the bar above the drawing. It starts at the
+    machine the viewer opened on. Each machine node entered, or each machine of a board opened,
+    adds one crumb. A click on a crumb goes back to that machine, and Escape goes back one. The
+    last crumb is the machine drawn now. It replaces the machine name that led back to the board.
+    Here the reader entered <code>payment</code> from <code>checkout</code>, then
+    <code>fraud</code>.
+  </p>
+  <div class="viz">
+    <div class="viz-bar">
+      <div class="viz-bar-start">
+        <nav class="focus-path" aria-label="focus path sample">
+          <ol>
+            <li><button type="button">checkout</button></li>
+            <li><button type="button">payment</button></li>
+            <li><button type="button" aria-current="location">fraud</button></li>
+          </ol>
+        </nav>
+      </div>
+    </div>
   </div>
 
   <h2 id="phone-width">Phone width</h2>

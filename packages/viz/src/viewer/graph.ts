@@ -19,7 +19,6 @@ import { ENTER_TEXT, HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
 import { isNever } from "../is-never.ts";
 import type { Point } from "@dagrejs/dagre";
 import { placeBoard } from "./board.ts";
-import type { Overlap } from "./overlaps.ts";
 
 export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: string };
 
@@ -451,45 +450,40 @@ function messageGroup(doc: Document, message: PlacedMessage): SVGElement {
   );
 }
 
-/** The row under a drawing that holds its overlap warning. */
-const WARNING_ROW = 20;
-const WARNING_INSET = 8;
-
-/** The overlap warning's text, or undefined when nothing overlaps. */
-function warningOf(overlaps: ReadonlyArray<Overlap>): string | undefined {
-  if (overlaps.length === 0) return undefined;
-  const count = overlaps.length;
+/** The overlap warning's text for a drawing with `count` overlaps (its `data-overlaps`), or undefined when nothing overlaps. */
+export function overlapWarning(count: number): string | undefined {
+  if (count === 0) return undefined;
   const noun = count === 1 ? "overlap" : "overlaps";
   return `${count} ${noun}: some labels or lines touch.`;
 }
 
-/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. An overlapping layout is drawn too, with a warning row under it. */
+type Laid = ReturnType<typeof layoutMachine>;
+
+/** Layouts by machine, so moving back and forth between machines lays each one out once. */
+const layouts = new WeakMap<VizMachine, Laid>();
+
+function layoutOnce(machine: VizMachine): Laid {
+  const known = layouts.get(machine);
+  if (known !== undefined) return known;
+  const laid = layoutMachine(machine);
+  layouts.set(machine, laid);
+  return laid;
+}
+
+/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. An overlapping layout is drawn too; `data-overlaps` counts what overlaps. */
 export function renderGraph(
   doc: Document,
   machine: VizMachine,
   callbacks: GraphCallbacks,
 ): SVGSVGElement | HTMLElement {
-  const layout = layoutMachine(machine);
+  const layout = layoutOnce(machine);
   if (Either.isLeft(layout)) {
     return html(doc, "p", { class: "load-error", role: "alert" }, [`Cannot draw ${machine.id}.`]);
   }
   const { layout: placed, overlaps } = layout[1];
-  const warning = warningOf(overlaps);
-  const warningWidth = warning === undefined ? 0 : textWidth(warning) + 2 * WARNING_INSET;
-  const units = Math.max(placed.width, warningWidth);
+  const units = placed.width;
   const width = Math.ceil(units);
-  const height = Math.ceil(placed.height + (warning === undefined ? 0 : WARNING_ROW));
-  const warned =
-    warning === undefined
-      ? []
-      : [
-          svg(
-            doc,
-            "text",
-            { class: "overlap-warning", x: WARNING_INSET, y: placed.height + WARNING_ROW / 2 + 4 },
-            [warning],
-          ),
-        ];
+  const height = Math.ceil(placed.height);
   const root = svg(
     doc,
     "svg",
@@ -516,7 +510,6 @@ export function renderGraph(
       ]),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
       ...placed.nodes.map((node) => nodeGroup(node, { doc, callbacks })),
-      ...warned,
     ],
   );
   return root;

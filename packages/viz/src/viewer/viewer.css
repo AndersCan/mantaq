@@ -394,9 +394,10 @@
   color: var(--unknown);
 }
 
-/* Under a drawing that overlaps itself: drawn anyway, and it says so. */
-.viz .graph .overlap-warning {
-  fill: var(--unknown);
+/* Above a drawing that overlaps itself: drawn anyway, and it says so. */
+.viz .overlap-warning {
+  margin: 0;
+  color: var(--unknown);
 }
 
 .viz .muted {
@@ -636,7 +637,11 @@
   background: var(--bg);
 }
 
-.viz .focus-path {
+.viz .viz-bar-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-right: auto;
 }
 

@@ -33,6 +33,8 @@ A final state ends the walk. **Back** and **Reset** undo steps. `?machine=checko
 
 On the live page (the Vite plugin) each step runs the real actor, so guards are evaluated.
 
+A state that embeds another machine shows the id of that machine and an **enter** control. Enter draws the embedded machine on its own, without the walk. The walk and its steps stay as they were. The path above the diagram names each machine you opened. Click a name to go back to that machine, or press Escape to go back one. `?focus=` keeps the path in the address bar, so a link opens the same machine.
+
 ### Nodes
 
 | Style                                                              | Meaning                                                                                       |
