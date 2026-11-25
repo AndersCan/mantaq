@@ -206,6 +206,18 @@ describe("foldGroups labels", () => {
     ]);
   });
 
+  test("an arrow out of a group reads its own guard when the other branch stays inside", () => {
+    const branches = [
+      { conditions: ["x"], target: { kind: "state" as const, state: "b2" } },
+      { conditions: ["!(x)"], target: { kind: "state" as const, state: "c" } },
+    ];
+    const leaving = machineOf({
+      states: [stateOf("b1", { group: "g" }), stateOf("b2", { group: "g" }), stateOf("c")],
+      edges: ["b2", "c"].map((to) => readEdge(edgeOf("b1", { event: "e", to }), { branches })),
+    });
+    expect(foldGroups(leaving).edges.map((edge) => edgeLines(edge))).toEqual([["e", "!x"]]);
+  });
+
   test("an arrow into a group keeps its condition beside its else", () => {
     const branches = [
       { conditions: ["ready"], target: { kind: "state" as const, state: "listing" } },

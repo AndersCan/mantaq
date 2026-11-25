@@ -1,7 +1,7 @@
+import { groupNodesOf, realMachineOf } from "./fold-groups.ts";
 import { isAnyState, scopeOf } from "../../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../../schema.ts";
 import type { GroupNode } from "./fold-groups.ts";
-import { groupNodesOf } from "./fold-groups.ts";
 
 /** Each machine's entered groups by node id, so a group entered again is the same machine and keeps its layout. */
 const enteredGroups = new WeakMap<VizMachine, Map<string, VizMachine>>();
@@ -13,17 +13,18 @@ interface GroupQuery {
 
 /**
  * The view inside a group: its own states, the outside states its edges come
- * from or reach as stubs, and the real edges unchanged. Takes the real
- * machine, not a fold or a view. Undefined for an unknown group.
+ * from or reach as stubs, and the real edges unchanged. The real machine and
+ * its fold give the same view. Undefined for an unknown group.
  */
 export function groupMachine(machine: VizMachine, options: GroupQuery): VizMachine | undefined {
-  const views = enteredGroups.get(machine) ?? new Map<string, VizMachine>();
-  enteredGroups.set(machine, views);
+  const real = realMachineOf(machine);
+  const views = enteredGroups.get(real) ?? new Map<string, VizMachine>();
+  enteredGroups.set(real, views);
   const known = views.get(options.group);
   if (known !== undefined) return known;
-  const node = groupNodesOf(machine).find((each) => each.id === options.group);
+  const node = groupNodesOf(real).find((each) => each.id === options.group);
   if (node === undefined) return undefined;
-  const view = enter(machine, { node });
+  const view = enter(real, { node });
   views.set(options.group, view);
   return view;
 }

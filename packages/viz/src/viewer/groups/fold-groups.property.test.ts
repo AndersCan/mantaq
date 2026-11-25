@@ -1,3 +1,4 @@
+import { actorMapOf, isAnyState, scopeOf } from "../../schema.ts";
 import {
   arrowMembersOf,
   drawnNodeOf,
@@ -6,8 +7,7 @@ import {
   groupNodesOf,
 } from "./fold-groups.ts";
 import { describe, expect, test } from "vite-plus/test";
-import { isAnyState, scopeOf } from "../../schema.ts";
-import type { VizEdge, VizMachine } from "../../schema.ts";
+import type { VizEdge, VizMachine, VizState } from "../../schema.ts";
 import fc from "fast-check";
 import { groupedArbitrary } from "./grouped.arbitrary.ts";
 import { groupMachine } from "./group-machine.ts";
@@ -44,6 +44,14 @@ function edgeCounts(machine: VizMachine): string[] {
   return problems;
 }
 
+/** The node a state of the generated machine must be drawn as, read from its input alone. */
+function expectedNode(state: VizState, machine: VizMachine): string {
+  const scope = scopeOf(state.id);
+  const prefix = scope === "" ? "" : `${scope}.`;
+  const mapped = actorMapOf(state.id, machine) !== undefined;
+  return state.group === undefined || mapped ? state.id : `${prefix}@${state.group}`;
+}
+
 /** Real states not drawn exactly once, and drawn nodes that are neither a real state nor a group. */
 function stateCounts(machine: VizMachine): string[] {
   const folded = foldGroups(machine);
@@ -51,6 +59,8 @@ function stateCounts(machine: VizMachine): string[] {
   const problems: string[] = [];
   for (const state of machine.states) {
     const node = drawnNodeOf(machine, { state: state.id });
+    const expected = expectedNode(state, machine);
+    if (node !== expected) problems.push(`${state.id} is drawn as ${node}, not ${expected}`);
     const count = drawn.filter((id) => id === node).length;
     if (count !== 1) problems.push(`${state.id} drawn ${count} times`);
     if (scopeOf(node) !== scopeOf(state.id)) problems.push(`${node} is not in ${state.id}'s scope`);

@@ -28,6 +28,7 @@ export interface GroupArrow {
 }
 
 interface Folded {
+  real: VizMachine;
   machine: VizMachine;
   nodes: GroupNode[];
   arrows: GroupArrow[];
@@ -52,12 +53,17 @@ export function foldGroups(machine: VizMachine): VizMachine {
   return foldedOf(machine).machine;
 }
 
-/** The group nodes of the real machine, not of a fold or a view. */
+/** The group nodes of the real machine; its fold gives the same. */
+/** The real machine of a fold, or the machine itself. */
+export function realMachineOf(machine: VizMachine): VizMachine {
+  return foldedOf(machine).real;
+}
+
 export function groupNodesOf(machine: VizMachine): ReadonlyArray<GroupNode> {
   return foldedOf(machine).nodes;
 }
 
-/** Arrows of the fold of the real machine that stand for more than one real edge. */
+/** Arrows of the fold that stand for more than one real edge. */
 export function groupArrowsOf(machine: VizMachine): ReadonlyArray<GroupArrow> {
   return foldedOf(machine).arrows;
 }
@@ -66,7 +72,7 @@ interface StateQuery {
   state: string;
 }
 
-/** The node that draws a state of the real machine in its fold: its group node, or the state itself. */
+/** The node that draws a real state in the fold: its group node, or the state itself. */
 export function drawnNodeOf(machine: VizMachine, options: StateQuery): string {
   return foldedOf(machine).nodeOfState.get(options.state) ?? options.state;
 }
@@ -75,7 +81,7 @@ interface ArrowQuery {
   arrow: string;
 }
 
-/** The real edges a drawn edge of the real machine's fold stands for; empty for an id the fold does not draw. */
+/** The real edges a drawn edge of the fold stands for; empty for an id the fold does not draw. */
 export function arrowMembersOf(machine: VizMachine, options: ArrowQuery): ReadonlyArray<VizEdge> {
   return foldedOf(machine).membersOfEdge.get(options.arrow) ?? [];
 }
@@ -192,13 +198,17 @@ interface DrawnId extends Arrowing {
 
 interface Renames {
   names: ReadonlyMap<string, string>;
+  /** The local name of the drawn source node. */
+  source: string;
 }
 
-/** A branch that went to a member goes to its group node instead. */
+/** A branch that went to a member goes to its group node instead; to the arrow's own group node, it stays. */
 function renamedBranch(branch: VizBranch, options: Renames): VizBranch {
   if (branch.target.kind !== "state") return branch;
   const state = options.names.get(branch.target.state);
-  return state === undefined ? branch : { ...branch, target: { kind: "state", state } };
+  if (state === undefined) return branch;
+  if (state === options.source) return { ...branch, target: { kind: "stay" } };
+  return { ...branch, target: { kind: "state", state } };
 }
 
 interface EdgeEnds {
@@ -215,7 +225,8 @@ function renamedEdge(edge: VizEdge, options: EdgeEnds): VizEdge {
     if (!options.ends.includes(node.id)) continue;
     for (const state of node.states) names.set(localName(state), localName(node.id));
   }
-  const branches = explanation.branches.map((branch) => renamedBranch(branch, { names }));
+  const source = localName(edge.from);
+  const branches = explanation.branches.map((branch) => renamedBranch(branch, { names, source }));
   return { ...edge, explanation: { ...explanation, branches } };
 }
 
@@ -280,6 +291,7 @@ function fold(machine: VizMachine): Folded {
   const arrows = drawnArrows(machine.edges, index);
   const { initial, fuzz } = machine;
   return {
+    real: machine,
     machine: {
       ...machine,
       initial: initial === null ? null : (nodeOfState.get(initial) ?? initial),

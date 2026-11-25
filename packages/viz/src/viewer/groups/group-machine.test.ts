@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import { edgeOf, groupedCheckout, machineOf, stateOf } from "./shop-machines.ts";
+import { foldGroups } from "./fold-groups.ts";
 import { groupMachine } from "./group-machine.ts";
 
 const grouped = groupedCheckout();
@@ -79,8 +80,8 @@ describe("groupMachine", () => {
     });
   });
 
-  test("the same group enters to the same machine", () => {
-    expect(groupMachine(grouped, { group: "@shipping" })).toBe(
+  test("the same group enters to the same machine, from the real machine or its fold", () => {
+    expect(groupMachine(foldGroups(grouped), { group: "@shipping" })).toBe(
       groupMachine(grouped, { group: "@shipping" }),
     );
   });
