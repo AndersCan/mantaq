@@ -24,8 +24,9 @@ The validator refuses a reference to a machine that is not in the document. It a
 cycle, a machine that embeds itself through a chain of embeds. It reports each reference on the
 cycle, at that state's `machine` path, with the chain (`order > payment > order`).
 
-The key is omitted for a plain state, like the other optional keys (`actor`, `removed`). Producers
-do not fill it yet.
+The key is omitted for a plain state, like the other optional keys (`actor`, `removed`).
+`@mantaq/inspect` fills it from the `embedded` tag that `embed` of `@mantaq/sugar` puts on its
+effect fn, and adds the embedded machine to each document it writes.
 
 ## Rejected options
 

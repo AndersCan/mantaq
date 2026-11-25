@@ -119,3 +119,57 @@ describe("mantaqViz build alongside an app", () => {
     expect(Either.getRight(parseViz(text))?.machines.map((m) => m.id)).toEqual(["retry"]);
   }, 60_000);
 });
+
+describe("mantaqViz build with embedded machines", () => {
+  const fixtures = join(import.meta.dirname, "fixtures");
+
+  async function vizJson(machines: string[]) {
+    const dist = mkdtempSync(join(import.meta.dirname, "site-"));
+    await build({
+      root: fixtures,
+      configFile: false,
+      logLevel: "silent",
+      build: { outDir: dist, emptyOutDir: true, minify: false },
+      plugins: [mantaqViz({ machines, base: "/", fuzz: { iterations: 50 } })],
+    });
+    const text = readFileSync(join(dist, "viz.json"), "utf8");
+    rmSync(dist, { recursive: true, force: true });
+    return parseViz(text);
+  }
+
+  function shape(parsed: Awaited<ReturnType<typeof vizJson>>) {
+    const document = Either.getRight(parsed);
+    return {
+      issues: Either.getLeft(parsed) ?? [],
+      machines: (document?.machines ?? []).map((machine) => ({
+        id: machine.id,
+        fuzzed: machine.fuzz !== null,
+        embeds: machine.states.flatMap((state) =>
+          state.machine === undefined ? [] : [[state.id, state.machine]],
+        ),
+      })),
+    };
+  }
+
+  test("viz.json holds the machine two states embed, once, and validates", async () => {
+    expect(shape(await vizJson(["embedded/delivery.ts"]))).toEqual({
+      issues: [],
+      machines: [
+        {
+          id: "delivery",
+          fuzzed: true,
+          embeds: [
+            ["handingOver", "scan"],
+            ["pickingUp", "scan"],
+          ],
+        },
+        { id: "scan", fuzzed: true, embeds: [] },
+      ],
+    });
+  }, 60_000);
+
+  test("an embedded machine that a file also exports is in viz.json once", async () => {
+    const machines = shape(await vizJson(["embedded/delivery.ts", "embedded/scan.ts"])).machines;
+    expect(machines.map((machine) => machine.id)).toEqual(["delivery", "scan"]);
+  }, 60_000);
+});

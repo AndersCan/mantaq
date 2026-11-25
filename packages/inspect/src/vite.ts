@@ -26,7 +26,8 @@ import type { FuzzSettings, InspectedModule } from "./inspect.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { livePageHtml, serializeViz, UPDATE_EVENT } from "@mantaq/viz";
 import { normalizePath, searchForWorkspaceRoot } from "vite";
-import { projectRoot, vizDocument } from "./inspect.ts";
+import { modulesDocument } from "./embeds/modules-document.ts";
+import { projectRoot } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
 import { Either } from "@mantaq/utils";
 import { fileURLToPath } from "node:url";
@@ -178,7 +179,7 @@ async function inspectDevFile(server: ViteDevServer, options: DevFile): Promise<
   const { file, fuzz, programs } = options;
   const run = runOf(await server.ssrLoadModule(entryId(file)));
   return run === null
-    ? { machines: [], warnings: [`${file}: could not load the inspector`] }
+    ? { machines: [], embedded: [], warnings: [`${file}: could not load the inspector`] }
     : run({ fuzz, programs });
 }
 
@@ -214,7 +215,7 @@ async function documentText(
     options.files.map((file) => fileDocument(server, { ...options, file })),
   );
   return {
-    text: serializeViz(vizDocument(results.flatMap((result) => result.machines))),
+    text: serializeViz(modulesDocument(results)),
     warnings: results.flatMap((result) => result.warnings),
   };
 }
@@ -330,7 +331,7 @@ function siteBuild(context: SiteBuildContext): Plugin {
       for (const warning of results.flatMap((result) => result.warnings)) {
         this.warn(`[mantaq-viz] ${warning}`);
       }
-      const text = serializeViz(vizDocument(results.flatMap((result) => result.machines)));
+      const text = serializeViz(modulesDocument(results));
       const dir = context.base.replace(/^\//, "");
       const entry = Object.values(bundle).find(
         (chunk) => chunk.type === "chunk" && chunk.isEntry && chunk.name === "mantaq-live",

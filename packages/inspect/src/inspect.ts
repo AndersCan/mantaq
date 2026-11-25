@@ -1,6 +1,6 @@
 import type { AnalysisSource } from "./ast/program.ts";
 import type { ProgramStore } from "./ast/programs/program-store.ts";
-import type { AnyActor, Machine } from "@mantaq/core";
+import type { Machine } from "@mantaq/core";
 import type { AnyExpectations, CheckedExpectation } from "./expectations.ts";
 import type { FuzzOptions, FuzzStop, LostMessage } from "./fuzz/fuzz.ts";
 import type { FuzzTarget, MissingPayload } from "./fuzz/run.ts";
@@ -12,7 +12,7 @@ import { Either } from "@mantaq/utils";
 import { VirtualClock } from "@mantaq/core";
 import { analyzeModule, annotateWith } from "./ast/annotate.ts";
 import { checkExpectations } from "./expectations.ts";
-import { contextText, isActor } from "./fuzz/run.ts";
+import { contextText } from "./fuzz/run.ts";
 import { coverageGoal, unreached, withTestCoverage } from "./fuzz/coverage.ts";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
@@ -21,7 +21,13 @@ import { fuzzedMachine } from "./fuzz/to-viz.ts";
 import { guidance } from "./fuzz/guided.ts";
 import { normalizeRun, readRuns, RUN_DROPPED } from "./runs.ts";
 import { routingWarnings, unhandledSends, VIZ_SCHEMA_VERSION } from "@mantaq/viz";
-import { mapWarnings, toVizMachine } from "./structure.ts";
+import { mapWarnings, structureOf } from "./structure.ts";
+import type { BuiltEmbedding, Embedding } from "./embeds/embedded-machines.ts";
+import { createdOf, freshActor } from "./embeds/fresh-actor.ts";
+import type { Created } from "./embeds/fresh-actor.ts";
+import { isMachine } from "./embeds/is-machine.ts";
+import type { StateEmbed } from "./embeds/state-embeds.ts";
+import { withEmbedded } from "./embeds/embedded-machines.ts";
 
 const DEFAULT_ITERATIONS = 2000;
 
@@ -108,6 +114,8 @@ export type InspectTarget = TargetOptions & { machine: Machine };
 
 export interface Inspected {
   machine: VizMachine;
+  /** The machines its states embed, and the ones those embed, each inspected as if a file exported it. Put them in the same document. */
+  embedded: VizMachine[];
   /** Things worth fixing or knowing: unreachable routing, unhandled sends, why fuzzing was skipped. */
   warnings: string[];
   /** Events fuzzing sent without a payload whose fields the machine read; empty when fuzzing is off. */
@@ -133,14 +141,6 @@ export function missingPayloadBlock(id: string, missing: ReadonlyArray<MissingPa
   return `${id}: fuzzing had no payload for ${count} the machine reads, so this check proves nothing yet:\n${lines.join("\n")}\nPass \`source\` (payloads from the event types) or \`payloads: { ${keys} }\` with a real payload for each case.`;
 }
 
-/** The actor of a factory result, and the whole result when it is `{ actor, ... }`. */
-function createdOf(result: AnyActor<unknown> | { actor: AnyActor<unknown> }): {
-  actor: AnyActor<unknown>;
-  made?: unknown;
-} {
-  return isActor(result) ? { actor: result } : { actor: result.actor, made: result };
-}
-
 function warningsOf(machine: VizMachine): string[] {
   const routing = routingWarnings(machine).map((warning) => warning.message);
   const sends = machine.states.flatMap((state) =>
@@ -153,7 +153,7 @@ function warningsOf(machine: VizMachine): string[] {
 }
 
 /** A fresh actor from the target, built on a VirtualClock of its own. */
-function createdFrom(target: InspectTarget): ReturnType<typeof createdOf> {
+function createdFrom(target: InspectTarget): Created {
   return createdOf(target.machine.create({ clock: VirtualClock() }));
 }
 
@@ -192,12 +192,19 @@ function runner(
   });
 }
 
+/** What `inspectWith` reads besides the target: the analysis of its file and the payload samples from its types. */
+interface InspectWithOptions {
+  analysis?: Either<string, ModuleAnalysis>;
+  fromTypes?: Readonly<Record<string, ReadonlyArray<VizJson>>>;
+}
+
 function annotator(
   target: InspectTarget,
-  analysis: Either<string, ModuleAnalysis> | null,
+  options: InspectWithOptions,
 ): (machine: VizMachine) => VizMachine {
   const { source } = target;
-  if (analysis === null || source === undefined) return (machine) => machine;
+  const { analysis } = options;
+  if (analysis === undefined || source === undefined) return (machine) => machine;
   return (machine) => annotateWith(machine, { analysis, source });
 }
 
@@ -263,18 +270,21 @@ function fuzzRun(
   };
 }
 
-function inspectWith(
-  target: InspectTarget,
-  analysis: Either<string, ModuleAnalysis> | null,
-  fromTypes: Readonly<Record<string, ReadonlyArray<VizJson>>> = {},
-): Inspected {
-  const annotate = annotator(target, analysis);
+/** One machine inspected on its own, with the embeds of its states for the walk to follow. */
+interface OwnInspection extends Omit<Inspected, "embedded"> {
+  embeds: ReadonlyArray<StateEmbed>;
+}
+
+function inspectWith(target: InspectTarget, options: InspectWithOptions = {}): OwnInspection {
+  const { analysis } = options;
+  const annotate = annotator(target, options);
   const inferred = {
-    ...fromTypes,
+    ...options.fromTypes,
     ...Either.getRight(analysis ?? Either.left("none"))?.payloads,
   };
   const created = createdFrom(target);
-  const structure = annotate(toVizMachine({ id: target.machine.id, ...created }));
+  const own = structureOf({ id: target.machine.id, ...created });
+  const structure = annotate(own.machine);
   const expected = checkExpectations(
     target.expectations?.states,
     structure.states.filter((each) => each.region === null).map((each) => each.id),
@@ -284,11 +294,12 @@ function inspectWith(
   const unchecked = uncheckedExpectations(target, { expected, run });
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
-    analysis === null ? [] : [Either.getLeft(analysis)].filter((each) => each !== undefined);
+    analysis === undefined ? [] : [Either.getLeft(analysis)].filter((each) => each !== undefined);
   const lostRuns = lost.map((each) => ({ name: lostRunName(each), steps: each.steps }));
   const annotated = annotate({ ...machine, runs: [...(target.tests ?? []), ...lostRuns] });
   return {
     machine: annotated,
+    embeds: own.embeds,
     missingPayloads: missing,
     lostMessages: lost,
     warnings: [
@@ -308,7 +319,35 @@ function inspectWith(
  * that cannot run is skipped with a warning, never guessed.
  */
 export function inspect(target: InspectTarget): Inspected {
-  return inspectWith(target, target.source === undefined ? null : analyzeModule(target.source));
+  const { embeds, ...inspected } = inspectWith(
+    target,
+    target.source === undefined ? {} : { analysis: analyzeModule(target.source) },
+  );
+  const drawn = withEmbedded([{ machine: inspected.machine, embeds }], {
+    build: (machine) => inspectEmbedded(machine, { fuzz: target.fuzz }),
+  });
+  return {
+    ...inspected,
+    machine: drawn.roots[0] ?? inspected.machine,
+    embedded: drawn.embedded,
+    warnings: [...inspected.warnings, ...drawn.warnings],
+  };
+}
+
+interface EmbeddedSettings {
+  fuzz: InspectTarget["fuzz"];
+}
+
+/** A machine an embed reached, inspected as if a file exported it, but without a source file to read. */
+function inspectEmbedded(
+  machine: Machine,
+  options: EmbeddedSettings,
+): Either<string, BuiltEmbedding> {
+  const created = freshActor(machine);
+  if (Either.isLeft(created)) return created;
+  const target: InspectTarget = { machine };
+  if (options.fuzz !== undefined) target.fuzz = options.fuzz;
+  return Either.right(inspectWith(target));
 }
 
 /** The export that holds the expectations for machine `id`: any name, `machine` names the id, `states` is an object. */
@@ -328,15 +367,6 @@ export function projectRoot(file: string): string {
   let dir = dirname(file);
   while (!existsSync(join(dir, "package.json")) && dirname(dir) !== dir) dir = dirname(dir);
   return dir;
-}
-
-function isMachine(value: unknown): value is Machine {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof Reflect.get(value, "id") === "string" &&
-    typeof Reflect.get(value, "create") === "function"
-  );
 }
 
 /** The recorded runs of one machine that replay faithfully, and a warning for each that does not. */
@@ -373,6 +403,8 @@ export interface ModuleOptions {
 
 export interface InspectedModule {
   machines: VizMachine[];
+  /** The machines the file's machines embed that it does not export, each inspected as if exported. A document of this file holds them too. */
+  embedded: VizMachine[];
   /** Prefixed with the machine id, or the file when it is about the file. */
   warnings: string[];
 }
@@ -388,10 +420,12 @@ export async function inspectModule(
     ...(options.tsconfig === undefined ? {} : { tsconfig: options.tsconfig }),
   };
   const analysis = analyzeModule(source, { programs: options.programs });
-  if (Either.isLeft(analysis)) return { machines: [], warnings: [`${file}: ${analysis[0]}`] };
+  if (Either.isLeft(analysis)) {
+    return { machines: [], embedded: [], warnings: [`${file}: ${analysis[0]}`] };
+  }
   const found = analysis[1].machines;
   if (found.length === 0) {
-    return { machines: [], warnings: [`${file}: no exported machine(...) found`] };
+    return { machines: [], embedded: [], warnings: [`${file}: no exported machine(...) found`] };
   }
   const exports = await options.load(file);
   const { runs: recorded, warnings: runWarnings } = readRuns(dirname(file));
@@ -399,7 +433,7 @@ export async function inspectModule(
     const id = each.id;
     const value = exports[each.name];
     if (!isMachine(value)) {
-      return { machine: null, warnings: [`${id}: ${each.name} is not a machine(...) value`] };
+      return { machine: undefined, warnings: [`${id}: ${each.name} is not a machine(...) value`] };
     }
     const base: InspectTarget = { machine: value };
     const replayed = replayedRuns(base, recorded);
@@ -412,8 +446,7 @@ export async function inspectModule(
         ...(claimed === undefined ? {} : { expectations: claimed }),
         ...(replayed.runs.length === 0 ? {} : { tests: replayed.runs }),
       },
-      analysis,
-      each.samples,
+      { analysis, fromTypes: each.samples },
     );
     const withContext: VizMachine = {
       ...inspected.machine,
@@ -427,14 +460,23 @@ export async function inspectModule(
     };
     return {
       machine: withContext,
+      embeds: inspected.embeds,
       warnings: [...replayed.warnings, ...inspected.warnings].map((warning) => `${id}: ${warning}`),
     };
   });
+  const roots: Embedding[] = [];
+  for (const result of results) {
+    if (result.machine !== undefined) roots.push(result);
+  }
+  const settings: EmbeddedSettings = { fuzz: options.fuzz ?? {} };
+  const drawn = withEmbedded(roots, { build: (machine) => inspectEmbedded(machine, settings) });
   return {
-    machines: results.flatMap((result) => (result.machine === null ? [] : [result.machine])),
+    machines: drawn.roots,
+    embedded: drawn.embedded,
     warnings: [
       ...runWarnings.map((warning) => `${file}: ${warning}`),
       ...results.flatMap((result) => result.warnings),
+      ...drawn.warnings,
     ],
   };
 }
