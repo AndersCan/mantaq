@@ -6,8 +6,8 @@
  * The harness does not wait for a real effect's later answer: the live driver
  * holds effects, so an effect only reports when the caller sends its event.
  */
+import { actorMapOf, machineFindings, movesFrom, parseViz, scopeOf } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
-import { machineFindings, movesFrom, parseViz, scopeOf } from "@mantaq/viz";
 import type {
   VizActorRef,
   VizEdge,
@@ -130,7 +130,7 @@ async function readRegions(page: Page, machine: VizMachine): Promise<Record<stri
     const dot = id.lastIndexOf(".");
     if (dot === -1) return [];
     const scope = id.slice(0, dot);
-    const inMap = machine.maps.some((map) => scope === map || scope.startsWith(`${map}.`));
+    const inMap = actorMapOf(id, machine) !== undefined;
     return inMap ? [] : [[scope, id.slice(dot + 1)] as const];
   });
   return Object.fromEntries(entries);

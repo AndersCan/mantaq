@@ -1,4 +1,4 @@
-import { actorMapOf, scopeOf } from "@mantaq/viz";
+import { actorMapOf, groupNameProblem, scopeOf } from "@mantaq/viz";
 import type {
   ActorMaps,
   VizEdge,
@@ -283,16 +283,18 @@ interface TaggedState {
 /**
  * The group of each state, by id. A tag is found by the state's name, so a name in several
  * scopes (a root `idle` and `upload.idle`) gets no group, and nor does a state in an actor map.
- * A group that still reaches several scopes is left off, so the document passes `validateViz`.
+ * A name the validator rejects, or a group that still reaches several scopes, is left off.
  */
 function groupsOf(states: ReadonlyArray<VizState>, notes: StateNotes): Map<string, string> {
-  const named = states.map((state) => ({ key: localState(state.id), scope: scopeOf(state.id) }));
+  const taggable = states.filter((state) => actorMapOf(state.id, notes) === undefined);
+  const named = taggable.map((state) => ({ key: localState(state.id), scope: scopeOf(state.id) }));
   const shared = inSeveralScopes(named);
-  const tagged = states.flatMap((state): TaggedState[] => {
+  const tagged = taggable.flatMap((state): TaggedState[] => {
     const name = localState(state.id);
     const group = noteOf(name, { notes, kind: "stateGroups" });
-    const untaggable = shared.has(name) || actorMapOf(state.id, notes) !== undefined;
-    if (group === undefined || untaggable) return [];
+    if (group === undefined) return [];
+    const refused = shared.has(name) || groupNameProblem(group) !== undefined;
+    if (refused) return [];
     return [{ id: state.id, group, scope: scopeOf(state.id) }];
   });
   const split = inSeveralScopes(tagged.map(({ group, scope }) => ({ key: group, scope })));

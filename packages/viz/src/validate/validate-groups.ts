@@ -1,4 +1,4 @@
-import { actorMapOf, scopeOf } from "../schema.ts";
+import { actorMapOf, groupNameProblem, scopeOf } from "../schema.ts";
 import type { Reader } from "./validate-read.ts";
 import { report } from "./validate-read.ts";
 import type { VizMachine } from "../schema.ts";
@@ -19,12 +19,6 @@ function placeOf(scope: string): string {
   return scope === "" ? "the root" : `region ${JSON.stringify(scope)}`;
 }
 
-function nameProblem(group: string): string | undefined {
-  if (group === "") return "empty group name";
-  if (group.includes(".")) return `group name ${JSON.stringify(group)} contains "."`;
-  return undefined;
-}
-
 /**
  * Each group of a machine has a name without `.`, and all its states share one
  * region scope outside any actor map. Every issue is reported at the state's `group`.
@@ -36,7 +30,7 @@ export function checkGroups(reader: Reader, options: MachineAt): void {
     const { group } = state;
     if (group === undefined) continue;
     const at = `${path}.states[${index}].group`;
-    const problem = nameProblem(group);
+    const problem = groupNameProblem(group);
     if (problem !== undefined) report(reader, { path: at, message: problem });
     const scope = scopeOf(state.id);
     const map = actorMapOf(state.id, machine);

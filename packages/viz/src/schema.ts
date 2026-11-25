@@ -27,6 +27,13 @@ export function actorMapOf(id: string, options: ActorMaps): string | undefined {
   return options.maps.find((map) => scope === map || scope.startsWith(`${map}.`));
 }
 
+/** Why a group name is not allowed, or undefined when it is: a name is not empty and has no `.`. */
+export function groupNameProblem(group: string): string | undefined {
+  if (group === "") return "empty group name";
+  if (group.includes(".")) return `group name ${JSON.stringify(group)} contains "."`;
+  return undefined;
+}
+
 export function isAnyState(id: string): boolean {
   return id === ANY_STATE || id.endsWith(`.${ANY_STATE}`);
 }
