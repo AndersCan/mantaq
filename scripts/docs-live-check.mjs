@@ -123,6 +123,12 @@ async function fitFailures() {
   await viewer.getByRole("button", { name: "Zoom in" }).click();
   const zoomed = await percent();
   const fit = viewer.getByRole("button", { name: "Zoom to fit" });
+  if (await fit.isDisabled()) {
+    await tab.close();
+    return [
+      `events: Fit is off at ${zoomed} after Zoom in from ${opened}, so it cannot be checked`,
+    ];
+  }
   await fit.click();
   const fitted = await percent();
   const done = await fit.isDisabled();

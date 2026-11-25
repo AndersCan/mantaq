@@ -55,6 +55,8 @@ export interface ViewportOptions {
   drawing: () => Element | undefined;
   /** The room that `fit` fills; default the container's visible box. A container whose height follows the drawing passes its own. */
   fitBox?: () => Size;
+  /** How far down the window something covers it, in client pixels: `fit` puts the drawing's top below that. Default 0. */
+  coveredTop?: () => number;
   /** The part of the container the reader sees; zoom in, zoom out and 100% keep its center put. Default: the part inside the window. */
   shown?: () => Box;
   /** Default 100%, chosen, with the select tool. */
@@ -69,7 +71,7 @@ export interface Viewport {
   /** Zooms to the next step, at the center of the part of the container shown. */
   zoomIn: () => void;
   zoomOut: () => void;
-  /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's when the container starts above it; the page scrolls for that too. */
+  /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's (below what covers it) when the container starts above it; the page scrolls for that too. */
   fit: () => void;
   /** The scale that `fit` would choose now; undefined without a drawing. */
   fitScale: () => number | undefined;
@@ -172,7 +174,7 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
     const rect = drawing.getBoundingClientRect();
     const wanted = {
       x: container.scrollLeft + rect.left - Math.max(visible.x, 0),
-      y: container.scrollTop + rect.top - Math.max(visible.y, 0),
+      y: container.scrollTop + rect.top - Math.max(visible.y, options.coveredTop?.() ?? 0),
     };
     scrollTo(wanted, { x: followed(container, { sizeBefore }).x, y: "page" });
     lastOrigin = undefined;

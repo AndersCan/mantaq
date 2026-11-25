@@ -50,7 +50,8 @@ import { walkDriver } from "/groups/walk-driver.ts";
 const names = ["cart", "address", "shipping", "payment", "review", "paid", "picked", "packed", "shipped", "delivered"];
 const states = names.map((name, index) => stateOf(name, { initial: index === 0 }));
 const edges = [edgeOf("__initial__", { event: "", to: "cart", kind: "initial" })];
-for (const [index, name] of names.slice(1).entries()) edges.push(edgeOf(names[index], { event: "to" + name, to: name }));
+const tall = new URLSearchParams(location.search).has("tall");
+for (const [index, name] of names.slice(1).entries()) edges.push(edgeOf(tall ? "cart" : names[index], { event: "to" + name, to: name }));
 const machine = machineOf({ states, edges });
 const { driver, sent } = walkDriver(machine, { guarded: new Set() });
 const diagramOnly = new URLSearchParams(location.search).has("diagram-only");
@@ -61,11 +62,17 @@ window.sent = sent;
 interface ViewerPageOptions {
   /** "diagram": the viewer opens with Diagram only, so Show controls draws it all again. */
   shows?: "all" | "diagram";
+  /** "tall": every arrow leaves `cart`, so the drawing runs down, not across. */
+  drawing?: "wide" | "tall";
 }
 
 async function viewerPage(options: ViewerPageOptions = {}): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
-  await page.goto(options.shows === "diagram" ? `${origin}?diagram-only` : origin);
+  const query = new URLSearchParams();
+  if (options.shows === "diagram") query.set("diagram-only", "");
+  if (options.drawing === "tall") query.set("tall", "");
+  const search = query.toString();
+  await page.goto(`${origin}?${search}`);
   await page.setContent(
     '<link rel="stylesheet" href="/viewer.css"><style>body { margin: 16px; min-height: 3000px; }</style><div id="viewer"></div>',
   );
@@ -233,6 +240,7 @@ test("Zoom in, Zoom out and Fit change the drawn size and the percent; the zoom 
 
 test("the percent follows a Ctrl+wheel zoom and the zoom keys", async () => {
   const page = await viewerPage();
+  const opened = await shownOf(page);
   const label = await labelOf(page, { to: "review" });
   await page.mouse.move(label.x, label.y);
   await page.keyboard.down("Control");
@@ -244,8 +252,8 @@ test("the percent follows a Ctrl+wheel zoom and the zoom keys", async () => {
   expect({
     wheeled: wheeled.percent === `${wheeled.drawn}%`,
     keyed: keyed.percent === `${keyed.drawn}%`,
-    changed: wheeled.percent !== keyed.percent,
-  }).toEqual({ wheeled: true, keyed: true, changed: true });
+    changed: [opened.percent !== wheeled.percent, wheeled.percent !== keyed.percent],
+  }).toEqual({ wheeled: true, keyed: true, changed: [true, true] });
   await page.close();
 }, 60_000);
 
@@ -253,29 +261,70 @@ test("the tool and the percent hold across a step, and when Show controls draws 
   const page = await viewerPage({ shows: "diagram" });
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Move" }).click();
   const zoomed = await shownOf(page);
-  const label = await labelOf(page, { to: "address" });
-  await page.mouse.click(label.x, label.y);
+  await labelOf(page, { to: "address" });
+  // With Move a click on an arrow pans; Enter on it still sends.
+  await page.evaluate(() => {
+    document.querySelector<SVGGElement>('.graph g.edge[data-to="address"]')?.focus();
+  });
+  await page.keyboard.press("Enter");
   await page.waitForFunction(
     () => document.querySelector('g.state.current[data-node-id="address"]') !== null,
   );
-  await page.getByRole("button", { name: "Move" }).click();
   const stepped = { shown: await shownOf(page), tools: await toolsLook(page) };
   await page.getByRole("button", { name: "Show controls" }).click();
   await page.getByRole("tab", { name: "Step" }).waitFor();
   const redrawn = { shown: await shownOf(page), tools: await toolsLook(page) };
+  const moving = { select: "false", move: "true", pressedCursor: "default" };
   expect({
+    sent: await sentCount(page),
     stepped: { percent: stepped.shown.percent, tools: stepped.tools },
     redrawn: { percent: redrawn.shown.percent, tools: redrawn.tools },
   }).toEqual({
-    stepped: {
-      percent: zoomed.percent,
-      tools: { select: "false", move: "true", pressedCursor: "default" },
+    sent: 1,
+    stepped: { percent: zoomed.percent, tools: moving },
+    redrawn: { percent: zoomed.percent, tools: moving },
+  });
+  await page.close();
+}, 60_000);
+
+test("from the keyboard, Fit and a zoom limit turn the button off but keep focus on it, so the keys still act", async () => {
+  const page = await viewerPage();
+  const fit = page.getByRole("button", { name: "Zoom to fit" });
+  await fit.focus();
+  await page.keyboard.press("Enter");
+  const fitted = {
+    off: await fit.isDisabled(),
+    title: await fit.getAttribute("title"),
+    focused: await fit.evaluate((button) => document.activeElement === button),
+  };
+  await page.keyboard.press("h");
+  const tools = await toolsLook(page);
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  await zoomIn.focus();
+  for (const _ of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) await page.keyboard.press("Enter");
+  const largest = {
+    percent: (await shownOf(page)).percent,
+    off: await zoomIn.isDisabled(),
+    title: await zoomIn.getAttribute("title"),
+    focused: await zoomIn.evaluate((button) => document.activeElement === button),
+  };
+  await page.keyboard.press("Control+Minus");
+  expect({ fitted, tools: tools.move, largest, after: (await shownOf(page)).percent }).toEqual({
+    fitted: {
+      off: true,
+      title: "Zoom to fit (Shift+1): the whole diagram fits already",
+      focused: true,
     },
-    redrawn: {
-      percent: zoomed.percent,
-      tools: { select: "false", move: "true", pressedCursor: "default" },
+    tools: "true",
+    largest: {
+      percent: "800%",
+      off: true,
+      title: "Zoom in: 800% is the largest zoom",
+      focused: true,
     },
+    after: "600%",
   });
   await page.close();
 }, 60_000);
@@ -299,5 +348,31 @@ test("in full screen the bar stays in view while a canvas zoomed in scrolls", as
     top: { scrolled: true, barTop: 0 },
     exitShown: true,
   });
+  await page.close();
+}, 60_000);
+
+test("in full screen, Fit puts the whole drawing below the bar", async () => {
+  const page = await viewerPage({ drawing: "tall" });
+  await page.getByRole("button", { name: "Full screen" }).click();
+  await page.getByRole("button", { name: "Exit full screen" }).waitFor();
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  for (const _ of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    if (await zoomIn.isEnabled()) await zoomIn.click();
+  }
+  await page.evaluate(() => {
+    const viewer = document.querySelector<HTMLElement>("#viewer");
+    viewer?.scrollTo({ top: viewer.scrollHeight, behavior: "instant" });
+  });
+  await page.getByRole("button", { name: "Zoom to fit" }).click();
+  const placed = await page.evaluate(() => {
+    const bar = document.querySelector(".viz-bar")?.getBoundingClientRect() ?? new DOMRect();
+    const graph = document.querySelector(".canvas svg.graph")?.getBoundingClientRect();
+    const drawing = graph ?? new DOMRect();
+    return {
+      belowBar: drawing.top >= bar.bottom - 1,
+      inWindow: drawing.bottom <= innerHeight + 1,
+    };
+  });
+  expect(placed).toEqual({ belowBar: true, inWindow: true });
   await page.close();
 }, 60_000);

@@ -44,7 +44,8 @@ function builtPages(dist) {
 function inPage(options) {
   const shown = options.shown ?? [];
   function looksClickable(element) {
-    const unseen = element.closest("[disabled]") !== null || element.getClientRects().length === 0;
+    const off = element.closest('[disabled], [aria-disabled="true"]') !== null;
+    const unseen = off || element.getClientRects().length === 0;
     if (unseen) return false;
     if (element.getAttribute("role") === "button") return true;
     const pointer = getComputedStyle(element).cursor === "pointer";

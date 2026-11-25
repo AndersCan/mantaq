@@ -1,19 +1,18 @@
 import { html, svg } from "../dom.ts";
-import { MAX_ZOOM, MIN_ZOOM } from "../viewport/zoom.ts";
 import type { Viewport, ViewportState } from "../viewport/viewport.ts";
+import { zoomInFrom, zoomOutFrom } from "../viewport/zoom.ts";
 import { isNever } from "../../is-never.ts";
 
 /** What a toolbar button does to the viewport. */
 type ToolbarAction = "select" | "hand" | "zoomOut" | "zoomIn" | "fit";
-
-/** Scales closer than this to a zoom limit are at it. */
-const LIMIT_TOLERANCE = 1e-6;
 
 interface ButtonText {
   action: ToolbarAction;
   label: string;
   /** The tooltip: the label and its key. */
   title: string;
+  /** The tooltip while a click would change nothing: why the button is off. */
+  offTitle?: string;
   shortcut: string;
 }
 
@@ -26,6 +25,7 @@ const ZOOM_OUT: ButtonText = {
   action: "zoomOut",
   label: "Zoom out",
   title: "Zoom out (Ctrl or Cmd and -)",
+  offTitle: "Zoom out: 10% is the smallest zoom",
   shortcut: "Control+- Meta+-",
 };
 
@@ -33,6 +33,7 @@ const ZOOM_IN: ButtonText = {
   action: "zoomIn",
   label: "Zoom in",
   title: "Zoom in (Ctrl or Cmd and +)",
+  offTitle: "Zoom in: 800% is the largest zoom",
   shortcut: "Control+= Meta+=",
 };
 
@@ -40,6 +41,7 @@ const FIT: ButtonText = {
   action: "fit",
   label: "Zoom to fit",
   title: "Zoom to fit (Shift+1)",
+  offTitle: "Zoom to fit (Shift+1): the whole diagram fits already",
   shortcut: "Shift+1",
 };
 
@@ -113,7 +115,9 @@ export function bindToolbar(toolbar: HTMLElement, options: BindToolbarOptions): 
   for (const button of toolbar.querySelectorAll<HTMLButtonElement>("[data-viz-tool]")) {
     const action = actionOf(button);
     if (action === undefined) continue;
-    button.addEventListener("click", () => act(viewport, { action }));
+    button.addEventListener("click", () => {
+      if (button.getAttribute("aria-disabled") !== "true") act(viewport, { action });
+    });
   }
   function shown(): void {
     showState(toolbar, { state: viewport.state(), fitScale: viewport.fitScale() });
@@ -123,12 +127,16 @@ export function bindToolbar(toolbar: HTMLElement, options: BindToolbarOptions): 
   return shown;
 }
 
-function actionOf(button: HTMLElement): ToolbarAction | undefined {
+function textOf(button: HTMLElement): ButtonText | undefined {
   const named = button.dataset["vizTool"];
   for (const each of [...TOOLS, ZOOM_OUT, ZOOM_IN, FIT]) {
-    if (each.action === named) return each.action;
+    if (each.action === named) return each;
   }
   return undefined;
+}
+
+function actionOf(button: HTMLElement): ToolbarAction | undefined {
+  return textOf(button)?.action;
 }
 
 interface ActOptions {
@@ -181,13 +189,13 @@ function showState(toolbar: HTMLElement, options: ShowStateOptions): void {
         pressed(button, { on: state.tool === action });
         break;
       case "zoomOut":
-        button.disabled = state.scale <= MIN_ZOOM + LIMIT_TOLERANCE;
+        turnedOff(button, { off: zoomOutFrom(state.scale) === state.scale });
         break;
       case "zoomIn":
-        button.disabled = state.scale >= MAX_ZOOM - LIMIT_TOLERANCE;
+        turnedOff(button, { off: zoomInFrom(state.scale) === state.scale });
         break;
       case "fit":
-        button.disabled = fitted;
+        turnedOff(button, { off: fitted });
         break;
       default:
         isNever(action);
@@ -198,6 +206,19 @@ function showState(toolbar: HTMLElement, options: ShowStateOptions): void {
 function percentOf(scale: number): string {
   const rounded = Math.round(scale * 100);
   return `${rounded}%`;
+}
+
+interface TurnedOffOptions {
+  off: boolean;
+}
+
+/** A button whose click would change nothing looks off and ignores clicks, and its tooltip says why. It stays focusable, so focus and the viewer's keys stay where the reader was. */
+function turnedOff(button: HTMLButtonElement, options: TurnedOffOptions): void {
+  const text = textOf(button);
+  const title = options.off ? text?.offTitle : text?.title;
+  if (title !== undefined) button.title = title;
+  if (options.off) button.setAttribute("aria-disabled", "true");
+  else button.removeAttribute("aria-disabled");
 }
 
 interface PressedOptions {

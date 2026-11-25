@@ -1,4 +1,4 @@
-import { fitRoom, shownArea } from "../keep-in-view.ts";
+import { coveredTop, fitRoom, shownArea } from "../keep-in-view.ts";
 import type { Viewport, ViewportState } from "../viewport/viewport.ts";
 import { bindToolbar } from "./toolbar.ts";
 import { viewportOf } from "../viewport/viewport.ts";
@@ -21,6 +21,7 @@ export function viewportOnCanvas(
     drawing: () => canvas.querySelector("svg.graph") ?? undefined,
     fitBox: () => fitRoom(root, { canvas }),
     shown: () => shownArea(root, { canvas }),
+    coveredTop: () => coveredTop(root),
     initial: view.viewport,
   });
   viewport.subscribe(({ scale, tool, sizing }) => {

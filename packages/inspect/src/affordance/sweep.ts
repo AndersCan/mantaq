@@ -383,7 +383,7 @@ function reach(root: HTMLElement, options: ReachOptions): Element[] {
   return found;
 }
 
-/** The elements that look clickable. The current choice is left out: the open tab, the current crumb, and an element marked `aria-current` that is no button. Each keeps its tab stop but shows no pointer. */
+/** The elements that look clickable. The current choice is left out: the open tab, the current crumb, and an element marked `aria-current` that is no button. Each keeps its tab stop but shows no pointer. So is a control turned off with `aria-disabled`. */
 function clickables(root: HTMLElement): Element[] {
   const found: Element[] = [];
   for (const element of root.querySelectorAll(CLICKABLE)) {
@@ -398,7 +398,9 @@ function looksClickable(element: Element): boolean {
   const role = element.getAttribute("role");
   const openTab = role === "tab" && element.getAttribute("aria-selected") === "true";
   const current = element.hasAttribute("aria-current") && role !== "button";
-  if (openTab || current) return false;
+  const off = element.getAttribute("aria-disabled") === "true";
+  const plain = openTab || current;
+  if (plain || off) return false;
   if (element.getAttribute("role") === "button") return true;
   if (tabindex !== null && Number(tabindex) >= 0) return true;
   return element.matches("a[href], button:not([disabled])");

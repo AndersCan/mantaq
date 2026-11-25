@@ -644,6 +644,20 @@
   transform: none;
 }
 
+/* A zoom button whose click would change nothing looks off; it keeps focus, unlike a disabled button. */
+.viz .viz-tool[aria-disabled="true"],
+.viz .viz-tool[aria-disabled="true"]:hover {
+  color: var(--muted);
+  border-color: var(--muted);
+  background: var(--state-bg);
+  box-shadow: none;
+  cursor: default;
+}
+
+.viz .viz-tool[aria-disabled="true"]:active {
+  transform: none;
+}
+
 .viz .zoom-percent {
   min-width: 3.5em;
   text-align: center;
@@ -660,16 +674,6 @@
   box-sizing: border-box;
   overflow: auto;
   padding: 16px;
-}
-
-/* In full screen the viewer scrolls, not the page: the bar stays at its top, so a canvas zoomed in leaves the tools and Exit full screen in reach. */
-.viz:fullscreen .viz-bar {
-  position: sticky;
-  top: -16px;
-  z-index: 1;
-  margin: -16px -16px 0;
-  padding: 16px 16px 8px;
-  background: var(--bg);
 }
 
 .viz:fullscreen .canvas:not([data-sizing="chosen"]) .graph {
@@ -768,6 +772,16 @@
   position: sticky;
   top: 0;
   z-index: 1;
+  background: var(--bg);
+}
+
+/* In full screen the viewer scrolls, not the page: the bar stays at its top, also with a path, so a canvas zoomed in leaves the tools and Exit full screen in reach. */
+.viz:fullscreen .viz-bar {
+  position: sticky;
+  top: -16px;
+  z-index: 1;
+  margin: -16px -16px 0;
+  padding: 16px 16px 8px;
   background: var(--bg);
 }
 
