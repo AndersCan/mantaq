@@ -144,6 +144,15 @@ function barOf(root: HTMLElement): string[] {
   return names;
 }
 
+/** The class of each element in the frame that holds the canvas. */
+function framed(root: HTMLElement): string[] {
+  const names: string[] = [];
+  for (const child of root.querySelector(".canvas-frame")?.children ?? []) {
+    names.push(child.className);
+  }
+  return names;
+}
+
 describe("fullscreen placement", () => {
   test("the button sits in the bar above the diagram", () => {
     const { root, button } = mountFullscreen();
@@ -151,17 +160,24 @@ describe("fullscreen placement", () => {
     expect(root.firstElementChild).toBe(button?.parentElement);
   });
 
-  test("diagram only: the bar holds the zoom and pan tools, Show controls, then Full screen", () => {
+  test("diagram only: the bar holds Show controls, then Full screen", () => {
     const { root } = mountFullscreen(undefined, { diagramOnly: true });
-    expect(barOf(root)).toEqual(["viz-tools", "show-controls", "fullscreen-toggle"]);
+    expect(barOf(root)).toEqual(["show-controls", "fullscreen-toggle"]);
   });
 
-  test("diagram only without full screen: the bar holds the tools and Show controls", () => {
-    expect(barOf(mount({ diagramOnly: true }))).toEqual(["viz-tools", "show-controls"]);
+  test("diagram only without full screen: the bar holds Show controls alone", () => {
+    expect(barOf(mount({ diagramOnly: true }))).toEqual(["show-controls"]);
   });
 
-  test("the full viewer without full screen: the bar holds the tools alone", () => {
-    expect(barOf(mount())).toEqual(["viz-tools"]);
+  test("the full viewer without full screen: the bar is empty", () => {
+    expect(barOf(mount())).toEqual([]);
+  });
+
+  test("the zoom and pan tools follow the canvas in its frame, in both layouts", () => {
+    expect([framed(mount()), framed(mount({ diagramOnly: true }))]).toEqual([
+      ["canvas", "viz-tools"],
+      ["canvas", "viz-tools"],
+    ]);
   });
 
   test("the label still follows after a re-render", () => {

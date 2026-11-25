@@ -406,3 +406,64 @@ test("Fit turns on again when a new window height changes what it would do", asy
   expect({ fitted, after: await fit.isDisabled() }).toEqual({ fitted: true, after: false });
   await page.close();
 }, 60_000);
+
+interface Placed {
+  /** How far the tools' center is from the canvas's center, across. */
+  offCenter: number;
+  /** The tools are inside the canvas's box, at its bottom. */
+  inCanvas: boolean;
+  /** The drawing ends above the tools, when the canvas is scrolled to its end. */
+  drawingAbove: boolean;
+  /** The tools are inside the window. */
+  inWindow: boolean;
+}
+
+function placedOf(page: Page): Promise<Placed> {
+  return page.evaluate(() => {
+    const canvas = document.querySelector<HTMLElement>(".canvas");
+    canvas?.scrollTo({ top: canvas.scrollHeight, behavior: "instant" });
+    const box = canvas?.getBoundingClientRect() ?? new DOMRect();
+    const tools = document.querySelector(".viz-tools")?.getBoundingClientRect() ?? new DOMRect();
+    const drawing =
+      document.querySelector(".canvas svg.graph")?.getBoundingClientRect() ?? new DOMRect();
+    return {
+      offCenter: Math.round(Math.abs(tools.left + tools.width / 2 - (box.left + box.width / 2))),
+      inCanvas: tools.top >= box.top && tools.bottom <= box.bottom - 12,
+      drawingAbove: drawing.bottom <= tools.top + 1,
+      inWindow: tools.top >= 0 && tools.bottom <= innerHeight,
+    };
+  });
+}
+
+test("the tools float at the bottom center of the canvas, below the drawing, and stay in the window while a tall canvas runs past it", async () => {
+  const placed = { offCenter: 0, inCanvas: true, drawingAbove: true, inWindow: true };
+  const wide = await viewerPage();
+  const opened = await placedOf(wide);
+  await wide.close();
+  const page = await viewerPage({ drawing: "tall" });
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  for (const _ of [1, 2, 3, 4, 5, 6]) await zoomIn.click();
+  const tall = await page.evaluate(() => {
+    const box = document.querySelector(".canvas")?.getBoundingClientRect() ?? new DOMRect();
+    scrollTo({ top: box.top + scrollY - 100, behavior: "instant" });
+    const tools = document.querySelector(".viz-tools")?.getBoundingClientRect() ?? new DOMRect();
+    return {
+      runsPast: box.height > innerHeight,
+      toolsAtBottom: innerHeight - tools.bottom >= 8 && innerHeight - tools.bottom <= 16,
+    };
+  });
+  await page.getByRole("button", { name: "Zoom to fit" }).click();
+  const fitted = await page.evaluate(() => {
+    const tools = document.querySelector(".viz-tools")?.getBoundingClientRect() ?? new DOMRect();
+    const drawing =
+      document.querySelector(".canvas svg.graph")?.getBoundingClientRect() ?? new DOMRect();
+    // The page rounds its scroll to a pixel.
+    return { inWindow: drawing.top >= -1, aboveTools: drawing.bottom <= tools.top + 1 };
+  });
+  expect({ opened, tall, fitted }).toEqual({
+    opened: placed,
+    tall: { runsPast: true, toolsAtBottom: true },
+    fitted: { inWindow: true, aboveTools: true },
+  });
+  await page.close();
+}, 60_000);

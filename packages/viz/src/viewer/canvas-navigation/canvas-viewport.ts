@@ -1,4 +1,4 @@
-import { coveredTop, fitRoom, shownArea } from "../keep-in-view.ts";
+import { coveredTop, fitRoom, shownArea, toolsRoom } from "../keep-in-view.ts";
 import type { Viewport, ViewportState } from "../viewport/viewport.ts";
 import { bindToolbar } from "./toolbar.ts";
 import { viewportOf } from "../viewport/viewport.ts";
@@ -22,6 +22,7 @@ export function viewportOnCanvas(
     fitBox: () => fitRoom(root, { canvas }),
     shown: () => shownArea(root, { canvas }),
     coveredTop: () => coveredTop(root),
+    coveredBottom: () => toolsRoom(canvas),
     initial: view.viewport,
   });
   viewport.subscribe(({ scale, tool, sizing }) => {

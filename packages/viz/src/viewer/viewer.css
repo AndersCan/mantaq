@@ -92,11 +92,28 @@
 }
 
 /* The scrollbar's room is kept, so the width a drawing is chosen for holds
-   while the drawing, or the path above it, changes. */
+   while the drawing, or the path above it, changes. The room at the bottom
+   is the zoom and pan tools', so the end of the drawing is never under them.
+   Its heights count that room, as its floor is the height it opened with. */
 .viz .canvas {
   overflow: auto;
   position: relative;
   scrollbar-gutter: stable;
+  box-sizing: border-box;
+  padding-bottom: var(---viz-tools-room);
+}
+
+/* The canvas and the zoom and pan tools share one cell, so the tools float
+   over the canvas at its bottom center. */
+.viz .canvas-frame {
+  ---viz-tools-room: calc(1lh + 48px);
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  min-width: 0;
+}
+
+.viz .canvas-frame > * {
+  grid-area: 1 / 1;
 }
 
 .viz:has(.focus-path) .canvas {
@@ -603,12 +620,29 @@
   gap: 8px;
 }
 
-/* The zoom and pan tools: the tools, then the zoom, each a row of joined buttons. */
+/* The zoom and pan tools: the tools, then the zoom, each a row of joined
+   buttons, on a panel at the bottom center of the canvas, clear of its
+   scrollbar. While the canvas runs past the window's bottom, the panel stays
+   at the window's bottom. */
 .viz .viz-tools {
+  position: sticky;
+  bottom: 12px;
+  z-index: 1;
+  align-self: end;
+  justify-self: center;
   display: flex;
-  flex: none;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 8px;
+  max-width: calc(100% - 24px);
+  margin-bottom: 20px;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--state-border);
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 var(--shadow);
 }
 
 .viz .viz-tool-group {
@@ -777,7 +811,7 @@
   background: var(--bg);
 }
 
-/* In full screen the viewer scrolls, not the page: the bar stays at its top, also with a path, so a canvas zoomed in leaves the tools and Exit full screen in reach. */
+/* In full screen the viewer scrolls, not the page: the bar stays at its top, also with a path, so a canvas zoomed in leaves Exit full screen in reach. */
 .viz:fullscreen .viz-bar {
   position: sticky;
   top: -16px;
