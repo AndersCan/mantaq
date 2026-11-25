@@ -27,7 +27,7 @@ export function sayWhy(root: HTMLElement, options: SayWhyOptions): void {
     return;
   }
   const { edge, click } = drawnArrowClick(from, { shown: options.shown, id: selection.id });
-  const justSent = edge !== undefined && isJustSent(edge, { view: from.view });
+  const justSent = isJustSent(edge, { view: from.view });
   const step = justSent ? stepLine(root.ownerDocument, from) : [];
   const why = justSent ? from.view.blocked.get(edge.id) : whyOf(click);
   const gap = step.length > 0 && why !== undefined ? ". " : "";
@@ -51,7 +51,7 @@ export interface JustSentOptions {
 }
 
 /** True while `edge` is the arrow the newest click sent: the line under the board and Details say what it did, and the arrow keeps the selected look. */
-export function isJustSent(edge: VizEdge | undefined, options: JustSentOptions): boolean {
+export function isJustSent(edge: VizEdge | undefined, options: JustSentOptions): edge is VizEdge {
   return edge !== undefined && options.view.sent?.edge === edge.id;
 }
 
