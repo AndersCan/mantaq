@@ -1,7 +1,7 @@
 import { enteredGroupOf, groupMachine } from "../groups/group-machine.ts";
+import { foldGroups, groupNodesOf } from "../groups/fold-groups.ts";
 import { partMachine, partName, partsOf } from "../parts.ts";
 import type { EnteredGroup } from "../graph.ts";
-import { foldGroups } from "../groups/fold-groups.ts";
 import { isNever } from "../../is-never.ts";
 import type { VizMachine } from "../../schema.ts";
 
@@ -100,7 +100,9 @@ function stepInto(level: Level, step: FocusStep): Stepped | undefined {
     }
     case "enter": {
       if (isBoard(level) || level.groupNode !== undefined) return undefined;
-      const view = groupMachine(cutOf(level), { group: step.node });
+      const cut = cutOf(level);
+      const scoped = level.part ? `${level.part}.${step.node}` : step.node;
+      const view = groupMachine(cut, { group: step.node }) ?? groupMachine(cut, { group: scoped });
       const node = view === undefined ? undefined : enteredGroupOf(view);
       if (node === undefined) return undefined;
       const entered = { kind: "enter", node: node.id, name: node.name } as const;
@@ -121,6 +123,36 @@ export function decodeFocus(tokens: ReadonlyArray<string>, options: FocusOptions
     steps.push(step);
   }
   return focusOf(steps, options).steps;
+}
+
+/** What the bar says when a link's path names a machine or a group that is not there; undefined when the whole path resolves. */
+export function unknownFocusText(
+  tokens: ReadonlyArray<string>,
+  options: FocusOptions,
+): string | undefined {
+  const steps = decodeFocus(tokens, options);
+  const token = tokens[steps.length];
+  if (token === undefined) return undefined;
+  const focus = focusOf(steps, options);
+  const here = focus.crumbs.at(-1)?.label ?? options.root.id;
+  const kind = focus.canvas === "board" ? "machine" : "group";
+  const said = `No ${kind} "${token}" in ${here}. The link opens ${here}.`;
+  const named = namesHere(focus);
+  if (named.length === 0) return said;
+  const listed = named.join(", ");
+  const these = kind === "machine" ? "Machines" : "Groups";
+  return `${said} ${these} here: ${listed}.`;
+}
+
+/** What a link's next step can name at this level: the machines of a board, or the group nodes of the machine drawn. */
+function namesHere(focus: Focus): string[] {
+  if (focus.canvas === "board") {
+    return partsOf(focus.machine).map((part) => partName(focus.machine, part));
+  }
+  if (focus.groupNode !== undefined) return [];
+  const names: string[] = [];
+  for (const node of groupNodesOf(focus.drawn)) names.push(node.id);
+  return names;
 }
 
 function stepOf(token: string, focus: Focus): FocusStep | undefined {

@@ -29,8 +29,10 @@ export interface CanvasOptions {
 export interface Canvas {
   drawn: () => Node[];
   refit: () => void;
-  /** Draws the path above the canvas and listens for Escape; call once the canvas is on the page. */
+  /** Draws the path above the canvas; call once the canvas is on the page. */
   framed: () => void;
+  /** Goes back one level of the path; false at the top. */
+  back: () => boolean;
   /** Says in the bar where the walk is while it is outside the group entered. */
   walked: () => void;
 }
@@ -53,10 +55,10 @@ export function canvasOf(options: CanvasOptions): Canvas {
     root.querySelector(".canvas")?.replaceChildren(...drawn());
     titled();
   }
-  /** The start of the bar above the canvas: the path while a machine is opened or a group entered, and the overlap warning of the drawing. */
+  /** The start of the bar above the canvas: the path while a machine is opened or a group entered, then its notices. */
   function titled(): void {
     root.querySelector(".viz-bar-start")?.remove();
-    const shown = [...pathOf(), ...warningLine()];
+    const shown = [...pathOf(), ...noticeLines(doc, { root, view })];
     if (shown.length === 0) return;
     const bar = root.querySelector(".viz-bar") ?? html(doc, "div", { class: "viz-bar" });
     if (!bar.isConnected) root.prepend(bar);
@@ -66,7 +68,6 @@ export function canvasOf(options: CanvasOptions): Canvas {
     const focus = options.focus();
     if (focus.steps.length === 0) return [];
     const path = breadcrumbOf(doc, { focus, moveTo: (keep) => moveTo(focus.steps.slice(0, keep)) });
-    path.addEventListener("keydown", leaveOnEscape);
     if (focus.groupNode === undefined) return [path];
     return [path, html(doc, "p", { class: "walk-outside muted", role: "status" })];
   }
@@ -74,16 +75,11 @@ export function canvasOf(options: CanvasOptions): Canvas {
     const line = root.querySelector(".viz-bar .walk-outside");
     if (line !== null) line.textContent = outsideText({ focus: options.focus(), view }) ?? "";
   }
-  function warningLine(): HTMLElement[] {
-    const count = root.querySelector(".canvas .graph")?.getAttribute("data-overlaps");
-    const warning = overlapWarning(Number(count ?? 0));
-    if (warning === undefined) return [];
-    return [html(doc, "p", { class: "overlap-warning" }, [warning])];
-  }
   function moveTo(steps: FocusStep[], landing: Landing = {}): void {
     const { onto } = landing;
     const before = options.focus();
     view.focus = steps;
+    view.focusNotice = undefined;
     const after = options.focus();
     options.moved({ before, after });
     swap();
@@ -118,11 +114,11 @@ export function canvasOf(options: CanvasOptions): Canvas {
         : `.graph g.machine-enter[data-enter-group="${CSS.escape(left.node)}"]`;
     root.querySelector<SVGGElement>(selector)?.focus({ preventScroll: true });
   }
-  function leaveOnEscape(event: KeyboardEvent): void {
+  function back(): boolean {
     const { steps } = options.focus();
-    if (event.key !== "Escape" || steps.length === 0) return;
-    event.preventDefault();
+    if (steps.length === 0) return false;
     moveTo(steps.slice(0, -1));
+    return true;
   }
   function open(part: string): void {
     const { machine } = options.focus();
@@ -151,11 +147,26 @@ export function canvasOf(options: CanvasOptions): Canvas {
     swap();
     options.mark();
   }
-  function framed(): void {
-    root.querySelector<HTMLElement>(".canvas")?.addEventListener("keydown", leaveOnEscape);
-    titled();
+  return { drawn, refit, framed: titled, walked, back };
+}
+
+interface NoticeOptions {
+  root: HTMLElement;
+  view: ViewState;
+}
+
+/** The notices in the bar: a part of a link's path that is not there, and the overlap warning of the drawing. */
+function noticeLines(doc: Document, options: NoticeOptions): HTMLElement[] {
+  const { root, view } = options;
+  const lines: HTMLElement[] = [];
+  const notice = view.focusNotice;
+  if (notice !== undefined) {
+    lines.push(html(doc, "p", { class: "focus-notice", role: "status" }, [notice]));
   }
-  return { drawn, refit, framed, walked };
+  const count = root.querySelector(".canvas .graph")?.getAttribute("data-overlaps");
+  const warning = overlapWarning(Number(count ?? 0));
+  if (warning !== undefined) lines.push(html(doc, "p", { class: "overlap-warning" }, [warning]));
+  return lines;
 }
 
 interface BreadcrumbOptions {
