@@ -177,12 +177,18 @@ test("a pointer, a hover style or the march on a state or an arrow needs it to b
 });
 
 test("the crumb shown now is plain text: no frame, no pointer and no focus ring", () => {
-  const current = listed(".viz .focus-path [aria-current]");
+  const framing = bare.split("}").filter((block) => {
+    const selectors = block.split("{")[0] ?? "";
+    const current = selectors
+      .split(",")
+      .some((each) => each.trim() === ".viz .focus-path [aria-current]");
+    return current && /border|padding|background|cursor/.test(block);
+  });
   expect({
-    framed: /border|padding|background|cursor/.test(current),
+    framing,
     ring: listed(".viz .focus-path [aria-current]:focus-visible"),
   }).toStrictEqual({
-    framed: false,
+    framing: [],
     ring: expect.stringMatching(/outline:\s*none/),
   });
 });

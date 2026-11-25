@@ -100,7 +100,9 @@ function stepInto(level: Level, step: FocusStep): Stepped | undefined {
     }
     case "enter": {
       if (isBoard(level) || level.groupNode !== undefined) return undefined;
-      const view = groupMachine(cutOf(level), { group: step.node });
+      const cut = cutOf(level);
+      const scoped = level.part ? `${level.part}.${step.node}` : step.node;
+      const view = groupMachine(cut, { group: step.node }) ?? groupMachine(cut, { group: scoped });
       const node = view === undefined ? undefined : enteredGroupOf(view);
       if (node === undefined) return undefined;
       const entered = { kind: "enter", node: node.id, name: node.name } as const;

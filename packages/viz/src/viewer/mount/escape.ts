@@ -56,6 +56,7 @@ export function listenEscape(root: HTMLElement, options: EscapeOptions): void {
     if (!isElsewhere(event.target)) answer(root, event);
   });
   doc.addEventListener("keydown", (event) => {
-    if (ownsUnfocusedEscape(root)) answer(root, event);
+    const inside = event.target instanceof Node && root.contains(event.target);
+    if (!inside && ownsUnfocusedEscape(root)) answer(root, event);
   });
 }

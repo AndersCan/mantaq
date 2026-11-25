@@ -67,6 +67,11 @@ describe("the path in the address bar on a board", () => {
     });
   });
 
+  test("inside a machine of the board, a group may also be named by its own id", () => {
+    const entered = focusOf(decodeFocus(["till", "@payment"], { root }), { root });
+    expect(focusTokens(entered.steps)).toStrictEqual(["till", "till.@payment"]);
+  });
+
   test("a group cannot be entered from the board, only from its machine", () => {
     expect(decodeFocus(["till.@payment"], { root })).toStrictEqual([]);
   });

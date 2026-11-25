@@ -7,3 +7,5 @@ Escape goes back one level of the path from anywhere in the viewer, not only fro
 The current crumb of the path is plain text: it has no frame and no focus ring, but focus still lands on it so that a screen reader says where the reader is.
 
 If a `?focus=` link names a machine or a group that is not there, the bar says so and lists what is there, for example `No group "@nowhere" in shop. The link opens shop. Groups here: @payment, @shipping.`, until the next move along the path or the next step. An empty `focus=` value is ignored.
+
+Inside a machine of a board, a `?focus=` link may name a group by its own id, so `?focus=till&focus=@payment` opens the same group as `?focus=till&focus=till.@payment`.

@@ -250,10 +250,33 @@ describe("entering a group", () => {
     second.root.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
     blur();
     escape(document.body);
-    expect({ opened, touched: [shown(first.root).path, shown(second.root).path] }).toStrictEqual({
+    const touched = [shown(first.root).path, shown(second.root).path];
+    enter(second.root, { id: "@shipping" });
+    first.root.querySelector<HTMLElement>('[data-tab="details"]')?.focus();
+    blur();
+    escape(document.body);
+    expect({
+      opened,
+      touched,
+      focused: [shown(first.root).path, shown(second.root).path],
+    }).toStrictEqual({
       opened: [[], ["shop", "shipping"]],
       touched: [["shop", "payment"], []],
+      focused: [[], ["shop", "shipping"]],
     });
+  });
+
+  test("Escape on the host's own screen in the Screen tab does nothing", () => {
+    const { root } = mount({
+      focus: ["@payment"],
+      screen: () => {
+        const button = document.createElement("button");
+        button.textContent = "Close";
+        return button;
+      },
+    });
+    escape(root.querySelector('[data-tab-panel="screen"] button'));
+    expect(shown(root).path).toStrictEqual(["shop", "payment"]);
   });
 
   test("at the top level, with focus lost after a Details link, Escape closes Details", () => {
