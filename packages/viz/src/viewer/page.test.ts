@@ -26,7 +26,10 @@ describe("the address bar", () => {
     history.replaceState(undefined, "", "?machine=answer&value=code%3D%22c1%22&value=n%3D2");
     const options = linkOptions();
     expect(options.values).toEqual(['code="c1"', "n=2"]);
-    options.onNavigate?.({ machine: "answer", steps: [], payloads: ['ask={"code":"c1"}'],
+    options.onNavigate?.({
+      machine: "answer",
+      steps: [],
+      payloads: ['ask={"code":"c1"}'],
       focus: [],
     });
     const params = new URLSearchParams(location.search);
