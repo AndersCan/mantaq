@@ -1,5 +1,5 @@
 /**
- * Options for a page that keeps `?machine=&step=&run=&payload=` (and reads old `?value=` links) in the address bar so a walk can be shared (`linkOptions`).
+ * Options for a page that keeps `?machine=&step=&run=&payload=&focus=` (and reads old `?value=` links) in the address bar so a walk and the machine opened can be shared (`linkOptions`).
  */
 import type { ViewerOptions } from "./embed.ts";
 import "./viewer.css";
@@ -8,6 +8,7 @@ interface Walk {
   machine: string;
   steps: string[];
   payloads: string[];
+  focus: string[];
 }
 
 function rememberWalk(where: Walk): void {
@@ -17,8 +18,10 @@ function rememberWalk(where: Walk): void {
   next.delete("run");
   next.delete("value");
   next.delete("payload");
+  next.delete("focus");
   for (const payload of where.payloads) next.append("payload", payload);
   for (const step of where.steps) next.append("step", step);
+  for (const opened of where.focus) next.append("focus", opened);
   history.replaceState(null, "", `?${next.toString()}`);
 }
 
@@ -33,6 +36,7 @@ export function linkOptions(): ViewerOptions {
     steps: params.getAll("step"),
     payloads: params.getAll("payload"),
     values: params.getAll("value"),
+    focus: params.getAll("focus"),
     onNavigate: rememberWalk,
   };
 }

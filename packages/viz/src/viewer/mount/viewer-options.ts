@@ -16,14 +16,21 @@ export interface ViewerOptions {
   payloads?: ReadonlyArray<string>;
   /** Old links: a field value by name, as `name=<json>` (from `?value=`), for every event with a field of that name. */
   values?: ReadonlyArray<string>;
-  /** Called after every walk, or payload change, e.g. to keep the URL shareable. */
-  onNavigate?: (where: { machine: string; steps: string[]; payloads: string[] }) => void;
+  /** The machines to open from the root, one value per step (from `?focus=`): a machine's name on a board, else the state that embeds the next machine. Values that do not resolve are dropped. */
+  focus?: ReadonlyArray<string>;
+  /** Called after every walk, payload change or move along the focus path, e.g. to keep the URL shareable. */
+  onNavigate?: (where: {
+    machine: string;
+    steps: string[];
+    payloads: string[];
+    focus: string[];
+  }) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
   /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state, or, while a state is selected, for that state as a throwaway copy reaches it. */
   screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
-  /** Called with the embedded machine's id when the reader clicks enter on a machine node. Unset: machine nodes draw no enter control. */
-  onEnter?: (machine: string) => void;
+  /** Called after the reader enters a machine node: the embedded machine's id and the state that embeds it. The viewer shows that machine itself. */
+  onEnter?: (entered: { machine: string; state: string }) => void;
 }

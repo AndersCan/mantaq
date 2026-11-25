@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
+import type { EnteredMachine, Selection } from "./graph.ts";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
-import type { Selection } from "./graph.ts";
 import { documentOf } from "../validate/embed-document.ts";
 import { mountViewer } from "./viewer.ts";
 import { ARROW_SIZE } from "./geometry.ts";
@@ -490,17 +490,18 @@ describe("renderGraph machine node", () => {
     });
   });
 
-  test("enter calls back with the machine's id, by click and by key, and selects nothing", () => {
-    const entered: string[] = [];
+  test("enter calls back with the machine and its state, by click and by key, and selects nothing", () => {
+    const entered: EnteredMachine[] = [];
     const selected: Selection[] = [];
     const graph = renderGraph(document, checkout, {
       select: (selection) => selected.push(selection),
-      enter: (id) => entered.push(id),
+      enter: (opened) => entered.push(opened),
     });
     const enter = graph.querySelector(".machine-enter");
     enter?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     enter?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect({ entered, selected }).toEqual({ entered: ["payment", "payment"], selected: [] });
+    const paying = { machine: "payment", state: "paying" };
+    expect({ entered, selected }).toEqual({ entered: [paying, paying], selected: [] });
   });
 
   test("without an enter callback the node draws no enter control", () => {
@@ -513,14 +514,14 @@ describe("renderGraph machine node", () => {
 });
 
 describe("mountViewer onEnter", () => {
-  test("enter on a machine node calls onEnter with the embedded machine's id", () => {
+  test("enter on a machine node calls onEnter with the embedded machine and the state", () => {
     const root = document.createElement("div");
     document.body.append(root);
-    const entered: string[] = [];
-    mountViewer(root, shop, { machine: "checkout", onEnter: (id) => entered.push(id) });
+    const entered: EnteredMachine[] = [];
+    mountViewer(root, shop, { machine: "checkout", onEnter: (opened) => entered.push(opened) });
     root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     root.remove();
-    expect(entered).toEqual(["payment"]);
+    expect(entered).toEqual([{ machine: "payment", state: "paying" }]);
   });
 });
 

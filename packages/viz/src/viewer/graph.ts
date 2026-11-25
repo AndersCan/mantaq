@@ -27,8 +27,14 @@ export interface GraphCallbacks {
   select(selection: Selection): void;
   /** Opens an arrow's Details without sending. Absent: no `?` is drawn (diagram-only). */
   details?: (edgeId: string) => void;
-  /** Opens the machine a machine node embeds, by its id. Absent: no enter control is drawn. */
-  enter?: (machine: string) => void;
+  /** Opens the machine a machine node embeds. Absent: no enter control is drawn. */
+  enter?: (entered: EnteredMachine) => void;
+}
+
+/** The machine a machine node embeds, and the state that embeds it. */
+export interface EnteredMachine {
+  machine: string;
+  state: string;
 }
 
 function sourceText(from: string): string {
@@ -226,7 +232,7 @@ function machineGlyph(placed: PlacedMachine, options: NodeOptions): SVGGElement 
 
 interface EnterOptions {
   doc: Document;
-  enter: (machine: string) => void;
+  enter: (entered: EnteredMachine) => void;
 }
 
 function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
@@ -238,6 +244,7 @@ function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
     {
       class: "machine-enter",
       "data-enter-machine": placed.machine,
+      "data-enter-state": placed.state.id,
       "aria-label": `enter machine ${placed.machine}`,
     },
     [
@@ -251,7 +258,7 @@ function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
       svg(doc, "text", { x: box.x, y: box.y + 4, "text-anchor": "middle" }, [ENTER_TEXT]),
     ],
   );
-  activatable(group, () => enter(placed.machine));
+  activatable(group, () => enter({ machine: placed.machine, state: placed.state.id }));
   return group;
 }
 
