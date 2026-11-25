@@ -120,6 +120,19 @@ function labelOf(page: Page, options: LabelOptions): Promise<{ x: number; y: num
   }, options.to);
 }
 
+/** A point 30% along the line of the arrow into the state, away from its label, in client coordinates. */
+function lineOf(page: Page, options: LabelOptions): Promise<{ x: number; y: number }> {
+  return page.evaluate((name) => {
+    const line = document.querySelector<SVGPathElement>(
+      `.graph g.edge[data-to="${name}"] path.hit`,
+    );
+    const matrix = line?.getScreenCTM();
+    if (!line || !matrix) return { x: 0, y: 0 };
+    const at = line.getPointAtLength(line.getTotalLength() * 0.3);
+    return { x: at.x * matrix.a + matrix.e, y: at.y * matrix.d + matrix.f };
+  }, options.to);
+}
+
 /** A point on the canvas away from the drawing's elements: its top-left corner, inside the padding of the drawing. */
 function emptySpot(page: Page): Promise<{ x: number; y: number }> {
   return page.evaluate(() => {
@@ -297,6 +310,12 @@ test("with the Hand tool a drag on an arrow pans, a click on it sends nothing, a
     };
   }, again);
   await page.mouse.click(again.x, again.y);
+  const line = await lineOf(page, { to: "address" });
+  const lineHit = await page.evaluate(
+    (at) => document.elementFromPoint(at.x, at.y) === document.querySelector(".canvas"),
+    line,
+  );
+  await page.mouse.click(line.x, line.y);
   const handSent = await page.evaluate(() => window.sent?.length);
   const outside = page.getByRole("textbox", { name: "Outside" });
   await outside.focus();
@@ -305,9 +324,17 @@ test("with the Hand tool a drag on an arrow pans, a click on it sends nothing, a
   const typed = { value: await outside.inputValue(), tool: (await drawn(page)).tool };
   await page.mouse.click(again.x, again.y);
   const selectSent = await page.evaluate(() => window.sent?.length);
-  expect({ moved: after.scroll.x - before.scroll.x, hit, handSent, typed, selectSent }).toEqual({
+  expect({
+    moved: after.scroll.x - before.scroll.x,
+    hit,
+    lineHit,
+    handSent,
+    typed,
+    selectSent,
+  }).toEqual({
     moved: 120,
     hit: { canvas: true, cursor: "grab" },
+    lineHit: true,
     handSent: 0,
     typed: { value: "", tool: "select" },
     selectSent: 1,
@@ -392,6 +419,60 @@ test("after a click on an arrow, Space and a drag pan instead of pressing the ar
     focused: true,
     sent: 1,
     moved: 100,
+  });
+  await page.close();
+}, 60_000);
+
+test("on a page the reader has not touched, Space scrolls the page and Ctrl+= is the browser's, also over the canvas", async () => {
+  const page = await viewerPage();
+  const spot = await emptySpot(page);
+  await page.mouse.move(spot.x + 100, spot.y + 40);
+  const opened = await drawn(page);
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => scrollY > 0);
+  await page.keyboard.press("Control+Equal");
+  const untouched = await drawn(page);
+  const now = await emptySpot(page);
+  await page.mouse.click(now.x, now.y);
+  await page.keyboard.press("Control+Equal");
+  const touched = await drawn(page);
+  expect({
+    untouched: untouched.scale === opened.scale,
+    touched: touched.scale > opened.scale,
+  }).toEqual({
+    untouched: true,
+    touched: true,
+  });
+  await page.close();
+}, 60_000);
+
+test("a pinch out from low on the canvas keeps the canvas under the pointer and every step in the viewer", async () => {
+  const page = await viewerPage();
+  const box = await page.evaluate(() => {
+    const rect = document.querySelector(".canvas")?.getBoundingClientRect() ?? new DOMRect();
+    return { x: rect.left + rect.width / 2, y: rect.bottom - 10, height: rect.height };
+  });
+  await page.evaluate(() => {
+    window.held = [];
+    window.addEventListener("wheel", (event) => window.held?.push(event.defaultPrevented));
+  });
+  await page.mouse.move(box.x, box.y);
+  await page.keyboard.down("Control");
+  for (const _ of [1, 2, 3, 4, 5, 6, 7, 8]) await page.mouse.wheel(0, 40);
+  await page.keyboard.up("Control");
+  const after = await page.evaluate(() => ({
+    held: window.held,
+    height: document.querySelector(".canvas")?.getBoundingClientRect().height ?? 0,
+  }));
+  const zoomed = await drawn(page);
+  expect({
+    held: after.held,
+    kept: after.height >= box.height - 1,
+    smaller: zoomed.scale < 0.5,
+  }).toEqual({
+    held: [true, true, true, true, true, true, true, true],
+    kept: true,
+    smaller: true,
   });
   await page.close();
 }, 60_000);

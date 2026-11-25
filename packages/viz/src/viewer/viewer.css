@@ -207,8 +207,15 @@
 }
 
 .viz .canvas:is([data-tool="hand"], [data-pan]) .graph,
-.viz .canvas:is([data-tool="hand"], [data-pan]) .graph * {
+.viz .canvas:is([data-tool="hand"], [data-pan]) .graph *,
+.viz .canvas:is([data-tool="hand"], [data-pan]) .graph .edge path.hit {
   pointer-events: none;
+}
+
+/* A zoom out keeps the height the canvas opened with, so the canvas does
+   not shrink from under the pointer and the page below it stays put. */
+.viz .canvas[data-sizing="chosen"] {
+  min-height: var(--viz-canvas-floor, 0);
 }
 
 .viz .graph text {

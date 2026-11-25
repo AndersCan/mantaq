@@ -47,6 +47,8 @@ export interface ViewState {
   blockedFor: { live: VizLiveState; picked: ViewState["picked"]; payloads: Payloads } | undefined;
   /** The canvas's scale and tool, kept across steps, moves along the path and redraws; not saved. Fitted until the reader zooms. */
   viewport: HeldViewport;
+  /** The canvas height at the fitted width, in CSS pixels, where the height follows the drawing; a zoom out keeps at least this. Unset inside a capped canvas. */
+  canvasFloor: number | undefined;
 }
 
 export interface InitialViewOptions {
@@ -75,6 +77,7 @@ export function initialView(options: ViewerOptions, document: InitialViewOptions
     },
     blockedFor: undefined,
     viewport: { scale: 1, tool: "select", sizing: "fitted" },
+    canvasFloor: undefined,
   };
 }
 

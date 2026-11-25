@@ -29,6 +29,9 @@ const PIXELS_PER_DELTA = [1, 16, 400];
 /** How fast a wheel or pinch zooms: the scale doubles per this many pixels of delta. */
 const PIXELS_PER_DOUBLING = 100;
 
+/** Wheel events closer than this (ms) are one pinch: it keeps zooming when the canvas shrank from under the pointer. */
+const PINCH_GAP_MS = 300;
+
 /** The largest zoom one wheel event makes, as a power of two, so a mouse notch is not a jump. */
 const LARGEST_WHEEL_STEP = 0.5;
 
@@ -48,41 +51,53 @@ export interface NavigationOptions {
  * Zoom and pan for the canvas of the viewer in `root`: Ctrl or Cmd with the
  * wheel or a pinch zooms at the pointer, Space or the middle button with a drag
  * pans, and so does a drag with the Hand tool. Keys act while focus is in the
- * viewer, or nothing has focus and the pointer is over the canvas. Listens once
- * per root.
+ * viewer, or nothing has focus and the reader last touched the viewer. Listens
+ * once per root.
  */
 export function listenNavigation(root: HTMLElement, options: NavigationOptions): void {
   const listening = viewports.has(root);
   viewports.set(root, options.viewport);
   if (listening) return;
   const doc = root.ownerDocument;
-  let spaceDown = false;
+  const keys: KeyState = { touched: false, spaceDown: false, lastZoom: -Infinity };
   function current(): Viewport | undefined {
     return viewports.get(root)?.();
   }
   function afterDrag(): ViewportState["pan"] {
-    return spaceDown ? "held" : "none";
+    return keys.spaceDown ? "held" : "none";
   }
   function released(): void {
-    spaceDown = false;
+    keys.spaceDown = false;
+    keys.touched = false;
     const viewport = current();
     if (viewport?.state().pan === "held") viewport.setPan("none");
   }
-  root.addEventListener(
+  // On the document, so a pinch that shrank the canvas from under the pointer still zooms it.
+  doc.addEventListener(
     "wheel",
     (event) => {
       const viewport = current();
-      if (viewport !== undefined && canvasUnder(root, { target: event.target }) !== undefined) {
-        wheelZoom(event, { viewport });
-      }
+      const onCanvas = canvasUnder(root, { target: event.target }) !== undefined;
+      const going = event.timeStamp - keys.lastZoom < PINCH_GAP_MS;
+      if (viewport === undefined || !(onCanvas || going)) return;
+      if (!wheelZoom(event, { viewport })) return;
+      keys.lastZoom = event.timeStamp;
+      keys.touched = true;
     },
     { passive: false },
+  );
+  doc.addEventListener(
+    "pointerdown",
+    (event) => {
+      keys.touched = event.target instanceof Node && root.contains(event.target);
+    },
+    { capture: true },
   );
   root.addEventListener("pointerdown", (event) => {
     const viewport = current();
     const canvas = canvasUnder(root, { target: event.target });
     if (viewport === undefined || canvas === undefined) return;
-    if (!pans(event, { viewport, held: spaceDown })) return;
+    if (!pans(event, { viewport, held: keys.spaceDown })) return;
     event.preventDefault();
     const focused = doc.activeElement;
     if (focused instanceof HTMLElement && !canvas.contains(focused)) focused.blur();
@@ -93,19 +108,19 @@ export function listenNavigation(root: HTMLElement, options: NavigationOptions):
     "keydown",
     (event) => {
       const viewport = current();
-      const space = event.key === " " && keysHere(root, event);
-      const free = space && !takesSpace(root, { target: event.target });
+      const space = isPlainSpace(event) && keysHere(root, { event, keys });
+      const free = space && overCanvas(root) && !takesSpace(root, { target: event.target });
       if (viewport === undefined || !free) return;
       event.preventDefault();
       event.stopPropagation();
-      spaceDown = true;
+      keys.spaceDown = true;
       if (viewport.state().pan === "none") viewport.setPan("held");
     },
     { capture: true },
   );
   doc.addEventListener("keydown", (event) => {
     const viewport = current();
-    const ours = !event.defaultPrevented && keysHere(root, event);
+    const ours = !event.defaultPrevented && keysHere(root, { event, keys });
     if (viewport === undefined || !ours) return;
     const key = keyFor(event);
     if (key === undefined) return;
@@ -113,9 +128,21 @@ export function listenNavigation(root: HTMLElement, options: NavigationOptions):
     act(viewport, { key });
   });
   doc.addEventListener("keyup", (event) => {
-    if (event.key === " " && spaceDown) released();
+    if (event.key !== " " || !keys.spaceDown) return;
+    keys.spaceDown = false;
+    const viewport = current();
+    if (viewport?.state().pan === "held") viewport.setPan("none");
   });
   doc.defaultView?.addEventListener("blur", released);
+}
+
+/** What the listeners of one viewer remember between events. */
+interface KeyState {
+  /** The last pointerdown on the page, or the last wheel zoom, was in this viewer: keys act while nothing has focus. */
+  touched: boolean;
+  spaceDown: boolean;
+  /** The `timeStamp` of the last wheel event that zoomed. */
+  lastZoom: number;
 }
 
 interface UnderOptions {
@@ -134,9 +161,9 @@ interface ViewportOptions {
   viewport: Viewport;
 }
 
-/** Ctrl or Cmd with the wheel, and a trackpad pinch (a wheel with `ctrlKey`), zoom at the pointer; a plain or Shift wheel stays a scroll. */
-function wheelZoom(event: WheelEvent, options: ViewportOptions): void {
-  if (!event.ctrlKey && !event.metaKey) return;
+/** Ctrl or Cmd with the wheel, and a trackpad pinch (a wheel with `ctrlKey`), zoom at the pointer; a plain or Shift wheel stays a scroll. True when it zoomed. */
+function wheelZoom(event: WheelEvent, options: ViewportOptions): boolean {
+  if (!event.ctrlKey && !event.metaKey) return false;
   event.preventDefault();
   const { viewport } = options;
   const pixels = event.deltaY * (PIXELS_PER_DELTA[event.deltaMode] ?? 1);
@@ -146,6 +173,7 @@ function wheelZoom(event: WheelEvent, options: ViewportOptions): void {
   );
   const scale = viewport.state().scale * 2 ** doublings;
   viewport.zoomAt({ x: event.clientX, y: event.clientY }, { scale, kind: "pinch" });
+  return true;
 }
 
 interface PansOptions {
@@ -192,13 +220,28 @@ function dragPan(canvas: HTMLElement, options: DragOptions): void {
   canvas.addEventListener("pointercancel", ended);
 }
 
-/** True for a key from inside the viewer, outside a text field and the host's own screen; or from a page where nothing has focus while the pointer is over the canvas. */
-function keysHere(root: HTMLElement, event: KeyboardEvent): boolean {
-  const { target } = event;
+interface KeysHereOptions {
+  event: KeyboardEvent;
+  keys: KeyState;
+}
+
+/** True for a key from inside the viewer, outside a text field and the host's own screen; or from a page where nothing has focus and the reader last touched this viewer. */
+function keysHere(root: HTMLElement, options: KeysHereOptions): boolean {
+  const { target } = options.event;
   if (target instanceof Element && root.contains(target)) return !typesHere(target);
   const doc = root.ownerDocument;
   const unfocused = doc.activeElement === null || doc.activeElement === doc.body;
-  return unfocused && root.querySelector(".canvas")?.matches(":hover") === true;
+  return unfocused && options.keys.touched;
+}
+
+function overCanvas(root: HTMLElement): boolean {
+  return root.querySelector(".canvas")?.matches(":hover") === true;
+}
+
+/** Space alone: with Shift it pages up, and other modifiers mean something else. */
+function isPlainSpace(event: KeyboardEvent): boolean {
+  const modified = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
+  return event.key === " " && !modified;
 }
 
 function typesHere(target: Element): boolean {
@@ -212,8 +255,7 @@ function typesHere(target: Element): boolean {
 function takesSpace(root: HTMLElement, options: UnderOptions): boolean {
   const { target } = options;
   if (!(target instanceof Element) || !target.matches(SPACE_TAKERS)) return false;
-  const drawn = target.closest(".graph") !== null;
-  return !drawn || root.querySelector(".canvas")?.matches(":hover") !== true;
+  return target.closest(".graph") === null || !overCanvas(root);
 }
 
 function keyFor(event: KeyboardEvent): NavigationKey | undefined {
