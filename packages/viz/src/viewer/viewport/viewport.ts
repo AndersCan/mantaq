@@ -7,6 +7,14 @@ import {
   zoomOutFrom,
 } from "./zoom.ts";
 import type { Point, Size } from "./zoom.ts";
+import { scrollByChained } from "./chained-scroll.ts";
+
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
 
 /** What a plain drag does: "select" picks elements, "hand" pans. */
 type ViewportTool = "select" | "hand";
@@ -29,21 +37,21 @@ export interface ViewportOptions {
   fitBox?: () => Size;
 }
 
-/** Zoom and pan over a scroll container. Pan is native scroll; the scale is the `--viz-zoom` custom property that the drawn width reads. */
+/** Zoom and pan over a scroll container. Pan is native scroll, chained to the page; the scale is the `--viz-zoom` custom property that the drawn width reads. */
 export interface Viewport {
   state: () => ViewportState;
   /** Scales so the drawing's point under `point` (client coordinates, as a pointer event gives them) stays put. */
   zoomAt: (point: Point, options: ZoomAtOptions) => void;
-  /** Zooms to the next step, at the center of the visible box. */
+  /** Zooms to the next step, at the center of the part of the container on screen. */
   zoomIn: () => void;
   zoomOut: () => void;
-  /** Scales so the whole drawing fits, and scrolls to its top-left. */
+  /** Scales so the whole drawing fits, and scrolls its top-left to the top-left of the part of the container on screen. */
   fit: () => void;
-  /** Zooms to 100%, at the center of the visible box. */
+  /** Zooms to 100%, at the center of the part of the container on screen. */
   actualSize: () => void;
   /** Sets the tool, and `data-tool` on the container for the cursor. */
   setTool: (tool: ViewportTool) => void;
-  /** Scrolls by the delta, in CSS pixels. */
+  /** Scrolls by the delta, in CSS pixels; what the container cannot take scrolls the ancestors and the page, as a wheel does. */
   panBy: (delta: Point) => void;
   /** Calls `listener` after each change of scale or tool; the result stops it. */
   subscribe: (listener: (state: ViewportState) => void) => () => void;
@@ -59,49 +67,59 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
   container.style.setProperty(ZOOM_PROPERTY, String(state.scale));
   container.dataset["tool"] = state.tool;
 
-  /** The drawing's top-left in the container's scrolled content; the content's start without a drawing. */
-  function drawingOrigin(): Point {
+  /** The drawing's top-left in the container's scrolled content, and its drawn width; the content's start without a drawing. */
+  function drawingBox(): { origin: Point; width: number } {
     const drawing = options.drawing();
-    if (drawing === undefined) return { x: 0, y: 0 };
+    if (drawing === undefined) return { origin: { x: 0, y: 0 }, width: 0 };
     const visible = visibleOrigin(container);
     const rect = drawing.getBoundingClientRect();
-    return {
+    const origin = {
       x: rect.left - visible.x + container.scrollLeft,
       y: rect.top - visible.y + container.scrollTop,
     };
+    return { origin, width: rect.width };
   }
   function changed(next: ViewportState): void {
     state = next;
     for (const listener of listeners) listener(state);
   }
-  function scaled(scale: number): Point {
-    container.style.setProperty(ZOOM_PROPERTY, String(scale));
-    changed({ ...state, scale });
-    return drawingOrigin();
-  }
   function zoomAt(point: Point, zoom: ZoomAtOptions): void {
-    const from = state.scale;
     const target = clampZoom(zoom.scale);
-    if (target === from) return;
-    const anchor = {
-      scroll: { x: container.scrollLeft, y: container.scrollTop },
-      pointer: pointerIn(container, point),
-      origin: drawingOrigin(),
-    };
-    const originAfter = scaled(target);
-    const next = anchoredScroll({ ...anchor, originAfter, from, to: target });
-    container.scrollTo({ left: next.x, top: next.y, behavior: "instant" });
+    if (target === state.scale) return;
+    const scroll = { x: container.scrollLeft, y: container.scrollTop };
+    const pointer = pointerIn(container, point);
+    const before = drawingBox();
+    container.style.setProperty(ZOOM_PROPERTY, String(target));
+    const after = drawingBox();
+    const measured = before.width > 0 && after.width > 0;
+    const next = anchoredScroll({
+      scroll,
+      pointer,
+      origin: before.origin,
+      originAfter: after.origin,
+      from: measured ? before.width : state.scale,
+      to: measured ? after.width : target,
+    });
+    scrollByChained(container, {
+      x: next.x - container.scrollLeft,
+      y: next.y - container.scrollTop,
+    });
+    changed({ ...state, scale: target });
   }
   function fit(): void {
-    const drawing = viewBoxSize(options.drawing()?.getAttribute("viewBox") ?? undefined);
-    if (drawing === undefined) return;
+    const drawing = options.drawing();
+    const natural = viewBoxSize(drawing?.getAttribute("viewBox") ?? undefined);
+    if (drawing === undefined || natural === undefined) return;
     const box = options.fitBox?.() ?? {
       width: container.clientWidth,
       height: container.clientHeight,
     };
-    const target = fitZoom(drawing, { box });
-    const origin = target === state.scale ? drawingOrigin() : scaled(target);
-    container.scrollTo({ left: origin.x, top: origin.y, behavior: "instant" });
+    const target = fitZoom(natural, { box });
+    container.style.setProperty(ZOOM_PROPERTY, String(target));
+    const shown = shownBox(container);
+    const rect = drawing.getBoundingClientRect();
+    scrollByChained(container, { x: rect.left - shown.left, y: rect.top - shown.top });
+    if (target !== state.scale) changed({ ...state, scale: target });
   }
   return {
     state: () => state,
@@ -116,7 +134,7 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
       changed({ ...state, tool });
     },
     panBy(delta) {
-      container.scrollBy({ left: delta.x, top: delta.y, behavior: "instant" });
+      scrollByChained(container, delta);
     },
     subscribe(listener) {
       listeners.add(listener);
@@ -136,7 +154,28 @@ function pointerIn(container: HTMLElement, point: Point): Point {
   return { x: point.x - visible.x, y: point.y - visible.y };
 }
 
-function centerOf(container: HTMLElement): Point {
+/** The part of the container's visible box inside the window, in client coordinates; the whole box when none of it is. */
+function shownBox(container: HTMLElement): Box {
   const visible = visibleOrigin(container);
-  return { x: visible.x + container.clientWidth / 2, y: visible.y + container.clientHeight / 2 };
+  const whole = {
+    left: visible.x,
+    top: visible.y,
+    right: visible.x + container.clientWidth,
+    bottom: visible.y + container.clientHeight,
+  };
+  const view = container.ownerDocument.defaultView;
+  const shown = {
+    left: Math.max(whole.left, 0),
+    top: Math.max(whole.top, 0),
+    right: Math.min(whole.right, view?.innerWidth ?? whole.right),
+    bottom: Math.min(whole.bottom, view?.innerHeight ?? whole.bottom),
+  };
+  const empty = shown.right <= shown.left || shown.bottom <= shown.top;
+  return empty ? whole : shown;
+}
+
+/** The center of the part of the container on screen. */
+function centerOf(container: HTMLElement): Point {
+  const shown = shownBox(container);
+  return { x: (shown.left + shown.right) / 2, y: (shown.top + shown.bottom) / 2 };
 }
