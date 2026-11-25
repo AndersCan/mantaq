@@ -321,7 +321,9 @@ async function clickAt(sweepCase: SweepCase, at: ClickAtOptions): Promise<Click>
   const samePath = focus.join("\n") === at.stand.focus.join("\n");
   const stayed = changed && samePath && layout === at.stand.layout;
   const key = keys[at.index];
-  const again = stayed && key !== undefined ? clickAgain(mounted.root, { key }) : "none";
+  let nth = 0;
+  for (const earlier of keys.slice(0, at.index)) if (earlier === key) nth += 1;
+  const again = stayed && key !== undefined ? clickAgain(mounted.root, { key, nth }) : "none";
   const click: Click = {
     count: found.length,
     element: name,
@@ -346,11 +348,14 @@ function keysOf(elements: ReadonlyArray<Element>): string[] {
 
 interface AgainOptions {
   key: string;
+  /** Which of the elements with `key` was clicked, counted from 0: text alone may name two. */
+  nth: number;
 }
 
 /** Clicks the element with `key` once more, when it still looks clickable. */
 function clickAgain(root: HTMLElement, options: AgainOptions): Click["again"] {
-  const element = clickables(root).find((each) => keyOf(each) === options.key);
+  const same = clickables(root).filter((each) => keyOf(each) === options.key);
+  const element = same[options.nth];
   if (element === undefined) return "none";
   const before = sight(root);
   clickOn(element);

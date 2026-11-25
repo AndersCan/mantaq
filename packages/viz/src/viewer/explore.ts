@@ -29,6 +29,8 @@ export interface ExploreContext {
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
+    /** How the followed child's row shows: the current choice while a click on it would change nothing. Unset: the current choice. */
+    followedLook?: "current" | "button";
     /** The followed child; its row in the Step tab is marked. */
     picked?: { map: string; key: string } | null;
     /** Follow this child: Send in the map goes to it. */
@@ -99,6 +101,7 @@ function timersSection(
 interface LiveMoves {
   state: VizLiveState;
   picked?: { map: string; key: string } | null;
+  followedLook?: "current" | "button";
   pick: (child: { map: string; key: string }) => void;
 }
 
@@ -133,7 +136,7 @@ function childrenSections(
           ],
         );
         onButtonPress(li, { press: () => live.pick({ map, key: child.key }) });
-        affordance(li, child.key === followed ? "current" : "button");
+        affordance(li, child.key === followed ? (live.followedLook ?? "current") : "button");
         return li;
       });
     if (rows.length === 0) return null;
@@ -355,7 +358,12 @@ interface LivePartsOptions {
 function liveParts(doc: Document, options: LivePartsOptions): Array<HTMLElement | null> {
   const { machine, live, final } = options;
   const { state } = live;
-  const moves: LiveMoves = { state, picked: live.picked ?? null, pick: live.pick };
+  const moves: LiveMoves = {
+    state,
+    picked: live.picked,
+    pick: live.pick,
+    followedLook: live.followedLook,
+  };
   return [
     runList(doc, machine, live),
     ...childrenSections(doc, machine, moves),

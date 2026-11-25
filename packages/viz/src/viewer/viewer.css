@@ -610,7 +610,7 @@
   stroke: none;
 }
 
-.viz .child-marker[aria-current="true"] rect:not(.marker-hit) {
+.viz .child-marker[data-followed] rect:not(.marker-hit) {
   stroke: var(--select);
   stroke-width: 2;
 }

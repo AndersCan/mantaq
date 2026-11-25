@@ -1,6 +1,6 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
 import { decodeFocus, enteredBy, focusReader, unknownFocusText } from "./mount/focus.ts";
-import { drawCallbacks, membersWhy, pickChild, sayWhy } from "./mount/arrow-click.ts";
+import { drawCallbacks, followedLook, membersWhy, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { listenEscape } from "./mount/escape.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
@@ -103,7 +103,12 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     const stepTab = explorePanel(doc, {
       machine,
       rewind,
-      ...liveOf(view, { send, pick: pickRow, routes: options.routes }),
+      ...liveOf(view, {
+        send,
+        pick: pickRow,
+        routes: options.routes,
+        followedLook: followedLook(view),
+      }),
     });
     const details = renderPanel(doc, {
       machine: shown(),

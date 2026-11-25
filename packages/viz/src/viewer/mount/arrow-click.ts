@@ -32,11 +32,12 @@ export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
   line.replaceChildren(...step, gap, why);
 }
 
-/** What the newest step did: `Step 3: take: stayed in cart`. The number tells one send from the next. */
+/** What the newest step did: `Step 3: take: stayed in cart`. The number tells one send from the next. A step the driver threw on took no step: the line says what it threw. */
 function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
   const { live } = from.view;
   const last = live?.last;
   if (!live || !last) return [];
+  if (last.error) return [`Handler threw: ${last.error}`];
   const number = live.steps.length;
   return [`Step ${number}: `, ...outcomeText(doc, from.machine, last)];
 }
@@ -187,6 +188,12 @@ export function memberSelection(selection: Selection, options: MemberOptions): S
   const sources = new Map(walked.edges.map((edge) => [edge.id, edge.from]));
   const member = actingMember(members, { moves, blocked: view.blocked, currents, sources });
   return member === undefined ? selection : { kind: "edge", id: member };
+}
+
+/** Following a child clears the selection and shows the Step tab; while that is how the view stands, the followed child is the current choice. */
+export function followedLook(view: ViewState): "current" | "button" {
+  const stepShown = view.diagramOnly || view.tab === "step";
+  return view.selection === undefined && stepShown ? "current" : "button";
 }
 
 export interface PickChildOptions {

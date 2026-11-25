@@ -7,6 +7,8 @@ import type { VizLiveChild } from "../schema.ts";
 export interface MarkerContext {
   children: ReadonlyArray<VizLiveChild>;
   picked: { map: string; key: string } | null;
+  /** How the followed child's chip shows: the current choice while a click on it would change nothing, else a button that brings back its Step tab. Unset: the current choice. */
+  followedLook?: "current" | "button";
   onPick(child: { map: string; key: string }): void;
 }
 
@@ -196,7 +198,8 @@ function drawMarker(live: Live, layer: SVGGElement, item: Item): void {
   marker.setAttribute("data-marker-key", item.child.key);
   marker.setAttribute("data-marker-state", item.state);
   const followed = context.picked?.map === item.child.map && context.picked.key === item.child.key;
-  affordance(marker, followed ? "current" : "button");
+  marker.toggleAttribute("data-followed", followed);
+  affordance(marker, followed ? (context.followedLook ?? "current") : "button");
   marker.setAttribute("aria-label", `${named}, in ${localName(item.state)}`);
   place(marker, item);
   marker.replaceChildren(svg(doc, "title", {}, [named]), ...shapeOf(doc, item));

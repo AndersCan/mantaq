@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { edgeOf, machineOf, stateOf } from "../groups/shop-machines.ts";
 import { expect, test } from "vite-plus/test";
+import type { VizDocument, VizDriver } from "../../schema.ts";
 import { mountViewer } from "../viewer.ts";
 import { VIZ_SCHEMA_VERSION } from "../../schema.ts";
-import type { VizDocument } from "../../schema.ts";
 import { walkDriver } from "../groups/walk-driver.ts";
 
 /** inCart -checkout-> paying -paid-> done, and paying -retry-> paying. */
@@ -66,4 +66,25 @@ test("after Enter sends an arrow, focus goes to the first arrow that sends, then
     afterRetry: "paying-retry-paying",
     afterPaid: "done",
   });
+});
+
+test("without a panel, a send the driver throws on says what it threw, not a step", () => {
+  const root = document.createElement("div");
+  document.body.append(root);
+  const { driver } = walkDriver(shop, { guarded: new Set() });
+  const throwing: VizDriver = {
+    ...driver,
+    step: (step) => {
+      if (step.kind === "event" && step.event === "paid") throw new Error("card declined");
+      return driver.step(step);
+    },
+  };
+  const viz: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shop] };
+  mountViewer(root, viz, { driver: throwing, diagramOnly: true, steps: ["checkout"] });
+  root
+    .querySelector('.graph g.edge[data-edge-id="paying-paid-done"]')
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(root.querySelector(".viz-main > .blocked-note")?.textContent).toBe(
+    "Handler threw: card declined",
+  );
 });

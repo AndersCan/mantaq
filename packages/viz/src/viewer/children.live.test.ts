@@ -362,6 +362,23 @@ describe("live actor map children", () => {
     expect(sent).toEqual([]);
   });
 
+  test("while Details show, the followed chip is a button again and brings back the Step tab", () => {
+    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
+    pick(root, "p1");
+    click(box(root, "photoSent"));
+    function chip(): Element | null {
+      return root.querySelector('g.child-marker[data-marker-key="p1"]');
+    }
+    const look = chip()?.getAttribute("role");
+    pick(root, "p1");
+    expect({
+      look,
+      step: root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected"),
+      selected: root.querySelector(".graph .selected") !== null,
+      current: chip()?.getAttribute("aria-current"),
+    }).toEqual({ look: "button", step: "true", selected: false, current: "true" });
+  });
+
   test("a chip click clears the selection and marks the row; the Step count stays", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
     click(box(root, "sendingPhoto"));

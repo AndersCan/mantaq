@@ -1,6 +1,6 @@
 import { drawnNodeOf } from "../groups/fold-groups.ts";
 import { affordance, svg } from "../dom.ts";
-import { drawnArrowClick, memberSelection } from "./arrow-click.ts";
+import { drawnArrowClick, followedLook, memberSelection } from "./arrow-click.ts";
 import type { Affordance } from "../dom.ts";
 import { drawChildMarkers, drawQueue } from "../markers.ts";
 import { listOf, markExplore } from "../explore.ts";
@@ -31,6 +31,7 @@ export function markDiagram(root: HTMLElement, context: MarkDiagramContext): voi
     drawChildMarkers(graph, {
       children: view.live.children,
       picked: view.picked,
+      followedLook: followedLook(view),
       onPick: context.pick,
     });
     const state = drawnNodeOf(context.shown, { state: view.live.state });
