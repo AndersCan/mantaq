@@ -466,15 +466,22 @@ describe("live controls", () => {
     root.remove();
   });
 
-  test("arrowClickedShowingWhyNot: an arrow from another state opens Details with the line, sends nothing", () => {
+  test("arrowClickedShowingWhyNot: an arrow from another state is plain; its title and its ? say why", () => {
     const { root, live } = mount();
+    const arrow = root.querySelector('[data-edge-id="paying-paymentTimeout-error"]');
+    const why = "paymentTimeout can't be sent: the walk is in idle, this arrow leaves paying.";
     clickArrow(root, "paying-paymentTimeout-error");
-    expect(live.log).toHaveLength(0);
-    expect(current(root)).toBe("idle");
-    expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
-    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
-      "paymentTimeout can't be sent: the walk is in idle, this arrow leaves paying.",
-    );
+    const clicked = {
+      sent: live.log.length,
+      button: arrow?.hasAttribute("role") || arrow?.hasAttribute("tabindex"),
+      title: arrow?.querySelector(":scope > title")?.textContent,
+      details: root.querySelector("[data-selected-edge]") !== null,
+    };
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect({ clicked, note: root.querySelector("[data-blocked-note]")?.textContent }).toEqual({
+      clicked: { sent: 0, button: false, title: why, details: false },
+      note: why,
+    });
   });
 
   test("timerArrow: a click on a running timer's arrow sends it now; its Details say it fires on its own", () => {
@@ -985,8 +992,8 @@ describe("field forms and the context table", () => {
     const step = { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } };
     expect({ prefilled, changed, sent, afterBack, log: live.log }).toEqual({
       prefilled: "1",
-      changed: ['checkout:submit={"amount":7.5}'],
-      sent: ['checkout:submit={"amount":7.5}'],
+      changed: ['submit={"amount":7.5}'],
+      sent: ['submit={"amount":7.5}'],
       afterBack: "7.5",
       log: [[step], [step]],
     });
@@ -1030,7 +1037,7 @@ describe("field forms and the context table", () => {
     });
     setBox(root, { field: "amount", text: "1" });
     expect({ seen: seen.at(-1), amount: valueBox(root, { field: "amount" })?.value }).toEqual({
-      seen: ['checkout:submit={"amount":1}'],
+      seen: ['submit={"amount":1}'],
       amount: "1",
     });
   });

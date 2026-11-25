@@ -115,7 +115,7 @@ const click = (root: HTMLElement) =>
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 const line = (root: HTMLElement) => root.querySelector(".viz-main > .blocked-note")?.textContent;
 
-test("a second click on the arrow just sent, now blocked, sends and says why", () => {
+test("after a send blocks the arrow, the line says why and a second click sends nothing", () => {
   const { driver, sent } = driverOf();
   const root = document.createElement("div");
   mountViewer(
@@ -124,21 +124,22 @@ test("a second click on the arrow just sent, now blocked, sends and says why", (
     { driver, diagramOnly: true },
   );
   click(root);
-  expect(sent).toHaveLength(1);
-  expect(line(root)).toBe("");
+  const first = { sent: sent.length, line: line(root) };
   click(root);
-  expect(sent).toHaveLength(2);
-  expect(line(root)).toBe("take is blocked: items is 1");
+  expect({ first, second: { sent: sent.length, line: line(root) } }).toEqual({
+    first: { sent: 1, line: "take is blocked: items is 1" },
+    second: { sent: 1, line: "take is blocked: items is 1" },
+  });
 });
 
-test("controls shown: Details says why for the same second click", () => {
+test("controls shown: Details says why the arrow, now blocked, sends nothing", () => {
   const { driver, sent } = driverOf();
   const root = document.createElement("div");
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
   click(root);
   click(root);
-  expect(sent).toHaveLength(2);
-  expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
-    "take is blocked: items is 1",
-  );
+  expect({
+    sent: sent.length,
+    note: root.querySelector("[data-blocked-note]")?.textContent,
+  }).toEqual({ sent: 1, note: "take is blocked: items is 1" });
 });

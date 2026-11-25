@@ -2,7 +2,6 @@ import { code, elapsed, listOf, outcomeText, sentEventLine } from "../explore.ts
 import type { VizEdge, VizMachine } from "../../schema.ts";
 import { arrowSend } from "./arrow-send.ts";
 import type { ArrowSendContext } from "./arrow-send.ts";
-import type { EnteredRun } from "./entered/entered-walk.ts";
 import type { EventClick } from "./event-send.ts";
 import { html } from "../dom.ts";
 import type { PayloadEdit } from "../send/payloads.ts";
@@ -41,7 +40,7 @@ export function sendFor(
     function note(text: string): HTMLElement {
       return html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [text]);
     }
-    const sent = sentHere(doc, { machine, view, edge, entered: from.entered });
+    const sent = sentHere(doc, { machine, view, edge });
     switch (decision.kind) {
       case "none":
         return sent;
@@ -73,8 +72,6 @@ interface SentHereOptions {
   machine: VizMachine;
   view: ViewState;
   edge: VizEdge;
-  /** Set inside an entered machine: the step went to its parent, which forwarded it. */
-  entered: EnteredRun | undefined;
 }
 
 /** After a send from this arrow: what was sent and where it went. */
@@ -82,12 +79,7 @@ function sentHere(doc: Document, from: SentHereOptions): HTMLElement | undefined
   const { view, edge } = from;
   const { sent } = view;
   if (sent?.edge !== edge.id) return undefined;
-  const { entered } = from;
-  const forwarded =
-    entered === undefined
-      ? undefined
-      : [`: sent to ${entered.parent.id}, which forwards it to ${entered.machine.id}`];
-  const outcome = forwarded ?? sentOutcome(doc, { machine: from.machine, view });
+  const outcome = sentOutcome(doc, { machine: from.machine, view });
   if (outcome === undefined) return undefined;
   return html(doc, "p", { "data-details-sent": "" }, [...sentEventLine(doc, sent), ...outcome]);
 }

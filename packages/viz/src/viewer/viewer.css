@@ -214,8 +214,13 @@
 
 .viz .state,
 .viz .edge {
-  cursor: pointer;
   outline: none;
+}
+
+/* Only a state or an arrow that a click acts on is a button; the rest look plain. */
+.viz .state[role="button"],
+.viz .edge[role="button"] {
+  cursor: pointer;
 }
 
 .viz .edge path,
@@ -661,23 +666,27 @@
   color: var(--muted);
 }
 
-.viz .focus-path button {
+.viz .focus-path button,
+.viz .focus-path [aria-current] {
   padding: 2px 8px;
   font: inherit;
   color: var(--fg);
   background: var(--bg);
   border: 1px solid var(--muted);
   border-radius: 8px;
+}
+
+.viz .focus-path button {
   cursor: pointer;
 }
 
-.viz .focus-path button[aria-current] {
+.viz .focus-path [aria-current] {
   font-weight: 600;
   border-color: transparent;
-  cursor: default;
+  outline: none;
 }
 
-.viz .focus-path button:not([aria-current]):hover,
-.viz .focus-path button:not([aria-current]):focus-visible {
+.viz .focus-path button:hover,
+.viz .focus-path button:focus-visible {
   border-color: var(--fg);
 }

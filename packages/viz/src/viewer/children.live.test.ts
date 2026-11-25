@@ -401,14 +401,20 @@ describe("live actor map children", () => {
     expect(sent[0]).toMatchObject({ actor: { map: "photos", key: "p2" } });
   });
 
-  test("a click on an arrow another part sends shows who sends it and sends nothing", () => {
+  test("an arrow another part sends is plain; a click sends nothing and its title says who sends it", () => {
     const fed: VizMachine = { ...photoQueue, partOutputs: { other: ["uploadConfirmed"] } };
     const by = mount([child("p1", "sendingPhoto", 1)], fed);
-    click(edgeGroup(by.root));
-    expect(by.sent).toEqual([]);
-    expect(by.root.querySelector("[data-blocked-note]")?.textContent).toBe(
-      "uploadConfirmed is sent by other, not by hand.",
-    );
+    const arrow = edgeGroup(by.root);
+    click(arrow);
+    expect({
+      sent: by.sent,
+      button: arrow?.getAttribute("role") === "button",
+      title: arrow?.querySelector(":scope > title")?.textContent,
+    }).toEqual({
+      sent: [],
+      button: false,
+      title: "uploadConfirmed is sent by other, not by hand.",
+    });
   });
 
   test.each([[undefined], ["p1"], ["p2"]] as const)(

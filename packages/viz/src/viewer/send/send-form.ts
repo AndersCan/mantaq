@@ -1,7 +1,7 @@
-import { arrowLock, arrowPayload } from "../mount/arrow-send.ts";
 import { button, code } from "../explore.ts";
 import { parseValue, valueText } from "../fill.ts";
 import type { VizActorRef, VizEdge, VizField, VizJson } from "../../schema.ts";
+import { arrowPayload } from "../mount/arrow-send.ts";
 import type { ArrowSendContext } from "../mount/arrow-send.ts";
 import { asksForPayload } from "../../moves.ts";
 import { html } from "../dom.ts";
@@ -43,13 +43,7 @@ export function sendForm(doc: Document, options: SendFormOptions): HTMLElement {
     input.addEventListener("change", () => {
       if (input.dataset["sent"] !== undefined) return;
       input.removeAttribute("aria-invalid");
-      const typed = parseValue(field, input.value);
-      options.edit({
-        machine: from.machine.id,
-        event: edge.event,
-        field: field.name,
-        value: typed,
-      });
+      options.edit({ event: edge.event, field: field.name, value: parseValue(field, input.value) });
       refill();
     });
     input.addEventListener("keydown", (event) => {
@@ -72,7 +66,7 @@ export function sendForm(doc: Document, options: SendFormOptions): HTMLElement {
       input.value = shown === undefined ? "" : valueText(field, shown);
     }
     whole?.replaceChildren("with ", code(doc, JSON.stringify(payload)));
-    const reason = arrowLock(from, edge);
+    const reason = from.view.blocked.get(edge.id);
     lock.replaceChildren(...(reason === undefined ? [] : [options.note(reason)]));
   }
   refill();

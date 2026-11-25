@@ -150,3 +150,26 @@ test("the queue takes the pointer, so its title shows on hover", () => {
   expect(listed(".viz .queue")).toMatch(/cursor:\s*default/);
   expect(listed(".viz .queue")).not.toMatch(/pointer-events:\s*none/);
 });
+
+/** Each compound selector naming a state or an arrow (`.state`, `.edge`, never `.edge-help`). */
+function stateOrArrowParts(selector: string): string[] {
+  return selector.split(/[\s>+~]+/).filter((part) => /\.(state|edge)(?![\w-])/.test(part));
+}
+
+test("a pointer or a hover style on a state or an arrow needs it to be a button", () => {
+  const offending: string[] = [];
+  for (const block of bare.split("}")) {
+    const [head = "", body = ""] = block.split("{");
+    const pointer = /cursor:\s*pointer/.test(body);
+    for (const selector of head.split(",").map((each) => each.trim())) {
+      const looksClickable = pointer || selector.includes(":hover");
+      const parts = stateOrArrowParts(selector);
+      const gated = parts.every((part) => part.includes('[role="button"]'));
+      if (looksClickable && !gated) offending.push(selector);
+    }
+  }
+  expect({ offending, gated: listed('.viz .edge[role="button"]') }).toEqual({
+    offending: [],
+    gated: expect.stringMatching(/cursor:\s*pointer/),
+  });
+});

@@ -1,10 +1,7 @@
-import { isAnyState } from "../schema.ts";
-import type { VizEdge, VizMachine } from "../schema.ts";
-import { activatable, html, svg } from "./dom.ts";
-import { localName } from "./compartments.ts";
-import { edgeCondition, edgeLines } from "./labels.ts";
+import { activatable, html, onButtonPress, svg } from "./dom.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
-import { Either } from "@mantaq/utils";
+import { edgeCondition, edgeLines } from "./labels.ts";
+import { ENTER_TEXT, HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
 import type {
   PlacedAny,
   PlacedEdge,
@@ -15,13 +12,17 @@ import type {
   PlacedState,
   PlacedUnknown,
 } from "./layout.ts";
-import { ENTER_TEXT, HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
+import type { VizEdge, VizMachine } from "../schema.ts";
+import { Either } from "@mantaq/utils";
+import { isAnyState } from "../schema.ts";
 import { isNever } from "../is-never.ts";
-import type { Point } from "@dagrejs/dagre";
+import { localName } from "./compartments.ts";
 import { placeBoard } from "./board.ts";
+import type { Point } from "@dagrejs/dagre";
 
 export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: string };
 
+/** A state or an arrow is drawn plain; the diagram marks make it a button where `select` does something. */
 export interface GraphCallbacks {
   select(selection: Selection): void;
   /** Opens an arrow's Details without sending. Absent: no `?` is drawn (diagram-only). */
@@ -166,7 +167,7 @@ function stateGroup(placed: PlacedState | PlacedMachine, options: NodeOptions): 
           }),
     ],
   );
-  activatable(group, () => callbacks.select({ kind: "state", id: state.id }));
+  onButtonPress(group, { press: () => callbacks.select({ kind: "state", id: state.id }) });
   return group;
 }
 
@@ -374,7 +375,7 @@ function edgeGroup(
       edgeLabel(doc, placed),
     ],
   );
-  activatable(group, () => context.callbacks.select({ kind: "edge", id: edge.id }));
+  onButtonPress(group, { press: () => context.callbacks.select({ kind: "edge", id: edge.id }) });
   return group;
 }
 

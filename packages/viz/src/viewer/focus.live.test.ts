@@ -110,13 +110,13 @@ interface CrumbOptions {
 }
 
 function crumb(root: HTMLElement, options: CrumbOptions): Element | undefined {
-  const crumbs = [...root.querySelectorAll(".focus-path button")];
+  const crumbs = [...root.querySelectorAll(".focus-path li > *")];
   return crumbs.find((button) => button.textContent === options.label);
 }
 
 /** What the viewer shows: the machine drawn, its states, the path above it, and the walk. */
 function shown(root: HTMLElement) {
-  const crumbs = [...root.querySelectorAll(".focus-path button")];
+  const crumbs = [...root.querySelectorAll(".focus-path li > *")];
   return {
     drawn: root.querySelector(".canvas svg")?.getAttribute("aria-label"),
     states: [...root.querySelectorAll(".canvas g.state")].map((node) =>
@@ -174,7 +174,7 @@ describe("entering a machine node", () => {
     const root = mount();
     enter(root, { from: "paying" });
     enter(root, { from: "verifying" });
-    escape(root.querySelector(".focus-path button[aria-current]"));
+    escape(root.querySelector(".focus-path [aria-current]"));
     const once = shown(root);
     escape(root.querySelector(".canvas svg"));
     const twice = shown(root);
@@ -186,23 +186,25 @@ describe("entering a machine node", () => {
     });
   });
 
-  test("never changes the walk or the step log, and draws the entered machine without it", () => {
+  test("never changes the walk or the step log, and draws the entered machine without it, its arrows plain", () => {
     const driver = checkoutDriver();
     const root = mount({ driver });
     press(root.querySelector('g.edge[data-edge-id="cart-pay-paying"]'));
     const walked = shown(root);
     enter(root, { from: "paying" });
     const inside = shown(root);
-    press(root.querySelector('.canvas g.edge[data-edge-id="card-submit-verifying"]'));
+    const arrow = root.querySelector('.canvas g.edge[data-edge-id="card-submit-verifying"]');
+    press(arrow);
     const clicked = {
       sent: driver.taken.length,
+      button: arrow?.getAttribute("role") === "button",
       details: root.querySelector("[data-selected-edge]")?.getAttribute("data-selected-edge"),
     };
     escape(root.querySelector(".canvas svg"));
     expect({ walked, inside, clicked, left: shown(root) }).toStrictEqual({
       walked: { ...atCheckout, current: "paying", steps: 1 },
       inside: { ...atPayment, steps: 1 },
-      clicked: { sent: 1, details: "card-submit-verifying" },
+      clicked: { sent: 1, button: false, details: undefined },
       left: walked,
     });
   });

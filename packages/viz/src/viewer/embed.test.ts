@@ -121,11 +121,23 @@ describe("mountVizText", () => {
     expect(ids).toEqual(["details"]);
     expect(root.querySelector(".explore")).toBeNull();
     expect(root.querySelectorAll(".graph .current, .graph .next")).toHaveLength(0);
+    const arrow = root.querySelector('[data-edge-id="open-go-done"]');
+    arrow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const afterArrow = root.querySelector("[data-selected-edge]");
     root
-      .querySelector('[data-edge-id="open-go-done"]')
+      .querySelector('[data-details-edge="open-go-done"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
-    expect(root.querySelector("[data-send-edge]")).toBeNull();
+    expect({
+      button: arrow?.hasAttribute("role") || arrow?.hasAttribute("tabindex"),
+      selectedByArrow: afterArrow !== null,
+      afterHelp: root.querySelector("[data-selected-edge]")?.getAttribute("data-selected-edge"),
+      send: root.querySelector("[data-send-edge]") !== null,
+    }).toEqual({
+      button: false,
+      selectedByArrow: false,
+      afterHelp: "open-go-done",
+      send: false,
+    });
   });
 
   test("an arrow's title carries its condition and lists the other arrows of the event", () => {
@@ -163,7 +175,7 @@ describe("mountVizText", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
     const click = (selector: string) =>
       root.querySelector(selector)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    click('[data-edge-id="waiting-answered-declined"]');
+    click('[data-details-edge="waiting-answered-declined"]');
     expect(root.querySelector(".details h2")?.textContent).toBe(
       "waiting —answered [else]→ declined",
     );
@@ -232,7 +244,7 @@ describe("mountVizText", () => {
     };
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
     root
-      .querySelector('[data-edge-id="idle-apply-review"]')
+      .querySelector('[data-details-edge="idle-apply-review"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
     expect(links.map((link) => link.textContent)).toEqual([
@@ -290,7 +302,7 @@ describe("mountVizText", () => {
     };
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
     root
-      .querySelector('[data-edge-id="r.idle-apply-r.review"]')
+      .querySelector('[data-details-edge="r.idle-apply-r.review"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
     expect(links.map((link) => link.textContent)).toEqual([
@@ -332,7 +344,7 @@ describe("mountVizText", () => {
     };
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
     root
-      .querySelector('[data-edge-id="idle-go-done"]')
+      .querySelector('[data-details-edge="idle-go-done"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
     expect(links.map((link) => link.textContent)).toEqual([
@@ -346,7 +358,7 @@ describe("mountVizText", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     const click = (selector: string) =>
       root.querySelector(selector)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    click('[data-edge-id="open-go-done"]');
+    click('[data-details-edge="open-go-done"]');
     const edgeTags = [...(root.querySelector(".details")?.children ?? [])].map((child) =>
       child.tagName.toLowerCase(),
     );

@@ -1,3 +1,5 @@
+import { isNever } from "../is-never.ts";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 type Child = Node | string | null;
@@ -43,13 +45,47 @@ export function svg<K extends keyof SVGElementTagNameMap>(
 
 /** Make an element act as a button for mouse and keyboard (Enter / Space). */
 export function activatable(element: Element, onActivate: () => void): void {
-  element.setAttribute("tabindex", "0");
-  element.setAttribute("role", "button");
-  element.addEventListener("click", onActivate);
+  onButtonPress(element, { press: onActivate });
+  affordance(element, "button");
+}
+
+/** How an element shows a click: as a button (pointer, tab stop, `role=button`), or plain. */
+export type Affordance = "button" | "plain";
+
+/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order. */
+export function affordance(element: Element, look: Affordance): void {
+  switch (look) {
+    case "button":
+      element.setAttribute("tabindex", "0");
+      element.setAttribute("role", "button");
+      return;
+    case "plain":
+      element.removeAttribute("role");
+      if (element.ownerDocument.activeElement === element) element.setAttribute("tabindex", "-1");
+      else element.removeAttribute("tabindex");
+      return;
+    default:
+      return isNever(look);
+  }
+}
+
+export interface ButtonPressOptions {
+  press: () => void;
+}
+
+/** Calls `press` on a click, Enter or Space, but only while the element shows as a button. */
+export function onButtonPress(element: Element, options: ButtonPressOptions): void {
+  const { press } = options;
+  function isButton(): boolean {
+    return element.getAttribute("role") === "button";
+  }
+  element.addEventListener("click", () => {
+    if (isButton()) press();
+  });
   element.addEventListener("keydown", (event) => {
-    if (!("key" in event)) return;
+    if (!("key" in event) || !isButton()) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    onActivate();
+    press();
   });
 }

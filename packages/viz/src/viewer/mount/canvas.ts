@@ -1,5 +1,5 @@
 import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../graph.ts";
-import type { EnteredMachine, GraphCallbacks, Selection } from "../graph.ts";
+import type { EnteredMachine, GraphCallbacks } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
 import { currentsOf } from "../compartments.ts";
@@ -129,19 +129,36 @@ interface BreadcrumbOptions {
   moveTo: (keep: number) => void;
 }
 
-/** The path above the canvas: the root machine, then each machine opened; a click on one goes back to it. */
+/** The path above the canvas: the root machine, then each machine opened; a click on one goes back to it. The machine shown is plain text that focus can land on. */
 function breadcrumbOf(doc: Document, options: BreadcrumbOptions): HTMLElement {
   const { crumbs } = options.focus;
   const crumbItems: HTMLElement[] = [];
   for (const [index, crumb] of crumbs.entries()) {
-    const button = html(doc, "button", { type: "button" }, [crumb.label]);
-    if (index === crumbs.length - 1) button.setAttribute("aria-current", "location");
-    else button.addEventListener("click", () => options.moveTo(crumb.keep));
-    crumbItems.push(html(doc, "li", {}, [button]));
+    crumbItems.push(
+      html(doc, "li", {}, [
+        crumbOf(doc, { crumb, current: index === crumbs.length - 1, moveTo: options.moveTo }),
+      ]),
+    );
   }
   return html(doc, "nav", { class: "focus-path", "aria-label": "Machines opened" }, [
     html(doc, "ol", {}, crumbItems),
   ]);
+}
+
+interface CrumbOptions {
+  crumb: Focus["crumbs"][number];
+  current: boolean;
+  moveTo: (keep: number) => void;
+}
+
+function crumbOf(doc: Document, options: CrumbOptions): HTMLElement {
+  const { crumb } = options;
+  if (options.current) {
+    return html(doc, "span", { "aria-current": "location", tabindex: "-1" }, [crumb.label]);
+  }
+  const button = html(doc, "button", { type: "button" }, [crumb.label]);
+  button.addEventListener("click", () => options.moveTo(crumb.keep));
+  return button;
 }
 
 export interface KeepCurrentOptions {
@@ -172,16 +189,4 @@ export function listenWidth(root: HTMLElement, options: ListenWidthOptions): voi
   }
   root.ownerDocument.defaultView?.addEventListener("resize", refitHere);
   root.addEventListener("fullscreenchange", refitHere);
-}
-
-interface StaticCallbackOptions {
-  openDetails: (selection: Selection) => void;
-}
-
-/** An entered machine is drawn without the walk: a click on a state or an arrow only opens its Details. */
-export function staticCallbacks(view: ViewState, options: StaticCallbackOptions): GraphCallbacks {
-  const callbacks: GraphCallbacks = { select: options.openDetails };
-  if (view.diagramOnly) return callbacks;
-  callbacks.details = (id) => options.openDetails({ kind: "edge", id });
-  return callbacks;
 }
