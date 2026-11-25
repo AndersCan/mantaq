@@ -238,6 +238,10 @@
   cursor: pointer;
 }
 
+.viz .edge-help:not([role="button"], [aria-current="true"]) {
+  display: none;
+}
+
 .viz .edge-help .ring {
   fill: none;
   stroke: var(--muted);

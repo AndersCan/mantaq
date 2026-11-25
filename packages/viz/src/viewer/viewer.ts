@@ -136,7 +136,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   }
   /** Diagram only: the line under the drawing says why the selected arrow sent nothing. */
   function whyNot(): void {
-    sayWhy(root, { machine, view, driver });
+    sayWhy(root, { from: { machine, view, driver }, shown: shown() });
   }
   function pickRow(child: PickedChild): void {
     pickChild(child, { root, view, refresh, source: "row" });

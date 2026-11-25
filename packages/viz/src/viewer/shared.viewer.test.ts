@@ -237,6 +237,24 @@ describe("an arrow three states share", () => {
   });
 });
 
+describe("a shared arrow with no member at the current state", () => {
+  test("says why on hover, and without a panel its ? puts why under the board", () => {
+    const why = "go can't be sent: the walk is in idle, this arrow leaves a or b or c.";
+    const hover = mount().root;
+    const { driver } = fakeDriver();
+    const root = document.createElement("div");
+    document.body.append(root);
+    const viz = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] };
+    mountViewer(root, viz, { driver, diagramOnly: true });
+    press(help(root));
+    expect({
+      title: shared(hover)?.querySelector(":scope > title.why")?.textContent,
+      line: root.querySelector(".viz-main > .blocked-note")?.textContent,
+      button: shared(root)?.getAttribute("role") ?? "plain",
+    }).toEqual({ title: why, line: why, button: "plain" });
+  });
+});
+
 describe("a shared node over a folded group", () => {
   /** `abort` leaves inCart, chargingCard and packing, but not confirming. */
   function mountShop(steps: string[]): HTMLElement {

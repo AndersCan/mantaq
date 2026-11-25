@@ -1,31 +1,37 @@
 import { actingMemberOf, realMembersOf } from "../groups/acting-member.ts";
-import { affordance } from "../dom.ts";
-import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
-import { whyNoneHere } from "../blocked.ts";
+import { arrowClick, updateBlocked } from "./arrow-send.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
-import { sharedArrowsOf } from "../shared.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
+import { affordance } from "../dom.ts";
 import type { EventClick } from "./event-send.ts";
 import { outcomeText } from "../explore.ts";
+import { sharedArrowsOf } from "../shared.ts";
+import { whyNoneHere } from "../blocked.ts";
+
+export interface SayWhyOptions {
+  from: ArrowSendContext;
+  /** The machine the canvas draws. */
+  shown: VizMachine;
+}
 
 /** Diagram only: the line under the board says what the send of the selected arrow did, by its step number, and why the arrow sends nothing now; empty when there is neither. */
-export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
+export function sayWhy(root: HTMLElement, options: SayWhyOptions): void {
+  const { from } = options;
   const { selection, sent } = from.view;
-  const edge = from.machine.edges.find(
-    (candidate) => selection?.kind === "edge" && candidate.id === selection.id,
-  );
   const line = root.querySelector(".viz-main > .blocked-note");
   if (line === null) return;
-  if (edge === undefined) {
+  if (selection?.kind !== "edge") {
     line.replaceChildren();
     return;
   }
-  const why = whyText(from, { edge, sent });
-  const step = sent?.edge === edge.id ? stepLine(root.ownerDocument, from) : [];
-  const gap = step.length > 0 && why !== "" ? ". " : "";
-  line.replaceChildren(...step, gap, why);
+  const { edge, click } = drawnArrowClick(from, { shown: options.shown, id: selection.id });
+  const justSent = edge !== undefined && sent?.edge === edge.id;
+  const step = justSent ? stepLine(root.ownerDocument, from) : [];
+  const why = justSent ? from.view.blocked.get(edge.id) : whyOf(click);
+  const gap = step.length > 0 && why !== undefined ? ". " : "";
+  line.replaceChildren(...step, gap, why ?? "");
 }
 
 /** What the newest step did: `Step 3: take: stayed in cart`. The number tells one send from the next. A handler that threw: the line adds what it threw, in the words Details use. */
@@ -40,24 +46,9 @@ function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
   return last.error ? [...step, `. It threw: ${last.error}`] : step;
 }
 
-interface WhyTextOptions {
-  edge: VizEdge;
-  sent: ViewState["sent"];
-}
-
-function whyText(from: ArrowSendContext, options: WhyTextOptions): string {
-  const { edge, sent } = options;
-  const decision = arrowSend(from, edge);
-  switch (decision.kind) {
-    case "send":
-      return decision.blocked ?? "";
-    case "refuse":
-      return decision.text;
-    case "elsewhere":
-      return sent?.edge === edge.id ? "" : decision.text;
-    case "none":
-      return "";
-  }
+/** Why a click on an arrow sends nothing: the one reason text the hover title, the line under the board and its `?` share. */
+export function whyOf(click: ArrowClick): string | undefined {
+  return click.kind === "plain" ? click.why : undefined;
 }
 
 export interface DrawHandlers {
@@ -67,11 +58,11 @@ export interface DrawHandlers {
   sendEvent: (click: EventClick) => void;
 }
 
-/** A click on an arrow sends its event; the diagram marks make only such an arrow a button. A click on a state, and an arrow's `?`, open Details. */
+/** A click on an arrow sends its event; the diagram marks make only such an arrow a button. A click on a state, and an arrow's `?`, open Details; without a panel, the `?` of an arrow that sends nothing puts why in the line under the board. */
 export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): GraphCallbacks {
   const { view } = from;
   const members = { machine: handlers.shown, view };
-  const callbacks: GraphCallbacks = {
+  return {
     select: (clicked) => {
       if (clicked.kind === "state") return handlers.openDetails(clicked);
       const { selection, edge, click } = drawnArrowClick(from, {
@@ -83,12 +74,11 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
       handlers.sendEvent({ event: edge.event, actor: click.actor, edge: edge.id });
       focusOnAfterSend(handlers.root, { arrow: clicked.id });
     },
+    details: (id) => {
+      if (view.diagramOnly) view.sent = undefined;
+      handlers.openDetails(memberSelection({ kind: "edge", id }, members));
+    },
   };
-  if (view.diagramOnly) return callbacks;
-  callbacks.details = (id) => {
-    handlers.openDetails(memberSelection({ kind: "edge", id }, members));
-  };
-  return callbacks;
 }
 
 interface SentArrow {
