@@ -147,8 +147,6 @@ export type SentEvent = {
   actor?: VizActorRef;
   payload: VizJson | null;
   edge?: string;
-  /** Why the guard blocked the arrow when it was sent. */
-  blocked?: string;
 };
 
 export function sentEventLine(doc: Document, sent: SentEvent): Array<Node | string> {

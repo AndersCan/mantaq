@@ -52,14 +52,12 @@ export function eventSender(context: EventSenderContext): (click: EventClick) =>
   return (click) => {
     const { event, actor, edge } = click;
     const step = eventStep(context, click);
-    const blocked = edge === undefined ? undefined : context.view.blocked.get(edge);
     send(step, {
       sent: {
         event,
         ...(actor ? { actor } : {}),
         payload: step.payload,
         ...(edge === undefined ? {} : { edge }),
-        ...(blocked === undefined ? {} : { blocked }),
       },
     });
   };
