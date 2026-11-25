@@ -44,7 +44,8 @@ function builtPages(dist) {
 function inPage(options) {
   const shown = options.shown ?? [];
   function looksClickable(element) {
-    const unseen = element.closest("[disabled]") !== null || element.getClientRects().length === 0;
+    const off = element.closest('[disabled], [aria-disabled="true"]') !== null;
+    const unseen = off || element.getClientRects().length === 0;
     if (unseen) return false;
     if (element.getAttribute("role") === "button") return true;
     const pointer = getComputedStyle(element).cursor === "pointer";
@@ -69,6 +70,7 @@ function inPage(options) {
       element.getAttribute("data-node-id") ??
       element.getAttribute("data-tab") ??
       element.getAttribute("data-part") ??
+      element.getAttribute("data-viz-tool") ??
       element.textContent.trim().slice(0, 40);
     const tag = element.tagName.toLowerCase();
     const classes = (element.getAttribute("class") ?? "").trim().split(/\s+/).join(".");
@@ -162,7 +164,7 @@ async function clickOn(options) {
   const problems = [];
   for (const error of errors.slice(loaded)) problems.push(`${where} throws: ${error}`);
   if (before.sight === after.sight) problems.push(`${where} changes nothing`);
-  return { clicked: true, problems };
+  return { clicked: true, name, problems };
 }
 
 /** Runs `tasks` (functions that return a promise), `TABS` at a time. */
@@ -186,7 +188,7 @@ async function sweepViewers(options) {
   const counted = await inBatches(options.pages.map((page) => () => countOn({ ...options, page })));
   const problems = [];
   const swept = [];
-  const report = { pages: swept, viewers: 0, viewersOn: {}, clicks: 0, problems };
+  const report = { pages: swept, viewers: 0, viewersOn: {}, clicks: 0, problems, names: new Set() };
   const clicks = [];
   for (const { page, viewers, count } of counted) {
     if (viewers === 0) continue;
@@ -199,6 +201,7 @@ async function sweepViewers(options) {
   }
   for (const click of await inBatches(clicks)) {
     if (click.clicked) report.clicks += 1;
+    if (click.name !== undefined) report.names.add(click.name.replace(/^viewer \d+: /u, ""));
     problems.push(...click.problems);
   }
   problems.sort((left, right) => left.localeCompare(right));
@@ -230,11 +233,9 @@ const PLANTED_PAGE = "getting-started/events/";
 const FIX = "make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks)";
 
 /**
- * Sweeps every page built into `options.dist`, then plants dead elements on one
- * page and sweeps it again: a sweep that misses one is too weak to trust. Returns one
- * failure line per problem, and a summary of what was clicked. Each page of
- * `options.mustSweep` must have a viewer the sweep clicked. An address there with
- * a query, as a link that opens a group, is swept as a page of its own.
+ * Sweeps every built page, then plants dead elements on one: a sweep that misses one is
+ * too weak. Each page of `options.mustSweep` (a query makes its own page) needs a clicked
+ * viewer; each name in `options.mustClick` needs a click. Returns failures and a summary.
  */
 export async function clickFailures(options) {
   const site = { browser: options.browser, origin: options.origin, base: options.base };
@@ -266,6 +267,10 @@ export async function clickFailures(options) {
     if (!swept.pages.includes(`/${page}`)) {
       failures.push(`docs-live-check: the click sweep found no viewer on /${page}`);
     }
+  }
+  for (const name of options.mustClick ?? []) {
+    if (swept.names.has(name)) continue;
+    failures.push(`docs-live-check: the click sweep never clicked ${name}`);
   }
   const sweptPages = swept.pages.join(", ");
   const summary = `${swept.clicks} clicks on ${swept.viewers} viewers on ${swept.pages.length} pages each change the page: ${sweptPages}`;

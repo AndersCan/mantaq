@@ -16,25 +16,27 @@ export const MAX_ZOOM = 8;
 /** The scales that zoom in and zoom out stop at, smallest first. */
 export const ZOOM_STEPS: readonly number[] = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
 
-/** Scales closer than this are the same step, so float noise next to a step does not skip it. */
-const STEP_TOLERANCE = 1e-6;
-
 /** The scale inside the zoom range; not a number is 100%. */
 export function clampZoom(scale: number): number {
   if (Number.isNaN(scale)) return 1;
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
 }
 
-/** The next step above the scale, or the largest scale. */
-export function zoomInFrom(scale: number): number {
-  const current = clampZoom(scale);
-  return ZOOM_STEPS.find((step) => step > current + STEP_TOLERANCE) ?? MAX_ZOOM;
+/** The scale as the whole percent the reader sees. */
+export function zoomPercent(scale: number): number {
+  return Math.round(scale * 100);
 }
 
-/** The next step below the scale, or the smallest scale. */
+/** The next step whose percent is above the scale's, or the largest scale: a step always changes the percent shown. */
+export function zoomInFrom(scale: number): number {
+  const shown = zoomPercent(clampZoom(scale));
+  return ZOOM_STEPS.find((step) => zoomPercent(step) > shown) ?? MAX_ZOOM;
+}
+
+/** The next step whose percent is below the scale's, or the smallest scale. */
 export function zoomOutFrom(scale: number): number {
-  const current = clampZoom(scale);
-  return ZOOM_STEPS.findLast((step) => step < current - STEP_TOLERANCE) ?? MIN_ZOOM;
+  const shown = zoomPercent(clampZoom(scale));
+  return ZOOM_STEPS.findLast((step) => zoomPercent(step) < shown) ?? MIN_ZOOM;
 }
 
 export interface FitOptions {

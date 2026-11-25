@@ -3,6 +3,7 @@ export const SHOWN_ATTRIBUTES = [
   "class",
   "hidden",
   "disabled",
+  "aria-disabled",
   "open",
   "style",
   "transform",

@@ -1,5 +1,6 @@
-import { fitRoom, shownArea } from "../keep-in-view.ts";
+import { coveredTop, fitRoom, shownArea } from "../keep-in-view.ts";
 import type { Viewport, ViewportState } from "../viewport/viewport.ts";
+import { bindToolbar } from "./toolbar.ts";
 import { viewportOf } from "../viewport/viewport.ts";
 import type { ViewState } from "../mount/view-state.ts";
 
@@ -7,7 +8,7 @@ export interface CanvasViewportOptions {
   view: ViewState;
 }
 
-/** Mounts a viewport on the viewer's canvas with the scale and tool the reader chose before, and hands each change back to the view; undefined without a canvas. */
+/** Mounts a viewport on the viewer's canvas with the scale and tool the reader chose before, hands each change back to the view, and binds the bar's zoom and pan tools to it; undefined without a canvas. */
 export function viewportOnCanvas(
   root: HTMLElement,
   options: CanvasViewportOptions,
@@ -20,20 +21,36 @@ export function viewportOnCanvas(
     drawing: () => canvas.querySelector("svg.graph") ?? undefined,
     fitBox: () => fitRoom(root, { canvas }),
     shown: () => shownArea(root, { canvas }),
+    coveredTop: () => coveredTop(root),
     initial: view.viewport,
   });
   viewport.subscribe(({ scale, tool, sizing }) => {
     view.viewport = { scale, tool, sizing };
     floored(canvas, { view, sizing });
   });
+  const toolbar = root.querySelector<HTMLElement>(".viz-tools");
+  const toolbarShown = toolbar === null ? () => undefined : bindToolbar(toolbar, { viewport });
   function resized(): void {
     viewport.redrawn();
     floored(canvas, { view, sizing: viewport.state().sizing });
+    toolbarShown();
   }
   resized();
-  const Observer = root.ownerDocument.defaultView?.ResizeObserver;
+  const win = root.ownerDocument.defaultView;
+  const Observer = win?.ResizeObserver;
   if (Observer !== undefined) new Observer(resized).observe(canvas);
-  return viewport;
+  // The window's height is part of the room a fit fills, also where the canvas keeps its size.
+  win?.addEventListener("resize", function windowResized() {
+    if (canvas.isConnected) toolbarShown();
+    else win.removeEventListener("resize", windowResized);
+  });
+  return {
+    ...viewport,
+    redrawn() {
+      viewport.redrawn();
+      toolbarShown();
+    },
+  };
 }
 
 interface FlooredOptions {

@@ -3,8 +3,8 @@ import { exampleCases, fixtureCases } from "./corpus.ts";
 import { expect, test } from "vite-plus/test";
 import { failureLines, sweep } from "./sweep.ts";
 
-/** The whole corpus takes about 40 s; a case gets room for a loaded CI runner. */
-const CASE_TIMEOUT_MS = 120_000;
+/** The whole corpus takes about 130 s alone, saga about 40 s of it; a case gets room for a loaded CI runner, where it runs up to five times slower. */
+const CASE_TIMEOUT_MS = 240_000;
 
 /** What each case sweeps today, at least: a sweep that loses stands (focus, walks) or clicks fails. Raise a floor when the viewer offers more; lower it when a fix makes a dead element plain. */
 const FLOORS: Record<string, { stands: number; clicks: number }> = {

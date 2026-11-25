@@ -11,11 +11,13 @@
 // back by the path and by the browser's Back. No click needs a sideways scroll first, and
 // after each step the labels of the next arrows show in the canvas. The checkout of the
 // visualizer guide is walked the same way, at both widths, the back arrows included.
-// The click sweep also opens the guide with a group entered, by a link.
+// The click sweep also opens the guide with a group entered, by a link, and must click the
+// Move, Zoom in and Zoom out tools. On events, Zoom in and then Fit each change the percent.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { GROUP_GUIDE, GROUP_GUIDE_ENTERED, groupWalkFailures } from "./lib/group-walk.mjs";
 import { VISUALIZER_GUIDE, visualizerWalkFailures } from "./lib/next-labels.mjs";
 import { clickFailures } from "./lib/viewer-sweep.mjs";
+import { toolbarFailures } from "./lib/toolbar-check.mjs";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -129,11 +131,13 @@ try {
 }
 await pool.close();
 
+failures.push(...(await toolbarFailures({ browser, origin, base })));
 failures.push(...(await groupWalkFailures({ browser, origin, base })));
 failures.push(...(await visualizerWalkFailures({ browser, origin, base })));
 
 const mustSweep = [...pages, GROUP_GUIDE, ...GROUP_GUIDE_ENTERED];
-const clicks = await clickFailures({ browser, origin, base, dist, mustSweep });
+const mustClick = ["hand", "zoomIn", "zoomOut"].map((tool) => `button.viz-tool "${tool}"`);
+const clicks = await clickFailures({ browser, origin, base, dist, mustSweep, mustClick });
 failures.push(...clicks.failures);
 
 await browser.close();

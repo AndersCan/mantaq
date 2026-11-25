@@ -1,4 +1,5 @@
 import { html } from "../dom.ts";
+import { toolbarOf } from "../canvas-navigation/toolbar.ts";
 import type { ViewState } from "./view-state.ts";
 
 interface FullscreenLabelOptions {
@@ -42,14 +43,15 @@ export interface FrameOptions {
   root: HTMLElement;
 }
 
-/** Everything the viewer draws under its root: the controls and panel, or with Diagram only just the canvas. */
+/** Everything the viewer draws under its root: the bar with the zoom and pan tools, then the controls and panel, or with Diagram only just the canvas. */
 export function layoutOf(doc: Document, context: FrameOptions): HTMLElement[] {
   const { view } = context;
   const canvas = html(doc, "div", { class: "canvas" }, context.graph);
   const fullscreen = fullscreenButton(doc, context.root);
+  const ends = fullscreen === undefined ? [] : [fullscreen];
   if (!view.diagramOnly) {
     return [
-      ...(fullscreen === undefined ? [] : [html(doc, "div", { class: "viz-bar" }, [fullscreen])]),
+      html(doc, "div", { class: "viz-bar" }, [toolbarOf(doc), ...ends]),
       ...noticeOf(doc, view),
       html(doc, "div", { class: "viz-main" }, [canvas, context.panel]),
     ];
@@ -58,7 +60,7 @@ export function layoutOf(doc: Document, context: FrameOptions): HTMLElement[] {
   show.setAttribute("data-show-controls", "");
   show.addEventListener("click", () => context.showControls());
   return [
-    html(doc, "div", { class: "viz-bar" }, fullscreen === undefined ? [show] : [show, fullscreen]),
+    html(doc, "div", { class: "viz-bar" }, [toolbarOf(doc), show, ...ends]),
     html(doc, "div", { class: "viz-main" }, [
       canvas,
       html(doc, "p", { class: "blocked-note", role: "status" }),
