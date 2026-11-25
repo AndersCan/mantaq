@@ -338,7 +338,7 @@ describe("the send form", () => {
 });
 
 describe("payloads in the address", () => {
-  test("open the send form with them, and onNavigate reports each change", () => {
+  test("an old bare entry opens the send form, and onNavigate reports each change qualified by machine", () => {
     const { driver, sent } = fakeDriver();
     const seen: string[][] = [];
     const root = mount({
@@ -352,7 +352,7 @@ describe("payloads in the address", () => {
     clickArrow(root, { event: "add" });
     expect({ shown, seen: seen.at(-1), sent: sent.map(fieldsOf) }).toEqual({
       shown: "5",
-      seen: ['add={"qty":5,"item":"fig"}'],
+      seen: ['cart:add={"qty":5,"item":"fig"}'],
       sent: [{ item: "fig", qty: 5 }],
     });
   });
@@ -362,7 +362,7 @@ describe("payloads in the address", () => {
     const root = mount({
       driver,
       values: ['coupon="free"', "qty=4"],
-      payloads: ['add={"qty":6}'],
+      payloads: ['cart:add={"qty":6}'],
     });
     openDetails(root, { event: "add" });
     const qty = box(root, { field: "qty" })?.value;

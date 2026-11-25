@@ -1,8 +1,8 @@
-import { decodePayloads, legacyPayloads } from "../send/payloads.ts";
-import type { VizEvent, VizJson, VizLiveState, VizLiveStep } from "../../schema.ts";
+import { decodePayloads, legacyPayloads, mergedPayloads } from "../send/payloads.ts";
+import type { MachineEvents, Payloads } from "../send/payloads.ts";
+import type { VizJson, VizLiveState, VizLiveStep } from "../../schema.ts";
 import { decodeValues } from "../fill.ts";
 import type { FocusStep } from "./focus.ts";
-import type { Payloads } from "../send/payloads.ts";
 import type { Selection } from "../graph.ts";
 import type { SentEvent } from "../explore.ts";
 import type { ViewerOptions } from "./viewer-options.ts";
@@ -45,8 +45,10 @@ export interface ViewState {
 }
 
 export interface InitialViewOptions {
-  /** Every event of the document: an old `?value=` field applies to each event with that field. */
-  events: ReadonlyArray<VizEvent>;
+  /** Every machine of the document: an old `?value=` field applies to each event with that field. */
+  machines: ReadonlyArray<MachineEvents>;
+  /** The machine the viewer opens on: a bare `?payload=` entry of an old link is one of its events. */
+  shown: string;
 }
 
 export function initialView(options: ViewerOptions, document: InitialViewOptions): ViewState {
@@ -63,10 +65,13 @@ export function initialView(options: ViewerOptions, document: InitialViewOptions
     notice: undefined,
     blocked: new Map(),
     chosen: new Map(),
-    payloads: {
-      ...legacyPayloads(decodeValues(options.values ?? []), document.events),
-      ...decodePayloads(options.payloads ?? []),
-    },
+    payloads: mergedPayloads(
+      legacyPayloads(decodeValues(options.values ?? []), document.machines),
+      decodePayloads(options.payloads ?? [], {
+        machines: document.machines.map((machine) => machine.id),
+        shown: document.shown,
+      }),
+    ),
     blockedFor: undefined,
   };
 }

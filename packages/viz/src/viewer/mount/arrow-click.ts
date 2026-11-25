@@ -1,11 +1,11 @@
+import { arrowSend, currentsFor } from "./arrow-send.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
 import { memberAt, shareArrows } from "../shared.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
-import { arrowSend } from "./arrow-send.ts";
 import type { ArrowSendContext } from "./arrow-send.ts";
-import { currentsOf } from "../compartments.ts";
 import type { EventClick } from "./event-send.ts";
+import { staticCallbacks } from "./canvas.ts";
 
 /** Diagram only: the line under the board says why the selected arrow's click did not, or will not, go where it is drawn. */
 export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
@@ -37,16 +37,16 @@ function whyText(from: ArrowSendContext, options: WhyTextOptions): string {
   }
 }
 
-export interface DrawHandlers {
+interface DrawHandlers {
   shown: VizMachine;
   openDetails: (selection: Selection) => void;
   sendEvent: (click: EventClick) => void;
 }
 
 /** A click on an arrow sends its event when a person can send it from here, blocked or not; else it opens the arrow's Details, which say why not. Its `?` opens Details. */
-export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): GraphCallbacks {
+function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): GraphCallbacks {
   const { machine, view } = from;
-  const members = { machine: handlers.shown, view };
+  const members = { machine: handlers.shown, currents: currentsFor(from) };
   return {
     select: (clicked) => {
       const selection = memberSelection(clicked, members);
@@ -72,16 +72,16 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
 
 interface MemberOptions {
   machine: VizMachine;
-  view: ViewState;
+  currents: string[];
 }
 
 /** A shared arrow acts as the member of the current state; with none, it is its own Details. */
 function memberSelection(selection: Selection, options: MemberOptions): Selection {
-  const { machine, view } = options;
+  const { machine, currents } = options;
   const arrow = shareArrows(machine).arrows.find(
     (each) => selection.kind === "edge" && each.id === selection.id,
   );
-  const member = arrow && view.live && memberAt(arrow, currentsOf(view.live, view.picked));
+  const member = arrow && currents.length > 0 && memberAt(arrow, currents);
   return member ? { kind: "edge", id: member.id } : selection;
 }
 
@@ -107,4 +107,32 @@ export function pickChild(child: PickedChild, options: PickChildOptions): void {
         row.getAttribute("data-child-key") === child.key,
     )
     ?.focus({ preventScroll: true });
+}
+
+export interface ClickCallbacksOptions {
+  /** Where clicks send from now; undefined while the entered machine is drawn without its state. */
+  arrows: () => ArrowSendContext | undefined;
+  view: ViewState;
+  shown: () => VizMachine;
+  openDetails: (selection: Selection) => void;
+  sendEvent: (click: EventClick) => void;
+}
+
+/** The canvas callbacks, worked out at each click: a step can stop or start the entered machine while the canvas stays. */
+export function clickCallbacks(options: ClickCallbacksOptions): GraphCallbacks {
+  const { arrows, view, openDetails } = options;
+  function now(): GraphCallbacks {
+    const sender = arrows();
+    if (sender === undefined) return staticCallbacks(view, { openDetails });
+    return drawCallbacks(sender, {
+      shown: options.shown(),
+      openDetails,
+      sendEvent: options.sendEvent,
+    });
+  }
+  function select(clicked: Selection): void {
+    now().select(clicked);
+  }
+  if (view.diagramOnly) return { select };
+  return { select, details: (id) => now().details?.(id) };
 }

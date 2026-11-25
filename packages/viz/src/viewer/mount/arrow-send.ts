@@ -1,6 +1,8 @@
 import { arrowCandidates, payloadFor } from "../fill.ts";
 import { blockedEdges, sentByParts, whyNotHere } from "../blocked.ts";
-import { currentsOf, walkedChild } from "../compartments.ts";
+import { currentsOf, localName, walkedChild } from "../compartments.ts";
+import type { EnteredRun, EnteredWalk } from "./entered/entered-walk.ts";
+import { isAnyState, scopeOf } from "../../schema.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type {
   VizActorRef,
@@ -10,8 +12,9 @@ import type {
   VizLiveState,
   VizMachine,
 } from "../../schema.ts";
+import { changedFields } from "../send/payloads.ts";
+import { isNever } from "../../is-never.ts";
 import { movesFrom } from "../../moves.ts";
-import { scopeOf } from "../../schema.ts";
 
 /** `send` also covers a blocked arrow: the click sends, and `blocked` says why the guard will not take the arrow. */
 export type ArrowSend =
@@ -21,15 +24,78 @@ export type ArrowSend =
   | { kind: "none" };
 
 export interface ArrowSendContext {
+  /** The machine whose arrows are clicked: the root, or the entered machine of `entered`. */
   machine: VizMachine;
   view: ViewState;
   driver: VizDriver | undefined;
+  /** Set when the arrows are those of an entered machine that runs: its events go to the root through `forward`. */
+  entered?: EnteredRun;
+}
+
+/** Whether a click on an entered machine's arrow sends: only a forwarded event from the child's current state does. */
+function enteredSend(run: EnteredRun, edge: VizEdge): ArrowSend {
+  if (edge.kind !== "transition" && edge.kind !== "stay") return { kind: "none" };
+  const { machine, current, forward, parent } = run;
+  if (!movesFrom(machine, current).some((move) => move.edge.id === edge.id)) {
+    const source = isAnyState(edge.from) ? "any state" : localName(edge.from);
+    const text = `${edge.event} can't be sent: ${machine.id} is in ${localName(current)}, this arrow leaves ${source}.`;
+    return { kind: "elsewhere", text };
+  }
+  if (forward.includes(edge.event)) {
+    return { kind: "send", actor: run.actor, blocked: undefined };
+  }
+  const listed = forward.join(", ");
+  const forwarded = forward.length === 0 ? "it forwards no events" : `it forwards ${listed}`;
+  return {
+    kind: "refuse",
+    text: `${edge.event} can't be sent: ${parent.id} does not forward it to ${machine.id}; ${forwarded}.`,
+  };
+}
+
+/** Edge id → why a click does not send it, for each arrow out of the entered machine's current state that the parent does not forward. */
+export function notForwarded(run: EnteredRun): Map<string, string> {
+  const refused = new Map<string, string>();
+  for (const move of movesFrom(run.machine, run.current)) {
+    const decision = enteredSend(run, move.edge);
+    if (decision.kind === "refuse") refused.set(move.edge.id, decision.text);
+  }
+  return refused;
+}
+
+/** The states the clicked machine is in now: the entered machine's one, else every state of the root's walk. */
+export function currentsFor(from: ArrowSendContext): string[] {
+  const { view, entered } = from;
+  if (entered !== undefined) return [entered.current];
+  return view.live === null ? [] : currentsOf(view.live, view.picked);
+}
+
+/** Why the guard blocks the arrow now; undefined when it does not, or for an entered machine, whose arrows are not dry run. */
+export function arrowLock(from: ArrowSendContext, edge: VizEdge): string | undefined {
+  return from.entered === undefined ? from.view.blocked.get(edge.id) : undefined;
+}
+
+/** Where a click on an arrow sends from: the root's walk, an entered machine that runs, or nowhere for a machine drawn without its state. */
+export function arrowContextOf(
+  walk: EnteredWalk,
+  root: ArrowSendContext,
+): ArrowSendContext | undefined {
+  switch (walk.kind) {
+    case "root":
+      return root;
+    case "running":
+      return { ...root, machine: walk.run.machine, entered: walk.run };
+    case "static":
+      return undefined;
+    default:
+      return isNever(walk);
+  }
 }
 
 /** Whether a click on this arrow sends: the one decision Details and the diagram share. */
 export function arrowSend(from: ArrowSendContext, edge: VizEdge): ArrowSend {
   const { machine, view } = from;
   if (view.live === null) return { kind: "none" };
+  if (from.entered !== undefined) return enteredSend(from.entered, edge);
   if (edge.kind !== "transition" && edge.kind !== "stay") return { kind: "none" };
   const senders = sentByParts(machine, edge);
   if (senders.length > 0) {
@@ -51,11 +117,11 @@ export function arrowSend(from: ArrowSendContext, edge: VizEdge): ArrowSend {
 /** The payload a click on `edge` sends: the one its dry run tried, else the event's default with the changed fields. Its send form shows it. */
 export function arrowPayload(from: ArrowSendContext, edge: VizEdge): VizJson {
   const { machine, view } = from;
-  updateBlocked(view, { machine, driver: from.driver });
-  const chosen = view.chosen.get(edge.id);
+  if (from.entered === undefined) updateBlocked(view, { machine, driver: from.driver });
+  const chosen = from.entered === undefined ? view.chosen.get(edge.id) : undefined;
   if (chosen !== undefined) return chosen;
   return payloadFor(machine, edge.event, {
-    set: view.payloads[edge.event] ?? {},
+    set: changedFields(view.payloads, { machine: machine.id, event: edge.event }),
     live: view.live,
     afters: view.afters,
   });
@@ -111,14 +177,14 @@ export function updateBlocked(view: ViewState, options: UpdateBlockedOptions): v
     currents: currentsOf(live, view.picked),
     defaultOf: (edge) =>
       payloadFor(machine, edge.event, {
-        set: view.payloads[edge.event] ?? {},
+        set: changedFields(view.payloads, { machine: machine.id, event: edge.event }),
         live,
         afters: view.afters,
       }),
     candidatesOf: (edge) => {
       const actor = actorFor(edge);
       return arrowCandidates(machine, edge, {
-        set: view.payloads[edge.event] ?? {},
+        set: changedFields(view.payloads, { machine: machine.id, event: edge.event }),
         live,
         afters: view.afters,
         actor: actor === "none" ? undefined : actor,
