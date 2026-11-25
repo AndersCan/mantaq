@@ -27,6 +27,7 @@ import type {
   VizState,
 } from "./schema.ts";
 import { checkEmbeds } from "./validate/validate-embeds.ts";
+import { checkGroups } from "./validate/validate-groups.ts";
 import { Either } from "@mantaq/utils";
 import { readExplanation } from "./validate/validate-explanation.ts";
 
@@ -58,6 +59,11 @@ function readState(reader: Reader, options: StateRecord): VizState {
     tested: readCoverage(reader, { record, key: "tested", path }),
     doc: readNullableString(reader, { record, key: "doc", path }),
   };
+  const group = record["group"];
+  if (typeof group === "string") state.group = group;
+  if (group !== undefined && typeof group !== "string") {
+    report(reader, { path: `${path}.group`, message: "expected string" });
+  }
   const machine = record["machine"];
   if (typeof machine === "string") state.machine = machine;
   if (machine !== undefined && typeof machine !== "string") {
@@ -227,6 +233,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
     runs: readRuns(reader, { record, path }),
   };
   checkReferences(reader, machine, path);
+  checkGroups(reader, { machine, path });
   return machine;
 }
 

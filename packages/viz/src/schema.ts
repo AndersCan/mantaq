@@ -16,6 +16,24 @@ export function scopeOf(id: string): string {
   return cut === -1 ? "" : id.slice(0, cut);
 }
 
+/** The actor map names of a machine (`VizMachine.maps`). */
+export interface ActorMaps {
+  maps: ReadonlyArray<string>;
+}
+
+/** The actor map a state id sits in: its region scope is the map or lies below it. undefined = in no map. */
+export function actorMapOf(id: string, options: ActorMaps): string | undefined {
+  const scope = scopeOf(id);
+  return options.maps.find((map) => scope === map || scope.startsWith(`${map}.`));
+}
+
+/** Why a group name is not allowed, or undefined when it is: a name is not empty and has no `.`. */
+export function groupNameProblem(group: string): string | undefined {
+  if (group === "") return "empty group name";
+  if (group.includes(".")) return `group name ${JSON.stringify(group)} contains "."`;
+  return undefined;
+}
+
 export function isAnyState(id: string): boolean {
   return id === ANY_STATE || id.endsWith(`.${ANY_STATE}`);
 }
@@ -53,6 +71,8 @@ export interface VizState {
   tested: VizCoverage | null;
   /** Leading JSDoc of the `state(...)` declaration. null = undocumented or AST not run. */
   doc: string | null;
+  /** Name from the `@group` tag of the `state(...)` declaration: the viewer can fold the group's states into one node. Viewer-only, the runtime never sees it. Omitted = ungrouped. */
+  group?: string;
   /** Id of another machine in the same document that this state embeds. That machine stays its own entry in `machines`; its states are not copied here. Omitted = a plain state. */
   machine?: string;
   /** Inputs of this machine that `embed` sends on to `machine` while this state is current (its `forward` option). Omitted = none, or no `machine`. */
