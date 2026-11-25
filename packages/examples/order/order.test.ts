@@ -45,14 +45,27 @@ describe("order", () => {
     ]);
   });
 
-  it("is cancelled before payment, or after the buyer gives up on a declined card", () => {
+  it("is cancelled before payment, or after the buyer gives up on a card that the provider or the bank declined", () => {
     const walks = {
       beforePayment: statesAfter(["cancelOrder"]),
       afterDecline: statesAfter(["placeOrder", "declined", "cancelOrder"]),
+      afterBankDecline: statesAfter([
+        "placeOrder",
+        "bankAskedToConfirm",
+        "declined",
+        "cancelOrder",
+      ]),
     };
     expect(walks).toStrictEqual({
       beforePayment: ["reviewingOrder", "cancelled"],
       afterDecline: ["reviewingOrder", "chargingCard", "cardDeclined", "cancelled"],
+      afterBankDecline: [
+        "reviewingOrder",
+        "chargingCard",
+        "confirmingWithBank",
+        "cardDeclined",
+        "cancelled",
+      ],
     });
   });
 

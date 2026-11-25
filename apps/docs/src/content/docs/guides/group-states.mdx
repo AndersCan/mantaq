@@ -21,7 +21,7 @@ A machine with more than about 12 states is hard to read as one diagram. The arr
 
 <Machine src="../../packages/examples/order/order.ts" />
 
-This is an order with 12 states, drawn with its two groups folded. The walk starts in `reviewingOrder`. The `payment` node holds 3 states and the `delivery` node holds 4 states. The other states are `cancelled`, `delivered`, `returnedToShop` and `refunded`. An arrow between two states of the same group is a loop on its group node, for example `retryCard` on `payment`.
+This is an order with 12 states, drawn with its two groups folded. The walk starts in `reviewingOrder`. The `payment` node holds 3 states and the `delivery` node holds 4 states. The other states are `cancelled`, `delivered`, `returnedToShop` and `refunded`. An arrow between two states of the same group is a loop on its group node, for example `retryCard` on `payment`. In `payment`, `bankAskedToConfirm` leads to the bank, and `charged` or `confirmed` lead out to `delivery`. In `delivery`, the loops `shipped`, `arrived`, `nobodyAnswered` and `rescheduled` move the parcel. `handedOver` leaves for `delivered`, `sentBack` leaves for `returnedToShop`, and `refundBuyer` leads to `refunded`.
 
 ### Tag the states
 
@@ -37,6 +37,9 @@ A group has these limits:
 - The name of a group cannot contain a `.`.
 - All the states of a group are in the same machine or region.
 - The states of an actor map cannot be in a group.
+- A state name that is used in more than one region cannot be in a group.
+
+A tag that breaks a limit is ignored, and the state is drawn on its own.
 
 ### What the viewer shows
 

@@ -43,6 +43,19 @@ const STEPS = [
 /** How long a step may take to show. */
 const STEP_MS = 3_000;
 
+/** How long the viewer may take to mount, as the other live checks allow. */
+const MOUNT_MS = 10_000;
+
+/** Runs in the page: whether `element` looks clickable to a reader, a pointer cursor and nothing on its way up fully transparent. */
+function looksClickable(element) {
+  const pointer = getComputedStyle(element).cursor === "pointer";
+  let shown = true;
+  for (let node = element; node !== null; node = node.parentElement) {
+    if (getComputedStyle(node).opacity === "0") shown = false;
+  }
+  return pointer && shown;
+}
+
 /** Runs in the page: the marked nodes, the path, the row of the current group node and the line about the walk outside the group. */
 function shownNow() {
   const current = [];
@@ -59,13 +72,24 @@ function shownNow() {
   return { current, path, row, line };
 }
 
-/** Clicks the button named `options.name` in `options.tab` where a reader would: on its label when it has one. */
+/** The first line of a Playwright failure. */
+function firstLine(error) {
+  return error.message.split("\n")[0];
+}
+
+/**
+ * Clicks the button named `options.name` in `options.tab` where a reader would: on its
+ * label when it has one. Returns `"clicked"`, or why the reader could not click it.
+ */
 async function clickButton(options) {
   const button = options.tab.getByRole("button", { name: options.name, exact: true }).first();
-  await button.waitFor({ timeout: STEP_MS });
+  const found = await button.waitFor({ timeout: STEP_MS }).then(() => "found", firstLine);
+  if (found !== "found") return `no button: ${found}`;
   const label = button.locator(":scope > text");
   const target = (await label.count()) > 0 ? label.first() : button;
-  await target.click({ timeout: STEP_MS });
+  const looks = await target.evaluate(looksClickable);
+  if (!looks) return "it does not look clickable";
+  return target.click({ timeout: STEP_MS }).then(() => "clicked", firstLine);
 }
 
 /** What `options.tab` shows once it shows `options.wanted`, or what it shows when the step's time is up. */
@@ -89,16 +113,14 @@ export async function groupWalkFailures(options) {
   const errors = [];
   tab.on("pageerror", (error) => errors.push(error.message));
   await tab.goto(`${options.origin}${options.base}${GROUP_GUIDE}`);
+  await tab.locator(".viz .graph g.current").first().waitFor({ timeout: MOUNT_MS });
   const failures = [];
   for (const [index, step] of STEPS.entries()) {
     const number = index + 1;
     const where = `${GROUP_GUIDE} step ${number}`;
-    const clicked = await clickButton({ tab, name: step.click }).then(
-      () => "clicked",
-      (error) => error.message.split("\n")[0],
-    );
+    const clicked = await clickButton({ tab, name: step.click });
     if (clicked !== "clicked") {
-      failures.push(`${where}: no button "${step.click}" to click: ${clicked}`);
+      failures.push(`${where}: cannot click "${step.click}": ${clicked}`);
       break;
     }
     const wanted = JSON.stringify(step.shows);

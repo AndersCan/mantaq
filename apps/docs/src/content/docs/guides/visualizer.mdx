@@ -35,7 +35,7 @@ On the live page (the Vite plugin) each step runs the real actor, so guards are 
 
 ### Moving around
 
-The viewer can draw a machine at more than one level. The path above the canvas shows the level that it draws now. The path starts with the name of the machine, and each level in adds one name, for example `order › payment`.
+The viewer can draw a machine at more than one level. When you open a machine on a board or enter a group, a path above the canvas shows the level that it draws now. The path starts with the name of the machine, and each level in adds one name, for example `order › payment`.
 
 - Board: if `create` returns two or more other machines next to its actor, the viewer first draws a board. A board has one box per machine, and a dotted line between two machines that send messages to each other. Click a box to open that machine. Its name is added to the path.
 - Group: if states of the machine have a `@group` tag, the viewer draws each group as one node. Click `enter` on a group node to draw the states of that group. Its name is added to the path. [Group the states of a big machine](/mantaq/guides/group-states/) shows this on a live diagram.
