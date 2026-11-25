@@ -71,7 +71,7 @@ interface NearOptions {
   clashes: LabelClashes;
 }
 
-/** The arrow's label as near the state it leaves as it fits along the line it hangs under, with nothing nearer to it than before. */
+/** The arrow's label as near the state it leaves as it fits along the line it hangs under, clear of everything; a label that already touches something stays. */
 function nearSource(placed: PlacedEdge, options: NearOptions): PlacedEdge {
   const segment = placed.target === placed.edge.from ? undefined : hungUnder(placed);
   const places = segment === undefined ? [] : tries(placed, segment);
@@ -79,9 +79,10 @@ function nearSource(placed: PlacedEdge, options: NearOptions): PlacedEdge {
   const { count } = options.clashes;
   const edge = placed.edge.id;
   const now = count({ edge, label: placed.label });
+  if (now > 0) return placed;
   for (const at of places) {
     const moved = shifted(placed, { at });
-    if (count({ edge, label: moved.label }) <= now) return moved;
+    if (count({ edge, label: moved.label }) === 0) return moved;
   }
   return placed;
 }
