@@ -1,6 +1,6 @@
+import { actingMember, realMembersOf } from "../groups/acting-member.ts";
 import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
-import { actingMember, realMembersOf } from "../groups/acting-member.ts";
 import { realMachineOf } from "../groups/fold-groups.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
 import { movesFrom } from "../../moves.ts";
