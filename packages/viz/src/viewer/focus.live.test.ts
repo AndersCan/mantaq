@@ -207,6 +207,25 @@ describe("entering a machine node", () => {
     });
   });
 
+  test("a state clicked inside opens its Details, not the root's Screen", () => {
+    const screen = (live: VizLiveState) => document.createTextNode(`screen of ${live.state}`);
+    const root = mount({ driver: checkoutDriver(), screen });
+    enter(root, { from: "paying" });
+    press(root.querySelector('.canvas g.state[data-node-id="settled"]'));
+    const inside = {
+      tab: root.querySelector('[role="tab"][aria-selected="true"]')?.textContent,
+      details: root.querySelector("[data-selected-state]")?.getAttribute("data-selected-state"),
+    };
+    escape(root.querySelector(".canvas svg"));
+    expect({
+      inside,
+      left: root.querySelector("[data-selected-state]") ?? undefined,
+    }).toStrictEqual({
+      inside: { tab: "Details", details: "settled" },
+      left: undefined,
+    });
+  });
+
   test("draws the enter control without onEnter", () => {
     const root = mount();
     expect(root.querySelectorAll(".machine-enter")).toHaveLength(2);

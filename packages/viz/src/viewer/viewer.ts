@@ -101,15 +101,22 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
         ? { send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }) }
         : {}),
     });
-    const screen = screenOf(doc, { options, machine, view, driver });
+    const screenView = focus().walk === "live" ? view : { ...view, selection: null };
+    const screen = screenOf(doc, { options, machine, view: screenView, driver });
     const tabs = panelTabs(doc, { view, parts: stepTab, details, screen, refresh });
     shownSteps = replaceKeepingSteps(panel, {
       tabs,
       shown: shownSteps,
       steps: view.live?.steps.length ?? 0,
     });
-    if (view.diagramOnly && focus().walk === "live") sayWhy(root, { machine, view, driver });
+    if (view.diagramOnly) whyNot();
     mark();
+  }
+  /** Diagram only: the line under the drawing says why the root's selected arrow sent nothing; an entered machine sends nothing, so it is empty. */
+  function whyNot(): void {
+    if (focus().walk === "live") return sayWhy(root, { machine, view, driver });
+    const line = root.querySelector(".viz-main > .blocked-note");
+    if (line !== null) line.textContent = "";
   }
   function pickRow(child: PickedChild): void {
     pickChild(child, { root, view, refresh, source: "row" });
@@ -140,7 +147,8 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   }
   function showDetails(selection: Selection): void {
     view.selection = selection;
-    if (!(view.tab === "screen" && selection.kind === "state")) view.tab = "details";
+    const previewed = view.tab === "screen" && selection.kind === "state";
+    if (!previewed || focus().walk === "static") view.tab = "details";
     refresh();
   }
   function openDetails(selection: Selection): void {
