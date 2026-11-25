@@ -102,7 +102,7 @@ m.onAny({
 
 ## Big Machine → Parent That Embeds Smaller Machines
 
-Split a machine when it has more than about 12 states, when the same handler is registered in a loop over many states, or when a group of states has one way in, a few ways out and no other arrows to the rest. Do not add more states to it. Move each group into its own machine with final states for its ends. In the parent, replace the group with one state that runs the child with `embed` from `@mantaq/sugar`. The viz draws that state as one machine node with its arrows; the reader enters it to see the child.
+Split a machine when it has more than about 12 states, when the same handler is registered in a loop over many states, or when a group of states has one way in, a few ways out and no other arrows to the rest. Do not add more states to it. Move each group into its own machine with final states for its ends. In the parent, replace the group with one state that runs the child with `embed` from `@mantaq/sugar`. The viz draws that state as one machine node with its arrows; the reader enters it to see the child. Needs `@mantaq/sugar` 3.1 or later (`@mantaq/inspect` 0.49 for the machine node). With older sugar, keep one machine.
 
 ```ts
 import { Actor, event, machine, state } from "@mantaq/core";
