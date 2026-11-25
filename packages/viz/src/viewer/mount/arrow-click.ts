@@ -38,7 +38,9 @@ function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
   const last = live?.last;
   if (!live || !last) return [];
   const number = live.steps.length;
-  const step = [`Step ${number}: `, ...outcomeText(doc, from.machine, last)];
+  const took = from.view.lasts.at(-1) === last;
+  const lead = took ? `Step ${number}: ` : "Not sent: ";
+  const step = [lead, ...outcomeText(doc, from.machine, last)];
   return last.error ? [...step, `. It threw: ${last.error}`] : step;
 }
 

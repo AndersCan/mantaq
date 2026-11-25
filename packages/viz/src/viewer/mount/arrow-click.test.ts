@@ -85,6 +85,21 @@ test("without a panel, a send that throws says what it threw", () => {
     .querySelector('.graph g.edge[data-edge-id="paying-paid-done"]')
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   expect(root.querySelector(".viz-main > .blocked-note")?.textContent).toBe(
-    "Step 1: paid: stayed in paying. It threw: card declined",
+    "Not sent: paid: stayed in paying. It threw: card declined",
   );
+});
+
+test("a held Enter does not send the arrow that focus moved to", () => {
+  const root = document.createElement("div");
+  document.body.append(root);
+  const { driver, sent } = walkDriver(shop, { guarded: new Set() });
+  const viz: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shop] };
+  mountViewer(root, viz, { driver, diagramOnly: true });
+  enterOn(root, { arrow: "inCart-checkout-paying" });
+  const held = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, repeat: true });
+  root.ownerDocument.activeElement?.dispatchEvent(held);
+  expect({ sent: sent.length, focused: focused(root) }).toEqual({
+    sent: 1,
+    focused: "paying-paid-done",
+  });
 });

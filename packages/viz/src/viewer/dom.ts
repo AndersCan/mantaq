@@ -92,6 +92,8 @@ export function onButtonPress(element: Element, options: ButtonPressOptions): vo
   element.addEventListener("keydown", (event) => {
     if (!("key" in event) || !isButton()) return;
     if (event.key !== "Enter" && event.key !== " ") return;
+    // A held key repeats: it must not press what focus moved to after the first press.
+    if ("repeat" in event && event.repeat === true) return;
     event.preventDefault();
     press();
   });
