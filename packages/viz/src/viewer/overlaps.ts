@@ -305,7 +305,7 @@ function insideBoxes(node: PlacedNode): Box[] {
         node.label,
         node.glyph,
         node.name,
-        node.enter,
+        ...(node.enter === undefined ? [] : [node.enter]),
         ...node.chips,
         ...(node.workers ? [node.workers] : []),
       ];

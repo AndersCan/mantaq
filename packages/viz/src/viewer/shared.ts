@@ -137,8 +137,3 @@ export function shareArrows(machine: VizMachine): Shared {
     arrows,
   };
 }
-
-/** The member a click acts on: the one whose source state is current, if any. */
-export function memberAt(arrow: SharedArrow, currents: ReadonlyArray<string>): VizEdge | undefined {
-  return arrow.members.find((member) => currents.includes(member.from));
-}

@@ -60,11 +60,13 @@ describe("foldGroups on the grouped checkout", () => {
     ]);
   });
 
-  test("edges inside a group are dropped and crossing ones keep their real id", () => {
+  test("edges inside a group are loops on its node, and every lone edge keeps its real id", () => {
     expect(endsOf(foldGroups(grouped).edges)).toEqual([
       "__initial__--inCart: __initial__ -> inCart",
       "inCart-checkout-chargingCard: inCart -> @payment",
+      "chargingCard-charged-confirming: @payment -> @payment",
       "confirming-confirmed-packing: @payment -> @shipping",
+      "packing-packed-sent: @shipping -> @shipping",
     ]);
     expect(groupArrowsOf(grouped)).toEqual([]);
     expect(arrowMembersOf(grouped, { arrow: "inCart-checkout-chargingCard" })).toEqual([
@@ -137,6 +139,8 @@ describe("foldGroups merges crossing edges", () => {
       "cart.editing-save-?: cart.@review -> ?",
       "group:cart.*>reset>cart.@review:transition: cart.* -> cart.@review",
       "cart.paying-paid-cart.done: cart.@pay -> cart.done",
+      "cart.listing-edit-cart.editing: cart.@review -> cart.@review",
+      "cart.editing-keep-cart.editing: cart.@review -> cart.@review",
     ]);
   });
 
@@ -151,7 +155,10 @@ describe("foldGroups merges crossing edges", () => {
       pay,
       "group:cart.*>reset>cart.@review:transition",
     ]);
-    expect(arrowMembersOf(merging, { arrow: "cart.listing-edit-cart.editing" })).toEqual([]);
+    expect(arrowMembersOf(merging, { arrow: "cart.listing-edit-cart.editing" })).toEqual([
+      merging.edges[10],
+    ]);
+    expect(arrowMembersOf(merging, { arrow: "cart.paying-pay-cart.listing" })).toEqual([]);
   });
 
   test("an arrow from several handlers sums their hits and shows no doc", () => {
@@ -239,7 +246,7 @@ describe("foldGroups labels", () => {
     const edges = ["listing", "empty"].map((to) =>
       readEdge(edgeOf("paying", { event: "pay", to }), { branches }),
     );
-    expect(linesOf(machineOf({ states, edges }))).toEqual([["pay"]]);
+    expect(linesOf(machineOf({ states, edges }))).toEqual([["pay"], ["pay"]]);
   });
 
   test("a handler with no end in a group keeps its conditions", () => {

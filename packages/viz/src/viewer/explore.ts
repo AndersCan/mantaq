@@ -1,5 +1,6 @@
 import { movesFrom } from "../moves.ts";
 import { actorText, localName } from "./compartments.ts";
+import { actingMember } from "./groups/acting-member.ts";
 import type {
   VizActorRef,
   VizJson,
@@ -417,7 +418,7 @@ export function markExplore(
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
     const members = listOf(element.dataset["members"]) ?? [id];
-    const here = members.find((member) => currents.includes(sources.get(member) ?? ""));
+    const here = actingMember(members, { moves, blocked, currents, sources });
     element.classList.toggle(
       "next",
       members.some((member) => next.has(member)),
@@ -432,7 +433,7 @@ export function listOf(value: string | undefined): string[] | undefined {
   return value === undefined ? undefined : (JSON.parse(value) as string[]);
 }
 
-/** A node is current when it is a current state, or a shared node standing for one. */
+/** A node is current when it is a current state, or a shared or group node standing for one; a group node also names its current state in `data-current-state`. */
 function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
     const id = element.dataset["nodeId"] ?? "";
@@ -441,6 +442,10 @@ function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
       "current",
       [id, ...states].some((state) => currents.includes(state)),
     );
+    if (element.classList.contains("any-node")) continue;
+    const inside = states.find((state) => currents.includes(state));
+    if (inside === undefined) delete element.dataset["currentState"];
+    else element.dataset["currentState"] = inside;
   }
 }
 

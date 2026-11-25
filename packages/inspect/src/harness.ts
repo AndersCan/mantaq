@@ -121,11 +121,21 @@ async function typePayload(
   return undefined;
 }
 
+/** The real states the diagram marks current: a state node's id, and for a folded group node the state of the walk inside it. */
+function currentStates(page: Page): Promise<string[]> {
+  return page
+    .locator(".graph g.state.current[data-node-id]")
+    .evaluateAll((nodes) =>
+      nodes.map(
+        (node) =>
+          node.getAttribute("data-current-state") ?? node.getAttribute("data-node-id") ?? "",
+      ),
+    );
+}
+
 /** Local state names of every region, read from the diagram's current states. */
 async function readRegions(page: Page, machine: VizMachine): Promise<Record<string, string>> {
-  const ids = await page
-    .locator(".graph g.current[data-node-id]:not([data-states])")
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));
+  const ids = await currentStates(page);
   const entries = ids.flatMap((id) => {
     const dot = id.lastIndexOf(".");
     if (dot === -1) return [];
@@ -265,12 +275,7 @@ function makeSend(
     const path = actorPath(actor);
     const missing = await missingActor(page, { machine, actor, path });
     if (missing !== undefined) return Either.left(missing);
-    const currents =
-      "map" in actor
-        ? [await pressRow(page, actor)]
-        : await page
-            .locator(".graph g.current[data-node-id]")
-            .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));
+    const currents = "map" in actor ? [await pressRow(page, actor)] : await currentStates(page);
     const edges = currents
       .flatMap((current) => movesFrom(machine, current))
       .map((move) => move.edge)

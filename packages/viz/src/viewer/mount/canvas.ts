@@ -3,6 +3,7 @@ import type { EnteredMachine, GraphCallbacks } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
 import { currentsOf } from "../compartments.ts";
+import { drawnNodeOf } from "../groups/fold-groups.ts";
 import { html } from "../dom.ts";
 import { keepInView } from "../keep-in-view.ts";
 import type { ViewState } from "./view-state.ts";
@@ -166,7 +167,7 @@ export interface KeepCurrentOptions {
   view: ViewState;
 }
 
-/** Scrolls to the live state; in a shown machine, to a state drawn there, never the page. An entered machine has no live state. */
+/** Scrolls to the live state, or the group node that draws it; in a shown machine, to a state drawn there, never the page. An entered machine has no live state. */
 export function keepCurrentInView(root: HTMLElement, from: KeepCurrentOptions): void {
   const { focus, view } = from;
   if (view.live === null || focus.walk === "static") return;
@@ -175,7 +176,7 @@ export function keepCurrentInView(root: HTMLElement, from: KeepCurrentOptions): 
   const currents =
     rootPart === undefined ? live : live.filter((id) => partOf(machine, id) === rootPart);
   const now = currents[0];
-  if (now !== undefined) keepInView(root, now);
+  if (now !== undefined) keepInView(root, drawnNodeOf(focus.drawn, { state: now }));
 }
 
 export interface ListenWidthOptions {

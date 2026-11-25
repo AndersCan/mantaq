@@ -7,7 +7,7 @@ import {
   groupNodesOf,
 } from "./fold-groups.ts";
 import { describe, expect, test } from "vite-plus/test";
-import type { VizEdge, VizMachine, VizState } from "../../schema.ts";
+import type { VizMachine, VizState } from "../../schema.ts";
 import { edgeCondition } from "../labels.ts";
 import fc from "fast-check";
 import { groupedArbitrary } from "./grouped.arbitrary.ts";
@@ -16,21 +16,14 @@ import { layoutMachine } from "../layout.ts";
 
 const run = { seed: 0x6a0, numRuns: 1000 };
 
-function isInside(machine: VizMachine, edge: VizEdge): boolean {
-  const from = drawnNodeOf(machine, { state: edge.from });
-  const grouped = from !== edge.from;
-  return grouped && edge.to !== null && drawnNodeOf(machine, { state: edge.to }) === from;
-}
-
-/** Each real edge with how often the fold draws it, alone or as an arrow member; 0 when inside a group. */
+/** Each real edge the fold does not draw exactly once, alone or as an arrow member; one inside a group is a loop on its node. */
 function edgeCounts(machine: VizMachine): string[] {
   const folded = foldGroups(machine);
   const problems: string[] = [];
   for (const edge of machine.edges) {
     const alone = folded.edges.filter((drawn) => drawn.id === edge.id).length;
     const merged = groupArrowsOf(machine).filter((arrow) => arrow.members.includes(edge)).length;
-    const expected = isInside(machine, edge) ? 0 : 1;
-    if (alone + merged !== expected) problems.push(`${edge.id} drawn ${alone} + ${merged}`);
+    if (alone + merged !== 1) problems.push(`${edge.id} drawn ${alone} + ${merged}`);
   }
   for (const drawn of folded.edges) {
     const members = arrowMembersOf(machine, { arrow: drawn.id });
@@ -142,7 +135,7 @@ function labelProblems(machine: VizMachine): string[] {
 }
 
 describe("groups on generated machines", () => {
-  test("G1: every real edge is inside a group, one drawn edge, or a member of one arrow", () => {
+  test("G1: every real edge is one drawn edge, or a member of one arrow", () => {
     fc.assert(
       fc.property(groupedArbitrary, (machine) => {
         expect(edgeCounts(machine)).toEqual([]);

@@ -1,7 +1,11 @@
-import { arrowClick, arrowSend } from "./arrow-send.ts";
+import { actingMember, realMembersOf } from "../groups/acting-member.ts";
+import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
+import { whyNoneHere } from "../blocked.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
+import { realMachineOf } from "../groups/fold-groups.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
-import { memberAt, shareArrows } from "../shared.ts";
+import { movesFrom } from "../../moves.ts";
+import { shareArrows } from "../shared.ts";
 import type { Shared } from "../shared.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
@@ -103,13 +107,31 @@ export function drawnArrowClick(
     const why = view.live === null ? undefined : STATIC_WHY;
     return { selection, edge: undefined, click: { kind: "plain", why } };
   }
+  updateBlocked(view, { machine, driver: from.driver });
   const selection = memberSelection(
     { kind: "edge", id: options.id },
     { machine: options.shown, view },
   );
   const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-  if (edge === undefined) return { selection, edge, click: { kind: "plain", why: undefined } };
-  return { selection, edge, click: arrowClick(from, edge) };
+  if (edge !== undefined) return { selection, edge, click: arrowClick(from, edge) };
+  const ids = realMembersOf(options.shown, {
+    shared: sharedArrows(options.shown),
+    arrow: options.id,
+  });
+  const members = machine.edges.filter((candidate) => ids.includes(candidate.id));
+  return { selection, edge, click: { kind: "plain", why: membersWhy(from, { members }) } };
+}
+
+export interface MembersWhyOptions {
+  /** The real edges one drawn arrow stands for. */
+  members: ReadonlyArray<VizEdge>;
+}
+
+/** Why a click on a drawn arrow sends none of its real edges: the walk is elsewhere; undefined with no walk. */
+export function membersWhy(from: ArrowSendContext, options: MembersWhyOptions): string | undefined {
+  const { machine, view } = from;
+  if (view.live === null) return undefined;
+  return whyNoneHere(machine, { edges: options.members, live: view.live, picked: view.picked });
 }
 
 interface MemberOptions {
@@ -128,14 +150,17 @@ function sharedArrows(machine: VizMachine): Shared {
   return shared;
 }
 
-/** A shared arrow acts as the member of the current state; with none, it is its own Details. */
+/** A shared or group arrow acts as its real member that leaves the current state; with none, it is its own Details. */
 export function memberSelection(selection: Selection, options: MemberOptions): Selection {
   const { machine, view } = options;
-  const arrow = sharedArrows(machine).arrows.find(
-    (each) => selection.kind === "edge" && each.id === selection.id,
-  );
-  const member = arrow && view.live && memberAt(arrow, currentsOf(view.live, view.picked));
-  return member ? { kind: "edge", id: member.id } : selection;
+  if (selection.kind !== "edge" || view.live === null) return selection;
+  const walked = realMachineOf(machine);
+  const currents = currentsOf(view.live, view.picked);
+  const moves = currents.flatMap((current) => movesFrom(walked, current));
+  const members = realMembersOf(machine, { shared: sharedArrows(machine), arrow: selection.id });
+  const sources = new Map(walked.edges.map((edge) => [edge.id, edge.from]));
+  const member = actingMember(members, { moves, blocked: view.blocked, currents, sources });
+  return member === undefined ? selection : { kind: "edge", id: member };
 }
 
 export interface PickChildOptions {

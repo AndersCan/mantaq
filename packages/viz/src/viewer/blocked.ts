@@ -45,23 +45,53 @@ export function whyNotHere(
     who = scope;
   }
   if (current === undefined) return null;
-  return leavesElsewhere(machine, { edge, current, who }) ?? null;
+  return leavesElsewhere(machine, { edges: [edge], current, who }) ?? null;
+}
+
+export interface NoneHereOptions {
+  /** The real edges one drawn arrow stands for, all from one part. */
+  edges: ReadonlyArray<VizEdge>;
+  live: VizLiveState;
+  picked: { map: string; key: string } | null;
+}
+
+/** Why the walk can send none of a drawn arrow's real edges where it is now, naming each source; undefined when one leaves it (or the part is unknown). */
+export function whyNoneHere(machine: VizMachine, options: NoneHereOptions): string | undefined {
+  const { edges, live, picked } = options;
+  const [first] = edges;
+  if (first === undefined) return undefined;
+  const why = whyNotHere(machine, first, { live, picked });
+  if (why === null) return undefined;
+  const scope = scopeOf(first.from);
+  const current = scope === "" ? live.state : live.regions[scope];
+  if (current === undefined || machine.maps.includes(scope)) return why;
+  const who = scope === "" ? "the walk" : scope;
+  return leavesElsewhere(machine, { edges, current, who });
 }
 
 interface ElsewhereOptions {
-  edge: VizEdge;
+  /** The real edges of one drawn arrow; the sentence names the first one's event. */
+  edges: ReadonlyArray<VizEdge>;
   /** The state the part is in now. */
   current: string;
   /** How the sentence names the part. */
   who: string;
 }
 
-/** Why `edge` cannot be sent from `current`; undefined when it leaves `current`. */
+/** Why none of `edges` can be sent from `current`; undefined when one leaves `current`. */
 function leavesElsewhere(machine: VizMachine, options: ElsewhereOptions): string | undefined {
-  const { edge, current, who } = options;
-  if (movesFrom(machine, current).some((move) => move.edge.id === edge.id)) return undefined;
-  const source = isAnyState(edge.from) ? "any state" : localName(edge.from);
-  return `${edge.event} can't be sent: ${who} is in ${localName(current)}, this arrow leaves ${source}.`;
+  const { edges, current, who } = options;
+  const moves = movesFrom(machine, current);
+  if (edges.some((edge) => moves.some((move) => move.edge.id === edge.id))) return undefined;
+  const sources: string[] = [];
+  for (const edge of edges) {
+    const source = isAnyState(edge.from) ? "any state" : localName(edge.from);
+    if (!sources.includes(source)) sources.push(source);
+  }
+  const event = edges[0]?.event ?? "";
+  const named = sources.join(" or ");
+  const here = localName(current);
+  return `${event} can't be sent: ${who} is in ${here}, this arrow leaves ${named}.`;
 }
 
 /** The value at a dotted path in the live context; "not set" when there is none (the Context tab's word). */
