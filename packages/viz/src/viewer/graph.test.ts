@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
+import * as shopMachines from "./groups/shop-machines.ts";
 import { describe, expect, test } from "vite-plus/test";
-import type { EnteredMachine, Selection } from "./graph.ts";
+import type { EnteredGroup, Selection } from "./graph.ts";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
-import { documentOf } from "../validate/embed-document.ts";
-import { mountViewer } from "./viewer.ts";
+import { foldGroups } from "./groups/fold-groups.ts";
+import { groupMachine } from "./groups/group-machine.ts";
 import { ARROW_SIZE } from "./geometry.ts";
 import { HELP_SLOT, LOCK_SLOT, placeMachine, textWidth } from "./layout.ts";
 
@@ -437,23 +438,20 @@ describe("arrow hit area", () => {
   });
 });
 
-const shop = documentOf([
-  {
-    id: "checkout",
-    states: [
-      { id: "cart", role: "initial" },
-      { id: "paying", machine: "payment" },
-      { id: "done", role: "final" },
-    ],
-    edges: [
-      { from: "cart", event: "pay", to: "paying" },
-      { from: "paying", event: "paid", to: "done" },
-      { from: "paying", event: "declined", to: "cart" },
-    ],
-  },
-  { id: "payment", states: [{ id: "charging", role: "initial" }] },
-]);
-const checkout = shop.machines.find((each) => each.id === "checkout") ?? machine;
+const shop = shopMachines.machineOf({
+  states: [
+    shopMachines.stateOf("inCart", { initial: true }),
+    shopMachines.stateOf("chargingCard", { group: "payment" }),
+    shopMachines.stateOf("confirming", { group: "payment" }),
+    shopMachines.stateOf("sent", { final: true }),
+  ],
+  edges: [
+    shopMachines.edgeOf("inCart", { event: "checkout", to: "chargingCard" }),
+    shopMachines.edgeOf("confirming", { event: "confirmed", to: "sent" }),
+    shopMachines.edgeOf("confirming", { event: "declined", to: "inCart" }),
+  ],
+});
+const checkout = foldGroups(shop);
 
 /** Every drawn arrow as `from>to`. */
 function edgeEnds(graph: Element): string[] {
@@ -464,13 +462,13 @@ function edgeEnds(graph: Element): string[] {
   });
 }
 
-describe("renderGraph machine node", () => {
-  test("draws the embedding state with a glyph, the machine's id, enter and its edges", () => {
+describe("renderGraph group node", () => {
+  test("draws the group with a glyph, its size, enter and its edges", () => {
     const graph = renderGraph(document, checkout, {
       select: () => undefined,
       enter: () => undefined,
     });
-    const node = graph.querySelector('g.machine-node[data-machine="payment"]');
+    const node = graph.querySelector('g.machine-node[data-group="payment"]');
     expect({
       nodes: graph.querySelectorAll("g.machine-node").length,
       state: node?.querySelector("g.state.machine")?.getAttribute("data-node-id"),
@@ -481,27 +479,27 @@ describe("renderGraph machine node", () => {
       edges: edgeEnds(graph),
     }).toEqual({
       nodes: 1,
-      state: "paying",
-      label: "state paying, embeds machine payment",
+      state: "@payment",
+      label: "group payment, 2 states: chargingCard, confirming",
       glyph: 2,
-      name: "payment",
-      enter: "enter machine payment",
-      edges: ["cart>paying", "paying>done", "paying>cart"],
+      name: "2 states",
+      enter: "enter group payment",
+      edges: ["inCart>@payment", "@payment>sent", "@payment>inCart"],
     });
   });
 
-  test("enter calls back with the machine and its state, by click and by key, and selects nothing", () => {
-    const entered: EnteredMachine[] = [];
+  test("enter calls back with the group, by click and by key, and selects nothing", () => {
+    const entered: EnteredGroup[] = [];
     const selected: Selection[] = [];
     const graph = renderGraph(document, checkout, {
       select: (selection) => selected.push(selection),
-      enter: (opened) => entered.push(opened),
+      enter: (group) => entered.push(group),
     });
     const enter = graph.querySelector(".machine-enter");
     enter?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     enter?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    const paying = { machine: "payment", state: "paying" };
-    expect({ entered, selected }).toEqual({ entered: [paying, paying], selected: [] });
+    const payment = { node: "@payment", name: "payment" };
+    expect({ entered, selected }).toEqual({ entered: [payment, payment], selected: [] });
   });
 
   test("without an enter callback the node draws no enter control", () => {
@@ -513,20 +511,39 @@ describe("renderGraph machine node", () => {
   });
 });
 
-describe("mountViewer onEnter", () => {
-  test("enter on a machine node calls onEnter with the embedded machine and the state", () => {
-    const root = document.createElement("div");
-    document.body.append(root);
-    const entered: EnteredMachine[] = [];
-    mountViewer(root, shop, { machine: "checkout", onEnter: (opened) => entered.push(opened) });
-    root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    root.remove();
-    expect(entered).toEqual([{ machine: "payment", state: "paying" }]);
+describe("renderGraph of a group entered", () => {
+  const view = groupMachine(shop, { group: "@payment" }) ?? shop;
+
+  test("a stub goes back where a leave callback is given, and is plain without one", () => {
+    const left: string[] = [];
+    const selected: Selection[] = [];
+    const graph = renderGraph(document, view, {
+      select: (selection) => selected.push(selection),
+      leave: (stub) => left.push(stub),
+    });
+    const plain = renderGraph(document, view, { select: () => undefined });
+    const stub = graph.querySelector('g.state.stub[data-node-id="sent"]');
+    stub?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect({
+      stubs: [...graph.querySelectorAll("g.state.stub")].map((each) =>
+        each.getAttribute("data-node-id"),
+      ),
+      left,
+      selected,
+      plain: plain.querySelector("g.state.stub")?.getAttribute("role") ?? undefined,
+      title: plain.querySelector("g.state.stub > title")?.textContent,
+    }).toEqual({
+      stubs: ["inCart", "sent"],
+      left: ["sent"],
+      selected: [],
+      plain: undefined,
+      title: "inCart is outside group payment.",
+    });
   });
 });
 
-describe("machine node styles", () => {
-  test("the machine's id is drawn at the 11px the layout measures it with", () => {
+describe("group node styles", () => {
+  test("the row is drawn at the 11px the layout measures it with", () => {
     const style = document.createElement("style");
     style.textContent = readFileSync(join(import.meta.dirname, "viewer.css"), "utf8");
     const root = document.createElement("div");

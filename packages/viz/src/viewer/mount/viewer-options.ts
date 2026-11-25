@@ -1,4 +1,4 @@
-import type { EnteredMachine } from "../graph.ts";
+import type { EnteredGroup } from "../graph.ts";
 import type { VizDriver, VizLiveState, VizOutputRoutes } from "../../schema.ts";
 
 export interface ViewerOptions {
@@ -17,7 +17,7 @@ export interface ViewerOptions {
   payloads?: ReadonlyArray<string>;
   /** Old links: a field value by name, as `name=<json>` (from `?value=`), for every event with a field of that name. */
   values?: ReadonlyArray<string>;
-  /** The machines to open from the root, one value per step (from `?focus=`): a machine's name on a board, else the state that embeds the next machine. Values that do not resolve are dropped. */
+  /** Where to open from the root, one value per step (from `?focus=`): a machine's name on a board, else a group node's id (`@payment`) to enter that group. Values that do not resolve are dropped. */
   focus?: ReadonlyArray<string>;
   /** Called after every walk, payload change or move along the focus path, e.g. to keep the URL shareable. */
   onNavigate?: (where: {
@@ -32,6 +32,6 @@ export interface ViewerOptions {
   screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
-  /** Called when the reader enters a machine node, before the viewer draws it: the embedded machine's id and the state that embeds it. The viewer shows that machine itself. */
-  onEnter?: (entered: EnteredMachine) => void;
+  /** Called when the reader enters a group, before the viewer draws it: the group node's id (`node`) and the group's name. The viewer shows the group itself. */
+  onEnterGroup?: (entered: EnteredGroup) => void;
 }

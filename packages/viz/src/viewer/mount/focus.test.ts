@@ -1,86 +1,89 @@
 import { decodeFocus, focusOf, focusTokens } from "./focus.ts";
 import { describe, expect, test } from "vite-plus/test";
-import type { VizDocument, VizMachine } from "../../schema.ts";
-import { VIZ_SCHEMA_VERSION } from "../../schema.ts";
-import { documentOf } from "../../validate/embed-document.ts";
+import { edgeOf, groupedCheckout, machineOf, stateOf } from "../groups/shop-machines.ts";
 import { foldGroups } from "../groups/fold-groups.ts";
-import { groupedCheckout } from "../groups/shop-machines.ts";
+import { groupMachine } from "../groups/group-machine.ts";
+import type { VizMachine } from "../../schema.ts";
 
-/** A board: the app's own `idle`, and the machines `stock` and `till` beside it; `till.paying` embeds `payment`. */
-function boardDocument(): VizDocument {
-  const shop = documentOf([
-    {
-      id: "app",
-      states: [
-        { id: "idle", role: "initial" },
-        { id: "stock.counting", role: "initial" },
-        { id: "till.open", role: "initial" },
-        { id: "till.paying", machine: "payment" },
-      ],
-    },
-    { id: "payment", states: [{ id: "card", role: "initial" }] },
-  ]);
-  const [app, payment] = shop.machines;
-  if (app === undefined || payment === undefined) return shop;
-  const board: VizMachine = {
-    ...app,
+/** A board: the app's own `idle`, and the machines `stock` and `till` beside it; the till's two payment states are a group. */
+function boardMachine(): VizMachine {
+  const shop = machineOf({
+    states: [
+      stateOf("idle", { initial: true }),
+      stateOf("stock.counting", { initial: true }),
+      stateOf("till.open", { initial: true }),
+      stateOf("till.chargingCard", { group: "payment" }),
+      stateOf("till.confirming", { group: "payment" }),
+    ],
+    edges: [
+      edgeOf("till.open", { event: "pay", to: "till.chargingCard" }),
+      edgeOf("till.chargingCard", { event: "charged", to: "till.confirming" }),
+    ],
     regions: ["stock", "till"],
-    actors: ["stock", "till"],
-    states: app.states.map((state) => {
-      const region = state.id.includes(".") ? state.id.slice(0, state.id.indexOf(".")) : undefined;
-      return region === undefined ? state : { ...state, region, initial: true };
-    }),
-  };
-  return { ...shop, machines: [board, payment] };
+  });
+  return { ...shop, id: "app", actors: ["stock", "till"] };
 }
 
 describe("the path in the address bar on a board", () => {
-  const viz = boardDocument();
-  const root = viz.machines[0];
+  const root = boardMachine();
 
-  test("names a machine of the board, the machine's own by its id, then a state that embeds one", () => {
-    if (root === undefined) return;
-    const own = focusOf(decodeFocus(["app"], { viz, root }), { viz, root });
-    const entered = focusOf(decodeFocus(["till", "till.paying"], { viz, root }), { viz, root });
+  test("names a machine of the board, the machine's own by its id, then a group of that machine", () => {
+    const own = focusOf(decodeFocus(["app"], { root }), { root });
+    const entered = focusOf(decodeFocus(["till", "till.@payment"], { root }), { root });
+    const states: string[] = [];
+    for (const state of entered.drawn.states) states.push(state.id);
     expect({
       own: { tokens: focusTokens(own.steps), drawn: own.drawn.id, canvas: own.canvas },
       entered: {
         tokens: focusTokens(entered.steps),
-        drawn: entered.drawn.id,
+        states,
         crumbs: entered.crumbs,
-        walk: entered.walk,
+        group: entered.groupNode,
       },
     }).toStrictEqual({
       own: { tokens: ["app"], drawn: "app", canvas: "graph" },
       entered: {
-        tokens: ["till", "till.paying"],
-        drawn: "payment",
+        tokens: ["till", "till.@payment"],
+        states: ["till.open", "till.chargingCard", "till.confirming"],
         crumbs: [
           { label: "app", keep: 0 },
           { label: "till", keep: 1 },
           { label: "payment", keep: 2 },
         ],
-        walk: "static",
+        group: "till.@payment",
       },
     });
   });
 
-  test("a state cannot be entered from the board, only from its machine", () => {
-    if (root === undefined) return;
-    expect(decodeFocus(["till.paying"], { viz, root })).toStrictEqual([]);
+  test("a group cannot be entered from the board, only from its machine", () => {
+    expect(decodeFocus(["till.@payment"], { root })).toStrictEqual([]);
+  });
+});
+
+describe("entering a group", () => {
+  const root = groupedCheckout();
+
+  test("draws the group's view of the same machine, which has no group to enter again", () => {
+    const entered = focusOf(decodeFocus(["@payment", "@shipping"], { root }), { root });
+    expect({
+      tokens: focusTokens(entered.steps),
+      drawn: entered.drawn === groupMachine(root, { group: "@payment" }),
+      machine: entered.machine === root,
+    }).toStrictEqual({ tokens: ["@payment"], drawn: true, machine: true });
+  });
+
+  test("a value that names no group ends the path", () => {
+    expect(decodeFocus(["payment", "@payment"], { root })).toStrictEqual([]);
   });
 });
 
 describe("the machine the canvas draws", () => {
   test("is the machine itself without groups, and its fold with them", () => {
-    const plain = boardDocument().machines[1];
+    const plain = machineOf({ states: [stateOf("idle", { initial: true })], edges: [] });
     const checkout = groupedCheckout();
-    if (plain === undefined) return;
-    const plainFocus = focusOf([], { viz: { ...boardDocument(), machines: [plain] }, root: plain });
-    const viz: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] };
     expect({
-      plain: plainFocus.drawn === plain,
-      grouped: focusOf([], { viz, root: checkout }).drawn === foldGroups(checkout),
+      plain: focusOf([], { root: plain }).drawn === plain,
+      grouped: focusOf([], { root: checkout }).drawn === foldGroups(checkout),
     }).toEqual({ plain: true, grouped: true });
   });
 });

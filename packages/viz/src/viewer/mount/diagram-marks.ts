@@ -6,27 +6,23 @@ import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizDriver, VizMachine } from "../../schema.ts";
 import { currentsOf } from "../compartments.ts";
 import { drawnArrowClick } from "./arrow-click.ts";
-import type { Focus } from "./focus.ts";
 import { queueOf } from "../queue.ts";
 import type { Selection } from "../graph.ts";
 import { updateBlocked } from "./arrow-send.ts";
 
 export interface MarkDiagramContext {
   machine: VizMachine;
-  /** The machine the canvas draws: `machine`, one machine of its board, or an entered machine. */
+  /** The machine the canvas draws: `machine` or one machine of its board, folded, or a group entered. */
   shown: VizMachine;
   view: ViewState;
   driver: VizDriver | undefined;
   pick: (child: PickedChild) => void;
-  /** Static: an entered machine, drawn without the walk; only the selection is marked. */
-  walk: Focus["walk"];
 }
 
 /** Everything drawn over the graph: walk marks, selection, and which states and arrows a click acts on. */
 export function markDiagram(root: HTMLElement, context: MarkDiagramContext): void {
   const { machine, view } = context;
   markAffordance(root, context);
-  if (context.walk === "static") return markSelection(root, { selection: view.selection });
   updateBlocked(view, { machine, driver: context.driver });
   markExplore(root, { machine, blocked: view.blocked, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>(".graph");
@@ -42,14 +38,14 @@ export function markDiagram(root: HTMLElement, context: MarkDiagramContext): voi
   markSelection(root, { selection: view.selection });
 }
 
-/** A state is a button while a click opens its Details in a panel that is shown; an arrow, while a click sends it. Every other arrow says why on hover. */
+/** A state is a button while a click opens its Details in a panel that is shown; an arrow, while a click sends it. Every other arrow says why on hover. A stub's look is its own: it goes back where it can. */
 function markAffordance(root: HTMLElement, context: MarkDiagramContext): void {
   const { machine, view, driver, shown } = context;
   const states = view.diagramOnly ? "plain" : "button";
-  for (const state of root.querySelectorAll(".graph g.state")) affordance(state, states);
+  for (const state of root.querySelectorAll(".graph g.state:not(.stub)")) affordance(state, states);
   for (const arrow of root.querySelectorAll<SVGGElement>(".graph g.edge[data-edge-id]")) {
     const id = arrow.dataset["edgeId"] ?? "";
-    const options = { shown, walk: context.walk, id };
+    const options = { shown, id };
     const { click } = drawnArrowClick({ machine, view, driver }, options);
     affordance(arrow, click.kind === "send" ? "button" : "plain");
     markWhy(arrow, { why: click.kind === "plain" ? click.why : undefined });
@@ -69,7 +65,7 @@ function markWhy(arrow: SVGGElement, options: MarkWhyOptions): void {
 }
 
 interface MarkSelectionOptions {
-  selection: Selection | null;
+  selection: Selection | undefined;
 }
 
 /** The node ids that the arrows holding the selected edge leave from. */
@@ -93,7 +89,7 @@ function markSelection(root: HTMLElement, options: MarkSelectionOptions): void {
     const members = listOf(element.dataset["members"]) ?? [];
     element.classList.toggle(
       "selected",
-      selection !== null &&
+      selection !== undefined &&
         (element.dataset[attribute] === selection.id ||
           (selection.kind === "edge" && members.includes(selection.id)) ||
           (element.classList.contains("any-node") && arrowNodes.has(element.dataset["nodeId"]))),

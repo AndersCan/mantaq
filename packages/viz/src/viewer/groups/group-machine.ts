@@ -6,6 +6,9 @@ import type { GroupNode } from "./fold-groups.ts";
 /** Each machine's entered groups by node id, so a group entered again is the same machine and keeps its layout. */
 const enteredGroups = new WeakMap<VizMachine, Map<string, VizMachine>>();
 
+/** The group node each entered view stands for. */
+const viewGroups = new WeakMap<VizMachine, GroupNode>();
+
 interface GroupQuery {
   /** The group node id, as `foldGroups` draws it. */
   group: string;
@@ -26,7 +29,23 @@ export function groupMachine(machine: VizMachine, options: GroupQuery): VizMachi
   if (node === undefined) return undefined;
   const view = enter(real, { node });
   views.set(options.group, view);
+  viewGroups.set(view, node);
   return view;
+}
+
+/** The group a view of `groupMachine` is inside; undefined for any other machine. */
+export function enteredGroupOf(view: VizMachine): GroupNode | undefined {
+  return viewGroups.get(view);
+}
+
+interface StubQuery {
+  state: string;
+}
+
+/** True for a state an entered group draws only because one of its arrows reaches it or comes from it. */
+export function isStub(view: VizMachine, options: StubQuery): boolean {
+  const node = viewGroups.get(view);
+  return node !== undefined && !node.states.includes(options.state);
 }
 
 interface Entering {

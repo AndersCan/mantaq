@@ -1,7 +1,15 @@
 import { activatable, html, onButtonPress, svg } from "./dom.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
+import {
+  currentRowText,
+  ENTER_TEXT,
+  HELP_SLOT,
+  layoutMachine,
+  rowText,
+  textWidth,
+} from "./layout.ts";
 import { edgeCondition, edgeLines } from "./labels.ts";
-import { ENTER_TEXT, HELP_SLOT, layoutMachine, rowText, textWidth } from "./layout.ts";
+import { enteredGroupOf, isStub } from "./groups/group-machine.ts";
 import type {
   LabelBox,
   PlacedAny,
@@ -12,6 +20,7 @@ import type {
   PlacedRegion,
   PlacedState,
   PlacedUnknown,
+  WalkInside,
 } from "./layout.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
 import { Either } from "@mantaq/utils";
@@ -29,14 +38,16 @@ export interface GraphCallbacks {
   select(selection: Selection): void;
   /** Opens an arrow's Details without sending. Absent: no `?` is drawn (diagram-only). */
   details?: (edgeId: string) => void;
-  /** Opens the machine a machine node embeds. Absent: no enter control is drawn. */
-  enter?: (entered: EnteredMachine) => void;
+  /** Enters the group a group node folds. Absent: no enter control is drawn. */
+  enter?: (entered: EnteredGroup) => void;
+  /** Goes back from an entered group to the level around it, onto a stub's state. Absent: a stub is plain. */
+  leave?: (state: string) => void;
 }
 
-/** The machine a machine node embeds, and the state that embeds it. */
-export interface EnteredMachine {
-  machine: string;
-  state: string;
+/** A group entered from its node: the node's id (`@payment`) and the group's name. */
+export interface EnteredGroup {
+  node: string;
+  name: string;
 }
 
 function sourceText(from: string): string {
@@ -144,6 +155,7 @@ function stateGroup(placed: PlacedState | PlacedMachine, options: NodeOptions): 
       "aria-label": `state ${state.id}${state.final ? " (final)" : ""}`,
     },
     [
+      ...stubTitle(state.id, options),
       svg(doc, "rect", { ...frame, class: "frame" }),
       state.final
         ? svg(doc, "rect", {
@@ -171,8 +183,31 @@ function stateGroup(placed: PlacedState | PlacedMachine, options: NodeOptions): 
           }),
     ],
   );
-  onButtonPress(group, { press: () => callbacks.select({ kind: "state", id: state.id }) });
+  if (!isStub(options.drawn, { state: state.id })) {
+    onButtonPress(group, { press: () => callbacks.select({ kind: "state", id: state.id }) });
+    return group;
+  }
+  group.classList.add("stub");
+  const label = group.getAttribute("aria-label");
+  group.setAttribute(
+    "aria-label",
+    `${label}, outside group ${enteredGroupOf(options.drawn)?.name}`,
+  );
+  const { leave } = callbacks;
+  if (leave !== undefined) activatable(group, () => leave(state.id));
   return group;
+}
+
+/** A stub's hover text: it stands for a state outside the group, and a click goes there. */
+function stubTitle(state: string, options: NodeOptions): SVGTitleElement[] {
+  const group = enteredGroupOf(options.drawn);
+  if (group === undefined || group.states.includes(state)) return [];
+  const outside = `${localName(state)} is outside group ${group.name}.`;
+  const shown =
+    options.callbacks.leave === undefined
+      ? outside
+      : `${outside} Click to go back and show it there.`;
+  return [svg(options.doc, "title", {}, [shown])];
 }
 
 function unknownGroup(doc: Document, placed: PlacedUnknown): SVGGElement {
@@ -245,21 +280,21 @@ function machineGlyph(placed: PlacedMachine, options: NodeOptions): SVGGElement 
 
 interface EnterOptions {
   doc: Document;
-  enter: (entered: EnteredMachine) => void;
-  machine: string;
+  enter: (entered: EnteredGroup) => void;
   box: LabelBox;
 }
 
+/** The group node's enter control: it sits beside the node's own button so the two never nest. */
 function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
-  const { doc, enter, machine, box } = options;
+  const { doc, enter, box } = options;
+  const entered = { node: placed.state.id, name: placed.holds.group };
   const group = svg(
     doc,
     "g",
     {
       class: "machine-enter",
-      "data-enter-machine": machine,
-      "data-enter-state": placed.state.id,
-      "aria-label": `enter machine ${machine}`,
+      "data-enter-group": entered.node,
+      "aria-label": `enter group ${entered.name}`,
     },
     [
       svg(doc, "rect", {
@@ -272,72 +307,64 @@ function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
       svg(doc, "text", { x: box.x, y: box.y + 4, "text-anchor": "middle" }, [ENTER_TEXT]),
     ],
   );
-  activatable(group, () => enter({ machine, state: placed.state.id }));
+  activatable(group, () => enter(entered));
   return group;
 }
 
-interface EmbedsOptions extends NodeOptions {
-  placed: PlacedMachine;
-  machine: string;
-}
-
-/** A state that embeds a machine: its enter control sits beside the state's own button so the two never nest. */
-function embedsGroup(state: SVGGElement, options: EmbedsOptions): SVGGElement {
-  const { doc, placed, machine } = options;
-  const label = state.getAttribute("aria-label");
-  state.setAttribute("aria-label", `${label}, embeds machine ${machine}`);
-  const { enter } = options.callbacks;
-  const box = placed.enter;
-  const unentered = enter === undefined || box === undefined;
-  const controls = unentered ? [] : [enterGroup(placed, { doc, enter, machine, box })];
-  return svg(doc, "g", { class: "machine-node", "data-machine": machine }, [state, ...controls]);
-}
-
-interface FoldedOptions {
-  doc: Document;
-  group: string;
-  states: ReadonlyArray<string>;
-  /** How many states it holds, as its row says. */
-  count: string;
-}
-
-/** A group folded into one node: `data-states` lists its real states, so the walk marks it current while it is in one. */
-function foldedGroup(state: SVGGElement, options: FoldedOptions): SVGGElement {
-  const { doc, group, states, count } = options;
-  const names: string[] = [];
-  for (const id of states) names.push(localName(id));
-  const listed = names.join(", ");
-  state.setAttribute("aria-label", `group ${group}, ${count}: ${listed}`);
-  state.setAttribute("data-states", JSON.stringify(states));
-  return svg(doc, "g", { class: "machine-node", "data-group": group }, [state]);
-}
-
-/** A node that holds more than one state: the state as usual, plus a glyph and what it holds under the name. */
+/**
+ * A group folded into one node, with the machine-node look: a glyph and a row
+ * under its name, and an enter control. `data-states` lists its real states, so
+ * the walk marks it current while it is in one; the row then names that state.
+ */
 function machineGroup(placed: PlacedMachine, options: NodeOptions): SVGGElement {
   const { doc } = options;
   const { holds } = placed;
   const state = stateGroup(placed, options);
   state.classList.add("machine");
+  const count = rowText(holds);
   const name = svg(
     doc,
     "text",
-    { class: "machine-name", x: placed.name.x, y: placed.name.y + 4, "text-anchor": "middle" },
-    [rowText(holds)],
+    {
+      class: "machine-name",
+      "data-count": count,
+      x: placed.name.x,
+      y: placed.name.y + 4,
+      "text-anchor": "middle",
+    },
+    [count],
   );
   state.append(machineGlyph(placed, options), name);
-  switch (holds.kind) {
-    case "machine":
-      return embedsGroup(state, { ...options, placed, machine: holds.machine });
-    case "group":
-      return foldedGroup(state, {
-        doc,
-        group: holds.group,
-        states: holds.states,
-        count: rowText(holds),
-      });
-    default:
-      return isNever(holds);
+  const names: string[] = [];
+  for (const id of holds.states) names.push(localName(id));
+  const listed = names.join(", ");
+  state.setAttribute("aria-label", `group ${holds.group}, ${count}: ${listed}`);
+  state.setAttribute("data-states", JSON.stringify(holds.states));
+  const { enter } = options.callbacks;
+  const controls =
+    enter === undefined ? [] : [enterGroup(placed, { doc, enter, box: placed.enter })];
+  return svg(doc, "g", { class: "machine-node", "data-group": holds.group }, [state, ...controls]);
+}
+
+export interface GroupStateOptions {
+  /** The real state of the group the walk is in; undefined when it is in none. */
+  state: string | undefined;
+  walk: WalkInside;
+}
+
+/** Writes on a group node's row, and in its accessible description, which of its states the walk is in; its size when it is in none. */
+export function markGroupState(node: Element, options: GroupStateOptions): void {
+  const row = node.querySelector(":scope > .machine-name");
+  if (row === null) return;
+  const { state, walk } = options;
+  if (state === undefined) {
+    row.textContent = row.getAttribute("data-count");
+    node.removeAttribute("aria-description");
+    return;
   }
+  const text = currentRowText(state, { walk });
+  row.textContent = text;
+  node.setAttribute("aria-description", text);
 }
 
 function nodeGroup(node: PlacedNode, options: NodeOptions): SVGGElement {

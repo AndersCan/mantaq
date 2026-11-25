@@ -1,13 +1,14 @@
+import { enteredGroupOf, groupMachine } from "../groups/group-machine.ts";
 import { partMachine, partName, partsOf } from "../parts.ts";
-import type { VizDocument, VizMachine } from "../../schema.ts";
-import type { EnteredMachine } from "../graph.ts";
+import type { EnteredGroup } from "../graph.ts";
 import { foldGroups } from "../groups/fold-groups.ts";
 import { isNever } from "../../is-never.ts";
+import type { VizMachine } from "../../schema.ts";
 
-/** One step in from the root: open one machine of a board, or enter the machine a state embeds. */
+/** One step in from the root: open one machine of a board, or enter a group of the machine drawn. */
 export type FocusStep =
   | { kind: "part"; part: string; name: string }
-  | { kind: "enter"; state: string };
+  | { kind: "enter"; node: string; name: string };
 
 /** A crumb of the path: its label and how many steps a click on it keeps. */
 interface Crumb {
@@ -21,64 +22,56 @@ export interface Focus {
   steps: FocusStep[];
   /** Board: the boxes of `machine`. Graph: `drawn`, drawn whole. */
   canvas: "board" | "graph";
-  /** The deepest machine: the root, or the last one entered. */
+  /** The machine the viewer walks. */
   machine: VizMachine;
-  /** The machine the canvas draws: `machine`, or one machine of its board, folded by `foldGroups`. */
+  /** What the canvas draws: `machine` or one machine of its board, with each group folded into one node, or the group entered. */
   drawn: VizMachine;
   /** The board machine shown alone (`""` for the machine's own); undefined when none is. */
   part: string | undefined;
-  /** The root's live state is drawn only at the root; an entered machine is drawn static. */
-  walk: "live" | "static";
-  /** The root's machine shown alone while the root is shown; undefined otherwise. */
-  rootPart: string | undefined;
+  /** The id of the group node entered (`@payment`); undefined when none is. */
+  groupNode: string | undefined;
   crumbs: Crumb[];
 }
 
 interface Level {
   machine: VizMachine;
   part: string | undefined;
+  groupNode: string | undefined;
 }
 
-/** What the canvas draws for a level: its machine or one machine of its board, with each group folded into one node. */
-function drawnOf(level: Level): VizMachine {
+/** The machine or the one board machine a level draws, before groups fold. */
+function cutOf(level: Level): VizMachine {
   const { machine, part } = level;
-  return foldGroups(part === undefined ? machine : partMachine(machine, part));
+  return part === undefined ? machine : partMachine(machine, part);
+}
+
+/** What the canvas draws for a level: the group entered, or the cut with each group folded into one node. */
+function drawnOf(level: Level): VizMachine {
+  const cut = cutOf(level);
+  const { groupNode } = level;
+  const entered = groupNode === undefined ? undefined : groupMachine(cut, { group: groupNode });
+  return entered ?? foldGroups(cut);
 }
 
 function isBoard(level: Level): boolean {
   return partsOf(level.machine).length > 0 && level.part === undefined;
 }
 
-interface EmbeddedOptions {
-  viz: VizDocument;
-  state: string;
-}
-
-/** The machine a state of the level's drawing embeds; undefined when it embeds none or the document lacks it. */
-function embedded(level: Level, options: EmbeddedOptions): VizMachine | undefined {
-  const state = drawnOf(level).states.find((candidate) => candidate.id === options.state);
-  if (state?.machine === undefined) return undefined;
-  return options.viz.machines.find((machine) => machine.id === state.machine);
-}
-
 export interface FocusOptions {
-  viz: VizDocument;
   root: VizMachine;
 }
 
 /** Walks `steps` from the root; the first step that does not resolve ends the path. */
 export function focusOf(steps: ReadonlyArray<FocusStep>, options: FocusOptions): Focus {
-  const { viz, root } = options;
-  let level: Level = { machine: root, part: undefined };
+  const { root } = options;
+  let level: Level = { machine: root, part: undefined, groupNode: undefined };
   const kept: FocusStep[] = [];
-  let walk: Focus["walk"] = "live";
   const crumbs: Crumb[] = [{ label: root.id, keep: 0 }];
   for (const step of steps) {
-    const next = stepInto(level, { viz, step });
+    const next = stepInto(level, step);
     if (next === undefined) break;
     kept.push(next.step);
-    crumbs.push({ label: next.label, keep: kept.length });
-    if (step.kind === "enter") walk = "static";
+    crumbs.push({ label: next.step.name, keep: kept.length });
     level = next.level;
   }
   return {
@@ -87,8 +80,7 @@ export function focusOf(steps: ReadonlyArray<FocusStep>, options: FocusOptions):
     machine: level.machine,
     drawn: drawnOf(level),
     part: level.part,
-    walk,
-    rootPart: walk === "static" ? undefined : level.part,
+    groupNode: level.groupNode,
     crumbs,
   };
 }
@@ -96,35 +88,30 @@ export function focusOf(steps: ReadonlyArray<FocusStep>, options: FocusOptions):
 interface Stepped {
   level: Level;
   step: FocusStep;
-  label: string;
 }
 
-interface StepIntoOptions {
-  viz: VizDocument;
-  step: FocusStep;
-}
-
-function stepInto(level: Level, options: StepIntoOptions): Stepped | undefined {
-  const { step } = options;
+function stepInto(level: Level, step: FocusStep): Stepped | undefined {
   switch (step.kind) {
     case "part": {
       if (!isBoard(level) || !partsOf(level.machine).includes(step.part)) return undefined;
       const name = partName(level.machine, step.part);
       const part = { kind: "part", part: step.part, name } as const;
-      return { level: { machine: level.machine, part: step.part }, step: part, label: name };
+      return { level: { ...level, part: step.part }, step: part };
     }
     case "enter": {
-      if (isBoard(level)) return undefined;
-      const machine = embedded(level, { viz: options.viz, state: step.state });
-      if (machine === undefined) return undefined;
-      return { level: { machine, part: undefined }, step, label: machine.id };
+      if (isBoard(level) || level.groupNode !== undefined) return undefined;
+      const view = groupMachine(cutOf(level), { group: step.node });
+      const node = view === undefined ? undefined : enteredGroupOf(view);
+      if (node === undefined) return undefined;
+      const entered = { kind: "enter", node: node.id, name: node.name } as const;
+      return { level: { ...level, groupNode: node.id }, step: entered };
     }
     default:
       return isNever(step);
   }
 }
 
-/** The steps the address bar names: on a board a machine's name, else a state that embeds a machine. */
+/** The steps the address bar names: on a board a machine's name, else a group node's id. */
 export function decodeFocus(tokens: ReadonlyArray<string>, options: FocusOptions): FocusStep[] {
   const steps: FocusStep[] = [];
   for (const token of tokens) {
@@ -137,16 +124,16 @@ export function decodeFocus(tokens: ReadonlyArray<string>, options: FocusOptions
 }
 
 function stepOf(token: string, focus: Focus): FocusStep | undefined {
-  if (focus.canvas === "graph") return { kind: "enter", state: token };
+  if (focus.canvas === "graph") return { kind: "enter", node: token, name: token };
   const { machine } = focus;
   if (machine.actors.includes(token)) return { kind: "part", part: token, name: token };
   return token === machine.id ? { kind: "part", part: "", name: token } : undefined;
 }
 
-/** The address-bar value of each step (`?focus=`): a machine's name on a board, else the state entered from. */
+/** The address-bar value of each step (`?focus=`): a machine's name on a board, else the group node entered. */
 export function focusTokens(steps: ReadonlyArray<FocusStep>): string[] {
   const tokens: string[] = [];
-  for (const step of steps) tokens.push(step.kind === "part" ? step.name : step.state);
+  for (const step of steps) tokens.push(step.kind === "part" ? step.name : step.node);
   return tokens;
 }
 
@@ -168,27 +155,16 @@ export function focusReader(view: Focused, options: FocusOptions): () => Focus {
   };
 }
 
-/** The machine a viewer opens on by default: the first that no other machine embeds. */
-export function startOf(viz: VizDocument): VizMachine | undefined {
-  const embeddedIds = new Set<string>();
-  for (const machine of viz.machines) {
-    for (const state of machine.states) {
-      if (state.machine !== undefined) embeddedIds.add(state.machine);
-    }
-  }
-  return viz.machines.find((machine) => !embeddedIds.has(machine.id)) ?? viz.machines[0];
-}
-
 /** A move along the focus path: what was shown, and what is shown now. */
 export interface FocusMove {
   before: Focus;
   after: Focus;
 }
 
-/** The machine a move entered and the state it entered from; undefined for any other move. */
-export function enteredBy(move: FocusMove): EnteredMachine | undefined {
+/** The group a move entered; undefined for any other move. */
+export function enteredBy(move: FocusMove): EnteredGroup | undefined {
   const { before, after } = move;
   const step = after.steps.at(-1);
   if (after.steps.length <= before.steps.length || step?.kind !== "enter") return undefined;
-  return { machine: after.machine.id, state: step.state };
+  return { node: step.node, name: step.name };
 }
