@@ -124,11 +124,10 @@ test("a resize that keeps the width leaves a hand scroll alone, and a new width 
   canvas.scrollLeft = 0;
   window.dispatchEvent(new Event("resize"));
   const sameWidth = canvas.scrollLeft;
-  const wider = window.innerWidth + 100;
-  vi.spyOn(window, "innerWidth", "get").mockReturnValue(wider);
+  Object.defineProperty(canvas, "clientWidth", { value: 400, configurable: true });
   window.dispatchEvent(new Event("resize"));
   expect({ sameWidth, newWidth: canvas.scrollLeft }).toEqual({
     sameWidth: 0,
-    newWidth: 3000 + 120 + 16 - 300,
+    newWidth: 3000 + 120 + 16 - 400,
   });
 });

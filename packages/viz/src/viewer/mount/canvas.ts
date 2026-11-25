@@ -288,16 +288,18 @@ export interface ListenWidthOptions {
   refit: () => void;
 }
 
-/** Calls `refit` when the window width changes, and on entering or leaving full screen; a change of height alone, as when a phone's address bar hides, calls nothing. */
+/** Calls `refit` when a resize changes the canvas's width, and on entering or leaving full screen; a change of height alone, as when a phone's address bar hides, calls nothing. */
 export function listenWidth(root: HTMLElement, options: ListenWidthOptions): void {
-  const host = root.ownerDocument.defaultView;
-  let width = host?.innerWidth;
+  function canvasWidth(): number {
+    return (root.querySelector<HTMLElement>(".canvas") ?? root).clientWidth;
+  }
+  let width = canvasWidth();
   function refitHere(): void {
-    width = host?.innerWidth;
+    width = canvasWidth();
     if (root.isConnected) options.refit();
   }
-  host?.addEventListener("resize", () => {
-    if (host.innerWidth !== width) refitHere();
+  root.ownerDocument.defaultView?.addEventListener("resize", () => {
+    if (canvasWidth() !== width) refitHere();
   });
   root.addEventListener("fullscreenchange", refitHere);
 }
