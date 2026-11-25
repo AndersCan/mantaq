@@ -1,4 +1,5 @@
 import { drawnNodeOf } from "../groups/fold-groups.ts";
+import { actingMemberOf } from "../groups/acting-member.ts";
 import { affordance, svg } from "../dom.ts";
 import { drawnArrowClick, followedLook, memberSelection } from "./arrow-click.ts";
 import type { Affordance } from "../dom.ts";
@@ -25,7 +26,10 @@ export function markDiagram(root: HTMLElement, context: MarkDiagramContext): voi
   const { machine, view } = context;
   markAffordance(root, context);
   updateBlocked(view, { machine, driver: context.driver });
-  markExplore(root, { machine, blocked: view.blocked, ...liveState(view) });
+  function actingOf(arrow: string): string | undefined {
+    return actingMemberOf(context.shown, { walk: view, arrow });
+  }
+  markExplore(root, { machine, blocked: view.blocked, actingOf, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>(".graph");
   if (graph !== null && view.live !== null) {
     drawChildMarkers(graph, {

@@ -1,16 +1,12 @@
-import { actingMember, realMembersOf } from "../groups/acting-member.ts";
+import { actingMemberOf, realMembersOf } from "../groups/acting-member.ts";
 import { affordance } from "../dom.ts";
 import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
 import { whyNoneHere } from "../blocked.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
-import { realMachineOf } from "../groups/fold-groups.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
-import { movesFrom } from "../../moves.ts";
-import { shareArrows } from "../shared.ts";
-import type { Shared } from "../shared.ts";
+import { sharedArrowsOf } from "../shared.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
-import { currentsOf } from "../compartments.ts";
 import type { EventClick } from "./event-send.ts";
 import { outcomeText } from "../explore.ts";
 
@@ -144,7 +140,7 @@ export function drawnArrowClick(
   const edge = machine.edges.find((candidate) => candidate.id === selection.id);
   if (edge !== undefined) return { selection, edge, click: arrowClick(from, edge) };
   const ids = realMembersOf(options.shown, {
-    shared: sharedArrows(options.shown),
+    shared: sharedArrowsOf(options.shown),
     arrow: options.id,
   });
   const members = machine.edges.filter((candidate) => ids.includes(candidate.id));
@@ -168,27 +164,11 @@ interface MemberOptions {
   view: ViewState;
 }
 
-/** Shared arrows by machine: the marks ask for each arrow after every step. */
-const sharedOf = new WeakMap<VizMachine, Shared>();
-
-function sharedArrows(machine: VizMachine): Shared {
-  const known = sharedOf.get(machine);
-  if (known !== undefined) return known;
-  const shared = shareArrows(machine);
-  sharedOf.set(machine, shared);
-  return shared;
-}
-
 /** A shared or group arrow acts as its real member that leaves the current state; with none, it is its own Details. */
 export function memberSelection(selection: Selection, options: MemberOptions): Selection {
   const { machine, view } = options;
-  if (selection.kind !== "edge" || view.live === null) return selection;
-  const walked = realMachineOf(machine);
-  const currents = currentsOf(view.live, view.picked);
-  const moves = currents.flatMap((current) => movesFrom(walked, current));
-  const members = realMembersOf(machine, { shared: sharedArrows(machine), arrow: selection.id });
-  const sources = new Map(walked.edges.map((edge) => [edge.id, edge.from]));
-  const member = actingMember(members, { moves, blocked: view.blocked, currents, sources });
+  if (selection.kind !== "edge") return selection;
+  const member = actingMemberOf(machine, { walk: view, arrow: selection.id });
   return member === undefined ? selection : { kind: "edge", id: member };
 }
 

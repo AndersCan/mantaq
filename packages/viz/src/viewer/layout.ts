@@ -1271,10 +1271,7 @@ function placeNodes(
     id,
     label: anyLabel(machine, id),
     states: sourcesOf(machine, { node: id }),
-    walked: sourcesOf(machine, { node: id }).flatMap((source) => {
-      const held = machine.holds.get(source);
-      return held === undefined ? [source] : held.states;
-    }),
+    walked: machine.shared.nodes.find((node) => node.id === id)?.walked ?? [],
     ...at(id),
   }));
   const unknowns: PlacedUnknown[] = machine.edges

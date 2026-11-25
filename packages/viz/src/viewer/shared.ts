@@ -1,3 +1,4 @@
+import { arrowMembersOf, groupNodeAt, realMachineOf } from "./groups/fold-groups.ts";
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
@@ -9,7 +10,10 @@ const ANY_LABEL = "any state";
 interface SharedNode {
   id: string;
   scope: string;
+  /** The drawn states it stands for: states, and group nodes of a fold. */
   states: string[];
+  /** The real states that take its arrows: the node is current while the walk is in one. A group node stands for only those of its states. */
+  walked: string[];
   label: string;
 }
 
@@ -49,7 +53,21 @@ interface Group {
   scope: string;
   event: string;
   sources: string[];
+  /** The real states the sources' edges leave from. */
+  walked: string[];
   entries: Entry[][];
+}
+
+/** The real states drawn edges leave from: a group arrow's members' sources, or the edge's own. */
+function realSourcesOf(machine: VizMachine, edges: ReadonlyArray<VizEdge>): string[] {
+  const sources: string[] = [];
+  for (const edge of edges) {
+    const members = arrowMembersOf(machine, { arrow: edge.id });
+    for (const member of members.length === 0 ? [edge] : members) {
+      if (!sources.includes(member.from)) sources.push(member.from);
+    }
+  }
+  return sources;
 }
 
 function groupsOf(machine: VizMachine): Group[] {
@@ -67,8 +85,9 @@ function groupsOf(machine: VizMachine): Group[] {
       const entries = entriesOf(edges);
       const scope = scopeOf(state.id);
       const id = [scope, event, ...entries.map((entry) => entry.key)].join("\u0001");
-      const group = groups.get(id) ?? { scope, event, sources: [], entries: [] };
+      const group = groups.get(id) ?? { scope, event, sources: [], walked: [], entries: [] };
       group.sources.push(state.id);
+      group.walked.push(...realSourcesOf(machine, edges));
       group.entries.push(entries);
       groups.set(id, group);
     }
@@ -78,6 +97,21 @@ function groupsOf(machine: VizMachine): Group[] {
 
 function labelOf(states: ReadonlyArray<string>): string {
   return `${states.length} states`;
+}
+
+/** Whether a group's sources are every open state of its scope, and each group node among them leaves from all its open states: only then is it `any state`. */
+function isEveryone(machine: VizMachine, group: Group): boolean {
+  const open = machine.states.filter((state) => scopeOf(state.id) === group.scope && !state.final);
+  const drawn =
+    open.length === group.sources.length && open.every((state) => group.sources.includes(state.id));
+  if (!drawn) return false;
+  const real = realMachineOf(machine).states;
+  for (const source of group.sources) {
+    const node = groupNodeAt(machine, { node: source });
+    const states = real.filter((state) => node?.states.includes(state.id) && !state.final);
+    if (states.some((state) => !group.walked.includes(state.id))) return false;
+  }
+  return true;
 }
 
 /** The edges to draw: arrows several sibling states take alike are replaced by one from a shared node. */
@@ -96,15 +130,12 @@ export function shareArrows(machine: VizMachine): Shared {
       a.sources.join(",").localeCompare(b.sources.join(",")),
   );
   for (const group of ranked) {
-    const setKey = `${group.scope}\u0001${group.sources.join("\u0000")}`;
+    const setKey = [group.scope, group.sources.join("\u0000"), group.walked.join("\u0000")].join(
+      "\u0001",
+    );
     let node = sets.get(setKey);
     if (node === undefined) {
-      const open = machine.states.filter(
-        (state) => scopeOf(state.id) === group.scope && !state.final,
-      );
-      const everyone =
-        open.length === group.sources.length &&
-        open.every((state) => group.sources.includes(state.id));
+      const everyone = isEveryone(machine, group);
       const prefix = group.scope === "" ? "" : `${group.scope}.`;
       const count = (counts.get(group.scope) ?? 0) + (everyone ? 0 : 1);
       counts.set(group.scope, count);
@@ -112,6 +143,7 @@ export function shareArrows(machine: VizMachine): Shared {
         id: everyone ? `${prefix}*` : `${prefix}*${count}`,
         scope: group.scope,
         states: group.sources,
+        walked: group.walked,
         label: everyone ? ANY_LABEL : labelOf(group.sources),
       };
       sets.set(setKey, node);
@@ -136,4 +168,16 @@ export function shareArrows(machine: VizMachine): Shared {
     nodes,
     arrows,
   };
+}
+
+/** Shared arrows by machine: the marks ask for each arrow after every step. */
+const sharedOf = new WeakMap<VizMachine, Shared>();
+
+/** `shareArrows`, worked out once per machine. */
+export function sharedArrowsOf(machine: VizMachine): Shared {
+  const known = sharedOf.get(machine);
+  if (known !== undefined) return known;
+  const shared = shareArrows(machine);
+  sharedOf.set(machine, shared);
+  return shared;
 }
