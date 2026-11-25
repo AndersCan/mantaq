@@ -81,12 +81,12 @@ describe("foldGroups on the grouped checkout", () => {
     expect(foldGroups(foldGroups(grouped))).toBe(foldGroups(grouped));
   });
 
-  test("a machine without groups folds to its own states and edges", () => {
+  test("a machine without groups folds to itself, so its layout is not made twice", () => {
     const plain = machineOf({
       states: [stateOf("idle", { initial: true }), stateOf("busy")],
       edges: [edgeOf("idle", { event: "go", to: "busy" })],
     });
-    expect(foldGroups(plain)).toEqual(plain);
+    expect(foldGroups(plain)).toBe(plain);
   });
 });
 
@@ -152,6 +152,31 @@ describe("foldGroups merges crossing edges", () => {
       "group:cart.*>reset>cart.@review:transition",
     ]);
     expect(arrowMembersOf(merging, { arrow: "cart.listing-edit-cart.editing" })).toEqual([]);
+  });
+
+  test("an arrow from several handlers sums their hits and shows no doc", () => {
+    const listing = { ...edgeOf("listing", { event: "pay", to: "paying" }), doc: "Pays a list." };
+    const editing = { ...edgeOf("editing", { event: "pay", to: "paying" }), doc: "Pays an edit." };
+    const counted = machineOf({
+      states: [
+        stateOf("listing", { group: "review" }),
+        stateOf("editing", { group: "review" }),
+        stateOf("paying"),
+      ],
+      edges: [
+        { ...listing, coverage: { hits: 2 } },
+        { ...editing, coverage: { hits: 3 } },
+      ],
+    });
+    expect(foldGroups(counted).edges).toEqual([
+      {
+        ...listing,
+        id: "group:@review>pay>paying:transition",
+        from: "@review",
+        doc: null,
+        coverage: { hits: 5 },
+      },
+    ]);
   });
 
   test("a stay and a transition with the same ends stay apart", () => {
@@ -288,7 +313,7 @@ describe("foldGroups keeps the validator's rules", () => {
     }).toEqual({ initial: "@g", starts: ["@g"], edges: ["__initial__--a: __initial__ -> @g"] });
   });
 
-  test("messages are drawn between the nodes that draw their ends", () => {
+  test("messages are drawn once between the nodes that draw their ends", () => {
     const talking: VizMachine = {
       ...grouped,
       fuzz: {
@@ -300,6 +325,7 @@ describe("foldGroups keeps the validator's rules", () => {
         expectations: [],
         messages: [
           { from: "chargingCard", event: "ship", to: "packing" },
+          { from: "confirming", event: "ship", to: "packing" },
           { from: "packing", event: "note", to: "sent" },
         ],
       },

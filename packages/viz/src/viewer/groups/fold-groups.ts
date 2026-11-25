@@ -40,7 +40,11 @@ function foldedOf(machine: VizMachine): Folded {
   return folded;
 }
 
-/** The machine with each group drawn as one node: edges inside a group dropped, crossing edges pointed at the group node. */
+/**
+ * The machine with each group drawn as one node: edges inside a group dropped,
+ * crossing edges pointed at the group node. Every drawn edge of a handler with
+ * an end in a group has no explanation; read its real edges with `arrowMembersOf`.
+ */
 export function foldGroups(machine: VizMachine): VizMachine {
   return foldedOf(machine).machine;
 }
@@ -246,20 +250,21 @@ function drawnArrows(edges: ReadonlyArray<VizEdge>, options: NodeIndex): GroupAr
   return arrows;
 }
 
-/** Messages with their ends on drawn nodes; one inside a group is dropped. */
+/** Messages with their ends on drawn nodes, once each; one inside a group is dropped. */
 function foldedMessages(
   messages: ReadonlyArray<VizFuzzMessage>,
   options: NodeIndex,
 ): VizFuzzMessage[] {
   const { nodeOfState } = options;
-  const folded: VizFuzzMessage[] = [];
+  const folded = new Map<string, VizFuzzMessage>();
   for (const message of messages) {
     const from = nodeOfState.get(message.from) ?? message.from;
     const target = nodeOfState.get(message.to) ?? message.to;
     const inside = from === target && nodeOfState.has(message.from);
-    if (!inside) folded.push({ ...message, from, to: target });
+    const key = [from, message.event, target].join("\u0000");
+    if (!inside) folded.set(key, { ...message, from, to: target });
   }
-  return folded;
+  return [...folded.values()];
 }
 
 function fold(machine: VizMachine): Folded {
@@ -269,15 +274,16 @@ function fold(machine: VizMachine): Folded {
   const index: NodeIndex = { nodes, nodeOfState };
   const arrows = drawnArrows(machine.edges, index);
   const { initial, fuzz } = machine;
+  const drawn: VizMachine = {
+    ...machine,
+    initial: initial === null ? null : (nodeOfState.get(initial) ?? initial),
+    states: foldedStates(machine, index),
+    edges: arrows.map((arrow) => arrow.drawn),
+    fuzz: fuzz === null ? fuzz : { ...fuzz, messages: foldedMessages(fuzz.messages, index) },
+  };
   return {
     real: machine,
-    machine: {
-      ...machine,
-      initial: initial === null ? null : (nodeOfState.get(initial) ?? initial),
-      states: foldedStates(machine, index),
-      edges: arrows.map((arrow) => arrow.drawn),
-      fuzz: fuzz === null ? fuzz : { ...fuzz, messages: foldedMessages(fuzz.messages, index) },
-    },
+    machine: nodes.length === 0 ? machine : drawn,
     nodes,
     arrows: arrows.filter((arrow) => arrow.members.length > 1),
     nodeOfState,
