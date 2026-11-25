@@ -117,8 +117,13 @@ function crumbs(root: HTMLElement) {
 function boardCrumb(root: HTMLElement) {
   return root.querySelector(".focus-path button");
 }
-const viewBox = (root: HTMLElement) => root.querySelector("svg")?.getAttribute("viewBox");
-const viewBoxWidth = (root: HTMLElement) => Number(viewBox(root)?.split(" ")[2]);
+function viewBox(root: HTMLElement): string | undefined {
+  return root.querySelector(".canvas svg")?.getAttribute("viewBox") ?? undefined;
+}
+
+function viewBoxWidth(root: HTMLElement): number {
+  return Number(viewBox(root)?.split(" ")[2]);
+}
 
 /** Counts calls to the two ways a page can be scrolled: `window.scrollBy` and `scrollIntoView`. */
 function spyPageScroll(): () => number {
@@ -180,13 +185,13 @@ describe("a board of three machines", () => {
 
   test("a new window width draws the board again; the same width does not", () => {
     const root = mount(Array.from({ length: 12 }, (_, index) => `machine${index}`));
-    const before = root.querySelector("svg");
+    const before = root.querySelector(".canvas svg");
     window.dispatchEvent(new Event("resize"));
-    expect(root.querySelector("svg")).toBe(before);
+    expect(root.querySelector(".canvas svg")).toBe(before);
     const narrow = viewBoxWidth(root);
     width = 2000;
     window.dispatchEvent(new Event("resize"));
-    expect(root.querySelector("svg")).not.toBe(before);
+    expect(root.querySelector(".canvas svg")).not.toBe(before);
     expect(viewBoxWidth(root)).not.toBe(narrow);
   });
 
@@ -200,20 +205,20 @@ describe("a board of three machines", () => {
 
   test("a viewer taken off the page ignores the window", () => {
     const root = mount(Array.from({ length: 12 }, (_, index) => `machine${index}`));
-    const before = root.querySelector("svg");
+    const before = root.querySelector(".canvas svg");
     root.remove();
     width = 2000;
     window.dispatchEvent(new Event("resize"));
-    expect(root.querySelector("svg")).toBe(before);
+    expect(root.querySelector(".canvas svg")).toBe(before);
   });
 
   test("a resize leaves a shown machine alone", () => {
     const root = mount(["p", "q"]);
     press(box(root, "p"));
-    const shown = root.querySelector("svg");
+    const shown = root.querySelector(".canvas svg");
     width = 2000;
     window.dispatchEvent(new Event("resize"));
-    expect(root.querySelector("svg")).toBe(shown);
+    expect(root.querySelector(".canvas svg")).toBe(shown);
   });
 });
 

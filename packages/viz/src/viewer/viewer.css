@@ -597,9 +597,57 @@
 
 .viz .viz-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: flex-start;
   gap: 8px;
+}
+
+/* The zoom and pan tools: the tools, then the zoom, each a row of joined buttons. */
+.viz .viz-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz .viz-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.viz .viz-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2em;
+  white-space: nowrap;
+}
+
+.viz .viz-tool-icon {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+/* The tool in use reads as pressed: filled, with no pointer, as a click on it changes nothing. */
+.viz .viz-tool[aria-pressed="true"],
+.viz .viz-tool[aria-pressed="true"]:hover {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  box-shadow: none;
+  cursor: default;
+}
+
+.viz .viz-tool[aria-pressed="true"]:active {
+  transform: none;
+}
+
+.viz .zoom-percent {
+  min-width: 3.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* The path and its lines wrap; the button keeps its one line. */
@@ -612,6 +660,16 @@
   box-sizing: border-box;
   overflow: auto;
   padding: 16px;
+}
+
+/* In full screen the viewer scrolls, not the page: the bar stays at its top, so a canvas zoomed in leaves the tools and Exit full screen in reach. */
+.viz:fullscreen .viz-bar {
+  position: sticky;
+  top: -16px;
+  z-index: 1;
+  margin: -16px -16px 0;
+  padding: 16px 16px 8px;
+  background: var(--bg);
 }
 
 .viz:fullscreen .canvas:not([data-sizing="chosen"]) .graph {

@@ -71,6 +71,8 @@ export interface Viewport {
   zoomOut: () => void;
   /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's when the container starts above it; the page scrolls for that too. */
   fit: () => void;
+  /** The scale that `fit` would choose now; undefined without a drawing. */
+  fitScale: () => number | undefined;
   /** Zooms to 100%, at the center of the part of the container shown. */
   actualSize: () => void;
   /** Sets the tool, and `data-tool` on the container for the cursor. */
@@ -161,11 +163,9 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
   }
   function fit(): void {
     const drawing = options.drawing();
-    const natural = viewBoxSize(drawing?.getAttribute("viewBox") ?? undefined);
-    if (drawing === undefined || natural === undefined) return;
+    const target = fitScaleOf(container, options);
+    if (drawing === undefined || target === undefined) return;
     const sizeBefore = outerSize(container);
-    const box = options.fitBox?.() ?? clientSize(container);
-    const target = fitZoom(natural, { box });
     const sizing = state.sizing;
     choose(target);
     const visible = visibleOrigin(container);
@@ -195,6 +195,7 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
     zoomIn: () => zoomAt(center(), { scale: zoomInFrom(state.scale) }),
     zoomOut: () => zoomAt(center(), { scale: zoomOutFrom(state.scale) }),
     fit,
+    fitScale: () => fitScaleOf(container, options),
     actualSize: () => zoomAt(center(), { scale: 1 }),
     setTool(tool) {
       if (tool === state.tool) return;
@@ -216,6 +217,13 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
       return () => listeners.delete(listener);
     },
   };
+}
+
+/** The scale that shows the whole drawing in the room a fit fills; undefined without a drawing. */
+function fitScaleOf(container: HTMLElement, options: ViewportOptions): number | undefined {
+  const natural = viewBoxSize(options.drawing()?.getAttribute("viewBox") ?? undefined);
+  if (natural === undefined) return undefined;
+  return fitZoom(natural, { box: options.fitBox?.() ?? clientSize(container) });
 }
 
 /** The scale the drawn width shows now: drawn width over viewBox width; undefined while it is not laid out. */
