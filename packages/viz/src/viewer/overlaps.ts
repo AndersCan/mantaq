@@ -1,7 +1,8 @@
 import type { Point } from "@dagrejs/dagre";
 import { scopeOf } from "../schema.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
-import type { MachineLayout } from "./layout.ts";
+import type { MachineLayout, PlacedNode } from "./layout.ts";
+import { isNever } from "../is-never.ts";
 
 type Part =
   | `label:${string}`
@@ -287,15 +288,41 @@ type Add = (rule: Rule, a: Part, b: Part, gap: number) => void;
 
 /** The region a node sits in, as `ownersOf` in layout.ts decides it: a state's own, a `*`'s scope, an unknown's source. */
 function ownerOf(layout: MachineLayout, node: MachineLayout["nodes"][number]): string | null {
-  if (node.kind === "state") return node.state.region;
+  if (node.kind === "state" || node.kind === "machine") return node.state.region;
   if (node.kind === "any") return scopeOf(node.id) || null;
   const source = layout.edges.find((placed) => placed.target === node.id)?.edge.from;
   const from = layout.nodes.find((each) => each.id === source);
   return from === undefined || from.kind === "unknown" ? null : ownerOf(layout, from);
 }
 
+/** The boxes drawn inside a node that must keep clear of its frame and of each other. */
+function insideBoxes(node: PlacedNode): Box[] {
+  switch (node.kind) {
+    case "state":
+      return [node.label, ...node.chips, ...(node.workers ? [node.workers] : [])];
+    case "machine":
+      return [
+        node.label,
+        node.glyph,
+        node.name,
+        node.enter,
+        ...node.chips,
+        ...(node.workers ? [node.workers] : []),
+      ];
+    case "any":
+    case "unknown":
+      return [];
+    default:
+      return isNever(node);
+  }
+}
+
+/** A state's finding mark sticks out of its box; other nodes have none. */
+function grown(kind: PlacedNode["kind"]): number {
+  return kind === "state" || kind === "machine" ? MARK_OVERHANG : 0;
+}
+
 function shapesOf(layout: MachineLayout): Shapes {
-  const grown = (kind: string) => (kind === "state" ? MARK_OVERHANG : 0);
   return {
     nodes: layout.nodes.map((node) => ({
       id: node.id,
@@ -309,7 +336,7 @@ function shapesOf(layout: MachineLayout): Shapes {
       owner: ownerOf(layout, node),
       frame: { x: node.x, y: node.y, width: node.width, height: node.height },
       inner:
-        node.kind === "state" && node.state.final
+        (node.kind === "state" || node.kind === "machine") && node.state.final
           ? {
               x: node.x,
               y: node.y,
@@ -317,10 +344,7 @@ function shapesOf(layout: MachineLayout): Shapes {
               height: node.height - 2 * FINAL_INSET,
             }
           : null,
-      inside:
-        node.kind === "state"
-          ? [node.label, ...node.chips, ...(node.workers ? [node.workers] : [])]
-          : [],
+      inside: insideBoxes(node),
     })),
     edges: [
       ...layout.edges.map((placed) => {

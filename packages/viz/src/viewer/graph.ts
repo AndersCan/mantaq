@@ -4,16 +4,19 @@ import { activatable, html, svg } from "./dom.ts";
 import { localName } from "./compartments.ts";
 import { edgeCondition, edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
-import { HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
 import { Either } from "@mantaq/utils";
 import type {
   PlacedAny,
   PlacedEdge,
+  PlacedMachine,
   PlacedMessage,
+  PlacedNode,
   PlacedRegion,
   PlacedState,
   PlacedUnknown,
 } from "./layout.ts";
+import { ENTER_TEXT, HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
+import { isNever } from "../is-never.ts";
 import type { Point } from "@dagrejs/dagre";
 import { placeBoard } from "./board.ts";
 import type { Overlap } from "./overlaps.ts";
@@ -24,6 +27,8 @@ export interface GraphCallbacks {
   select(selection: Selection): void;
   /** Opens an arrow's Details without sending. Absent: no `?` is drawn (diagram-only). */
   details?: (edgeId: string) => void;
+  /** Opens the machine a machine node embeds, by its id. Absent: no enter control is drawn. */
+  enter?: (machine: string) => void;
 }
 
 function sourceText(from: string): string {
@@ -81,7 +86,14 @@ function regionGroup(doc: Document, placed: PlacedRegion, isMap: boolean): SVGGE
   );
 }
 
-function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
+/** What drawing one node needs besides the node. */
+interface NodeOptions {
+  doc: Document;
+  callbacks: GraphCallbacks;
+}
+
+function chipGroups(placed: PlacedState | PlacedMachine, options: NodeOptions): SVGGElement[] {
+  const { doc } = options;
   return placed.state.effects.map((effect, index) => {
     const box = placed.chips[index] ?? placed;
     const width = box.width;
@@ -103,7 +115,8 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
   });
 }
 
-function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallbacks): SVGGElement {
+function stateGroup(placed: PlacedState | PlacedMachine, options: NodeOptions): SVGGElement {
+  const { doc, callbacks } = options;
   const { state } = placed;
   const left = placed.x - placed.width / 2;
   const top = placed.y - placed.height / 2;
@@ -135,7 +148,7 @@ function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallback
       svg(doc, "text", { x: placed.label.x, y: placed.label.y + 4, "text-anchor": "middle" }, [
         state.label,
       ]),
-      ...chipGroups(doc, placed),
+      ...chipGroups(placed, options),
       placed.workers === undefined
         ? null
         : svg(doc, "rect", {
@@ -193,13 +206,90 @@ function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
   );
 }
 
-function nodeGroup(
-  doc: Document,
-  node: PlacedState | PlacedUnknown | PlacedAny,
-  callbacks: GraphCallbacks,
-): SVGGElement {
-  if (node.kind === "state") return stateGroup(doc, node, callbacks);
-  return node.kind === "any" ? anyGroup(doc, node) : unknownGroup(doc, node);
+/** A box holding a smaller box: this state holds a machine. */
+function machineGlyph(placed: PlacedMachine, options: NodeOptions): SVGGElement {
+  const { doc } = options;
+  const { glyph } = placed;
+  const left = glyph.x - glyph.width / 2;
+  const top = glyph.y - glyph.height / 2;
+  return svg(doc, "g", { class: "machine-glyph", "aria-hidden": "true" }, [
+    svg(doc, "rect", { x: left, y: top, width: glyph.width, height: glyph.height, rx: 2 }),
+    svg(doc, "rect", {
+      class: "core",
+      x: glyph.x - glyph.width / 4,
+      y: glyph.y - glyph.height / 4,
+      width: glyph.width / 2,
+      height: glyph.height / 2,
+    }),
+  ]);
+}
+
+interface EnterOptions {
+  doc: Document;
+  enter: (machine: string) => void;
+}
+
+function enterGroup(placed: PlacedMachine, options: EnterOptions): SVGGElement {
+  const { doc, enter } = options;
+  const box = placed.enter;
+  const group = svg(
+    doc,
+    "g",
+    {
+      class: "machine-enter",
+      "data-enter-machine": placed.machine,
+      "aria-label": `enter machine ${placed.machine}`,
+    },
+    [
+      svg(doc, "rect", {
+        x: box.x - box.width / 2,
+        y: box.y - box.height / 2,
+        width: box.width,
+        height: box.height,
+        rx: box.height / 2,
+      }),
+      svg(doc, "text", { x: box.x, y: box.y + 4, "text-anchor": "middle" }, [ENTER_TEXT]),
+    ],
+  );
+  activatable(group, () => enter(placed.machine));
+  return group;
+}
+
+/** A state that embeds a machine: the state as usual, plus the machine's glyph and id, and its enter control beside the state's own button so the two never nest. */
+function machineGroup(placed: PlacedMachine, options: NodeOptions): SVGGElement {
+  const { doc } = options;
+  const state = stateGroup(placed, options);
+  state.classList.add("machine");
+  const label = state.getAttribute("aria-label");
+  state.setAttribute("aria-label", `${label}, embeds machine ${placed.machine}`);
+  const name = svg(
+    doc,
+    "text",
+    { class: "machine-name", x: placed.name.x, y: placed.name.y + 4, "text-anchor": "middle" },
+    [placed.machine],
+  );
+  state.append(machineGlyph(placed, options), name);
+  const { enter } = options.callbacks;
+  const controls = enter === undefined ? [] : [enterGroup(placed, { doc, enter })];
+  return svg(doc, "g", { class: "machine-node", "data-machine": placed.machine }, [
+    state,
+    ...controls,
+  ]);
+}
+
+function nodeGroup(node: PlacedNode, options: NodeOptions): SVGGElement {
+  switch (node.kind) {
+    case "state":
+      return stateGroup(node, options);
+    case "machine":
+      return machineGroup(node, options);
+    case "any":
+      return anyGroup(options.doc, node);
+    case "unknown":
+      return unknownGroup(options.doc, node);
+    default:
+      return isNever(node);
+  }
 }
 
 const LINE_HEIGHT = 16;
@@ -418,7 +508,7 @@ export function renderGraph(
         ...(callbacks.details === undefined ? [] : [helpGroup(doc, edge, callbacks.details)]),
       ]),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
-      ...placed.nodes.map((node) => nodeGroup(doc, node, callbacks)),
+      ...placed.nodes.map((node) => nodeGroup(node, { doc, callbacks })),
       ...warned,
     ],
   );

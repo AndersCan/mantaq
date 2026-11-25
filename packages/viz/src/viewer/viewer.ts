@@ -152,7 +152,12 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     }
   }
   function callbacks(): GraphCallbacks {
-    return drawCallbacks({ machine, view, driver }, { shown: shown(), openDetails, sendEvent });
+    const drawn = drawCallbacks(
+      { machine, view, driver },
+      { shown: shown(), openDetails, sendEvent },
+    );
+    if (options.onEnter === undefined) return drawn;
+    return { ...drawn, enter: options.onEnter };
   }
   const canvas = canvasOf({
     doc,

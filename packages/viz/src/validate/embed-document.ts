@@ -1,16 +1,26 @@
-import type { VizDocument, VizMachine, VizState } from "../schema.ts";
+import type { VizDocument, VizEdge, VizMachine, VizState } from "../schema.ts";
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 
 /** A state of the shop's machines; `machine` is the embedded machine's id. */
 interface ShopState {
   id: string;
   machine?: string;
+  /** Omitted: a plain state in the middle. */
+  role?: "initial" | "final";
+}
+
+/** A declared transition between two states of one machine. */
+interface ShopEdge {
+  from: string;
+  event: string;
+  to: string;
 }
 
 /** A machine whose states embed the machines they name. */
 interface ShopMachine {
   id: string;
   states: ShopState[];
+  edges?: ShopEdge[];
 }
 
 function stateOf(shopState: ShopState): VizState {
@@ -18,8 +28,8 @@ function stateOf(shopState: ShopState): VizState {
     id: shopState.id,
     label: shopState.id,
     region: null,
-    initial: false,
-    final: false,
+    initial: shopState.role === "initial",
+    final: shopState.role === "final",
     effects: [],
     coverage: null,
     tested: null,
@@ -29,10 +39,26 @@ function stateOf(shopState: ShopState): VizState {
   return state;
 }
 
+function edgeOf(shopEdge: ShopEdge): VizEdge {
+  return {
+    id: `${shopEdge.from}-${shopEdge.event}-${shopEdge.to}`,
+    ...shopEdge,
+    kind: "transition",
+    origin: "declared",
+    emits: [],
+    contexts: [],
+    explanation: null,
+    doc: null,
+    coverage: null,
+    tested: null,
+  };
+}
+
 function machineOf(shopMachine: ShopMachine): VizMachine {
+  const initial = shopMachine.states.find((shopState) => shopState.role === "initial");
   return {
     id: shopMachine.id,
-    initial: null,
+    initial: initial?.id ?? null,
     regions: [],
     maps: [],
     actors: [],
@@ -41,7 +67,7 @@ function machineOf(shopMachine: ShopMachine): VizMachine {
     outputs: [],
     partOutputs: {},
     context: null,
-    edges: [],
+    edges: (shopMachine.edges ?? []).map(edgeOf),
     fuzz: null,
     runs: [],
   };

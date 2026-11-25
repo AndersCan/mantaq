@@ -1,8 +1,13 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
+import type { Selection } from "./graph.ts";
+import { documentOf } from "../validate/embed-document.ts";
+import { mountViewer } from "./viewer.ts";
 import { ARROW_SIZE } from "./geometry.ts";
 import { HELP_SLOT, LOCK_SLOT, placeMachine, textWidth } from "./layout.ts";
 
@@ -429,5 +434,108 @@ describe("arrow hit area", () => {
       const drawn = group.querySelector("path:not(.hit)");
       expect(hits[0]?.getAttribute("d")).toBe(drawn?.getAttribute("d"));
     }
+  });
+});
+
+const shop = documentOf([
+  {
+    id: "checkout",
+    states: [
+      { id: "cart", role: "initial" },
+      { id: "paying", machine: "payment" },
+      { id: "done", role: "final" },
+    ],
+    edges: [
+      { from: "cart", event: "pay", to: "paying" },
+      { from: "paying", event: "paid", to: "done" },
+      { from: "paying", event: "declined", to: "cart" },
+    ],
+  },
+  { id: "payment", states: [{ id: "charging", role: "initial" }] },
+]);
+const checkout = shop.machines.find((each) => each.id === "checkout") ?? machine;
+
+/** Every drawn arrow as `from>to`. */
+function edgeEnds(graph: Element): string[] {
+  return [...graph.querySelectorAll("g.edge")].map((edge) => {
+    const source = edge.getAttribute("data-from");
+    const target = edge.getAttribute("data-to");
+    return `${source}>${target}`;
+  });
+}
+
+describe("renderGraph machine node", () => {
+  test("draws the embedding state with a glyph, the machine's id, enter and its edges", () => {
+    const graph = renderGraph(document, checkout, {
+      select: () => undefined,
+      enter: () => undefined,
+    });
+    const node = graph.querySelector('g.machine-node[data-machine="payment"]');
+    expect({
+      nodes: graph.querySelectorAll("g.machine-node").length,
+      state: node?.querySelector("g.state.machine")?.getAttribute("data-node-id"),
+      label: node?.querySelector("g.state")?.getAttribute("aria-label"),
+      glyph: node?.querySelectorAll("g.state .machine-glyph rect").length,
+      name: node?.querySelector("g.state .machine-name")?.textContent,
+      enter: node?.querySelector(":scope > .machine-enter")?.getAttribute("aria-label"),
+      edges: edgeEnds(graph),
+    }).toEqual({
+      nodes: 1,
+      state: "paying",
+      label: "state paying, embeds machine payment",
+      glyph: 2,
+      name: "payment",
+      enter: "enter machine payment",
+      edges: ["cart>paying", "paying>done", "paying>cart"],
+    });
+  });
+
+  test("enter calls back with the machine's id, by click and by key, and selects nothing", () => {
+    const entered: string[] = [];
+    const selected: Selection[] = [];
+    const graph = renderGraph(document, checkout, {
+      select: (selection) => selected.push(selection),
+      enter: (id) => entered.push(id),
+    });
+    const enter = graph.querySelector(".machine-enter");
+    enter?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    enter?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect({ entered, selected }).toEqual({ entered: ["payment", "payment"], selected: [] });
+  });
+
+  test("without an enter callback the node draws no enter control", () => {
+    const graph = renderGraph(document, checkout, { select: () => undefined });
+    expect({
+      nodes: graph.querySelectorAll("g.machine-node").length,
+      enter: graph.querySelectorAll(".machine-enter").length,
+    }).toEqual({ nodes: 1, enter: 0 });
+  });
+});
+
+describe("mountViewer onEnter", () => {
+  test("enter on a machine node calls onEnter with the embedded machine's id", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const entered: string[] = [];
+    mountViewer(root, shop, { machine: "checkout", onEnter: (id) => entered.push(id) });
+    root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.remove();
+    expect(entered).toEqual(["payment"]);
+  });
+});
+
+describe("machine node styles", () => {
+  test("the machine's id is drawn at the 11px the layout measures it with", () => {
+    const style = document.createElement("style");
+    style.textContent = readFileSync(join(import.meta.dirname, "viewer.css"), "utf8");
+    const root = document.createElement("div");
+    root.className = "viz";
+    root.append(renderGraph(document, checkout, { select: () => undefined }));
+    document.body.append(style, root);
+    const name = root.querySelector(".machine-name");
+    const shown = name === null ? undefined : getComputedStyle(name).fontSize;
+    root.remove();
+    style.remove();
+    expect(shown).toBe("11px");
   });
 });
