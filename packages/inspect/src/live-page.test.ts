@@ -38,7 +38,7 @@ function setField(root: HTMLElement, options: SetFieldOptions): void {
 
 async function groupedText(): Promise<string> {
   const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "grouped.ts"), {
-    load: async () => ({ grouped }),
+    load: () => Promise.resolve({ grouped }),
     fuzz: false,
   });
   return serializeViz(vizDocument(inspected.machines));
