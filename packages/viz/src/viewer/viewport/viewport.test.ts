@@ -5,6 +5,8 @@ import type { ViewportState } from "./viewport.ts";
 
 function containerWith(viewBox: string | undefined): { container: HTMLElement; drawing: Element } {
   const container = document.createElement("div");
+  container.style.overflowX = "auto";
+  container.style.overflowY = "auto";
   const drawing = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   if (viewBox !== undefined) drawing.setAttribute("viewBox", viewBox);
   container.append(drawing);

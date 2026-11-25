@@ -25,7 +25,8 @@ beforeAll(async () => {
   });
   await server.listen();
   origin = server.resolvedUrls?.local[0] ?? "";
-  browser = await chromium.launch();
+  // Classic scrollbars, as desktop Chrome on Windows and Linux draws them: they take room from the canvas.
+  browser = await chromium.launch({ ignoreDefaultArgs: ["--hide-scrollbars"] });
 }, 60_000);
 
 afterAll(async () => {
@@ -231,5 +232,46 @@ test("on a page that scrolls, zoomIn keeps the center of the canvas on screen pu
     return { centerPut, topLeftShown: Math.abs(rect.left - 40) < 1 && Math.abs(rect.top) < 1 };
   });
   expect(seen).toEqual({ centerPut: true, topLeftShown: true });
+  await page.close();
+}, 60_000);
+
+test("fit brings the drawing back on screen on a page that scrolls, also when the scale is already the fit scale", async () => {
+  const page = await pageWith(
+    "body { min-height: 3000px; } #canvas { width: 400px; overflow: auto; margin-top: 300px; }",
+  );
+  const tops = await page.evaluate(() => {
+    const create = window.viewportOf;
+    const canvas = document.querySelector<HTMLElement>("#canvas");
+    const drawing = canvas?.querySelector("svg") ?? undefined;
+    if (create === undefined || canvas === null || drawing === undefined) return [];
+    const viewport = create(canvas, {
+      drawing: () => drawing,
+      fitBox: () => ({ width: 400, height: 500 }),
+    });
+    const seen = [];
+    for (let press = 0; press < 2; press += 1) {
+      window.scrollTo({ left: 0, top: 900, behavior: "instant" });
+      viewport.fit();
+      seen.push(Math.abs(drawing.getBoundingClientRect().top) < 1);
+    }
+    return seen;
+  });
+  expect(tops).toEqual([true, true]);
+  await page.close();
+}, 60_000);
+
+test("panBy leaves an axis alone where the page hides its overflow", async () => {
+  const page = await pageWith(
+    "body { overflow-x: hidden; min-height: 3000px; } body::before { content: ''; display: block; width: 3000px; height: 1px; } #canvas { width: 400px; height: 300px; overflow: auto; }",
+  );
+  const scrolled = await page.evaluate(() => {
+    const create = window.viewportOf;
+    const canvas = document.querySelector<HTMLElement>("#canvas");
+    const drawing = canvas?.querySelector("svg") ?? undefined;
+    if (create === undefined || canvas === null || drawing === undefined) return undefined;
+    create(canvas, { drawing: () => drawing }).panBy({ x: 5000, y: 5000 });
+    return { page: { x: scrollX, y: scrollY } };
+  });
+  expect(scrolled?.page.x).toBe(0);
   await page.close();
 }, 60_000);

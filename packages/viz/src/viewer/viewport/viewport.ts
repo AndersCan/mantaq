@@ -16,6 +16,12 @@ interface Box {
   bottom: number;
 }
 
+/** Per axis, how far a scroll reaches: the container only, or on to the ancestors and the page. */
+interface Reach {
+  x: "canvas" | "page";
+  y: "canvas" | "page";
+}
+
 /** What a plain drag does: "select" picks elements, "hand" pans. */
 type ViewportTool = "select" | "hand";
 
@@ -39,13 +45,13 @@ export interface ViewportOptions {
 
 /** Zoom and pan over a scroll container. Pan is native scroll, chained to the page; the scale is the `--viz-zoom` custom property that the drawn width reads. */
 export interface Viewport {
-  state: () => ViewportState;
+  state: () => Readonly<ViewportState>;
   /** Scales so the drawing's point under `point` (client coordinates, as a pointer event gives them) stays put. */
   zoomAt: (point: Point, options: ZoomAtOptions) => void;
   /** Zooms to the next step, at the center of the part of the container on screen. */
   zoomIn: () => void;
   zoomOut: () => void;
-  /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's when the container starts above it. */
+  /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's when the container starts above it; the page scrolls for that too. */
   fit: () => void;
   /** Zooms to 100%, at the center of the part of the container on screen. */
   actualSize: () => void;
@@ -54,7 +60,7 @@ export interface Viewport {
   /** Scrolls by the delta, in CSS pixels; what the container cannot take scrolls the ancestors and the page, as a wheel does. */
   panBy: (delta: Point) => void;
   /** Calls `listener` after each change of scale or tool; the result stops it. */
-  subscribe: (listener: (state: ViewportState) => void) => () => void;
+  subscribe: (listener: (state: Readonly<ViewportState>) => void) => () => void;
 }
 
 /** The CSS custom property on the container that holds the scale. */
@@ -82,22 +88,26 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
     state = next;
     for (const listener of listeners) listener(state);
   }
-  /** Scrolls the container to `wanted`; the rest scrolls the page only on an axis where the container's size followed the drawing. */
-  function scrollTo(wanted: Point, sizeBefore: Size): void {
+  /** Scrolls the container to `wanted`; on the axes that `reach` names "page", the rest scrolls the ancestors and the page. */
+  function scrollTo(wanted: Point, reach: Reach): void {
     container.scrollTo({ left: wanted.x, top: wanted.y, behavior: "instant" });
-    const followed = {
-      x: container.clientWidth !== sizeBefore.width,
-      y: container.clientHeight !== sizeBefore.height,
-    };
+    const rest = { x: wanted.x - container.scrollLeft, y: wanted.y - container.scrollTop };
     scrollByChained(container, {
-      x: followed.x ? wanted.x - container.scrollLeft : 0,
-      y: followed.y ? wanted.y - container.scrollTop : 0,
+      x: reach.x === "page" ? beyondRounding(rest.x) : 0,
+      y: reach.y === "page" ? beyondRounding(rest.y) : 0,
     });
+  }
+  /** "page" on an axis where the container's outer size followed the drawing; a scrollbar that came or went does not count. */
+  function followed(sizeBefore: Size): Reach {
+    return {
+      x: container.offsetWidth === sizeBefore.width ? "canvas" : "page",
+      y: container.offsetHeight === sizeBefore.height ? "canvas" : "page",
+    };
   }
   function zoomAt(point: Point, zoom: ZoomAtOptions): void {
     const target = clampZoom(zoom.scale);
     if (target === state.scale) return;
-    const sizeBefore = clientSize(container);
+    const sizeBefore = outerSize(container);
     const before = drawingBox();
     container.style.setProperty(ZOOM_PROPERTY, String(target));
     const after = drawingBox();
@@ -109,15 +119,15 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
       originAfter: after.origin,
       ratio: measured ? after.width / before.width : target / state.scale,
     });
-    scrollTo(wanted, sizeBefore);
+    scrollTo(wanted, followed(sizeBefore));
     changed({ ...state, scale: target });
   }
   function fit(): void {
     const drawing = options.drawing();
     const natural = viewBoxSize(drawing?.getAttribute("viewBox") ?? undefined);
     if (drawing === undefined || natural === undefined) return;
-    const sizeBefore = clientSize(container);
-    const box = options.fitBox?.() ?? sizeBefore;
+    const sizeBefore = outerSize(container);
+    const box = options.fitBox?.() ?? clientSize(container);
     const target = fitZoom(natural, { box });
     container.style.setProperty(ZOOM_PROPERTY, String(target));
     const visible = visibleOrigin(container);
@@ -126,7 +136,7 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
       x: container.scrollLeft + rect.left - Math.max(visible.x, 0),
       y: container.scrollTop + rect.top - Math.max(visible.y, 0),
     };
-    scrollTo(wanted, sizeBefore);
+    scrollTo(wanted, { x: followed(sizeBefore).x, y: "page" });
     if (target !== state.scale) changed({ ...state, scale: target });
   }
   return {
@@ -155,6 +165,15 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
 function visibleOrigin(container: HTMLElement): Point {
   const rect = container.getBoundingClientRect();
   return { x: rect.left + container.clientLeft, y: rect.top + container.clientTop };
+}
+
+/** Leftover scroll under a pixel is rounding, not something to pass on. */
+function beyondRounding(distance: number): number {
+  return Math.abs(distance) < 1 ? 0 : distance;
+}
+
+function outerSize(container: HTMLElement): Size {
+  return { width: container.offsetWidth, height: container.offsetHeight };
 }
 
 function clientSize(container: HTMLElement): Size {
