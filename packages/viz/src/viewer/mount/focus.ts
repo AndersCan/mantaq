@@ -9,7 +9,7 @@ export type FocusStep =
   | { kind: "enter"; state: string };
 
 /** A crumb of the path: its label and how many steps a click on it keeps. */
-export interface Crumb {
+interface Crumb {
   label: string;
   keep: number;
 }
