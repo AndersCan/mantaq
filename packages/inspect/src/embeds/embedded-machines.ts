@@ -48,7 +48,7 @@ interface Followed {
 }
 
 interface Dropped {
-  /** State ids whose `machine` goes. */
+  /** State ids whose `machine` and `forward` go. */
   states: ReadonlySet<string>;
 }
 
@@ -57,7 +57,10 @@ function withoutReferences(machine: VizMachine, options: Dropped): VizMachine {
   const kept = [];
   for (const state of machine.states) {
     const copy = { ...state };
-    if (options.states.has(state.id)) delete copy.machine;
+    if (options.states.has(state.id)) {
+      delete copy.machine;
+      delete copy.forward;
+    }
     kept.push(copy);
   }
   return { ...machine, states: kept };

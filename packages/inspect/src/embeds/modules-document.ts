@@ -34,6 +34,7 @@ function visit(merge: Merge, machine: VizMachine): VizMachine {
     if (merge.open.has(target.id)) {
       const copy = { ...state };
       delete copy.machine;
+      delete copy.forward;
       states.push(copy);
       dropped += 1;
       merge.warnings.push(

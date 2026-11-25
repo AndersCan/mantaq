@@ -43,14 +43,15 @@ function regionOf(nodeId: string): string | null {
 interface StateContext {
   initialIds: ReadonlySet<string>;
   effects: ReadonlyArray<GraphEdge>;
-  /** Machine id per state that embeds one. */
-  embedded: ReadonlyMap<string, string>;
+  /** The first embed of each state that embeds a machine. */
+  embedded: ReadonlyMap<string, StateEmbed>;
 }
 
 function toState(node: GraphNode, context: StateContext): VizState {
-  const machine = context.embedded.get(node.id);
+  const embed = context.embedded.get(node.id);
+  const forward = embed?.forward === undefined ? {} : { forward: [...embed.forward] };
   return {
-    ...(machine === undefined ? {} : { machine }),
+    ...(embed === undefined ? {} : { machine: embed.machine.id, ...forward }),
     id: node.id,
     label: node.label,
     region: regionOf(node.id),
@@ -175,10 +176,10 @@ function prefixedGraph(child: MapChild): { nodes: GraphNode[]; edges: GraphEdge[
 }
 
 /** The first machine each state embeds, by state id: a state names one machine. */
-function embeddedByState(embeds: ReadonlyArray<StateEmbed>): Map<string, string> {
-  const byState = new Map<string, string>();
+function embeddedByState(embeds: ReadonlyArray<StateEmbed>): Map<string, StateEmbed> {
+  const byState = new Map<string, StateEmbed>();
   for (const embed of embeds) {
-    if (!byState.has(embed.state)) byState.set(embed.state, embed.machine.id);
+    if (!byState.has(embed.state)) byState.set(embed.state, embed);
   }
   return byState;
 }

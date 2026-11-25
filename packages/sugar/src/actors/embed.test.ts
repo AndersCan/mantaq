@@ -277,6 +277,7 @@ describe("embed", () => {
         error: "checkBroke",
         forward: [],
         snapshot: undefined,
+        running: expect.any(Function),
       },
     });
   });
@@ -372,6 +373,7 @@ function editorOf(upload: ReturnType<typeof uploadMachine>, options?: EditorOpti
         error: uploadBroke,
         forward: [retry, dismiss],
         snapshot: uploadChanged,
+        keep: "upload",
       });
       builder.on(saving, {
         event: uploadChanged,
@@ -394,6 +396,11 @@ function editorOf(upload: ReturnType<typeof uploadMachine>, options?: EditorOpti
     },
   });
   return { actor, clock, snapshots };
+}
+
+/** What the test reads of a child that `childBuilt` gets. */
+interface NamedChild {
+  state: { name: string };
 }
 
 describe("embed forward", () => {
@@ -468,7 +475,7 @@ describe("embed forward", () => {
     expect([failedAgain, actor.state.name]).toEqual(["saving", "saved"]);
   });
 
-  test("the tag lists the forwarded inputs and the snapshot event, and sends lists the snapshot event", () => {
+  test("the tag lists the forwarded inputs, the snapshot event and its context field, and sends lists the snapshot event", () => {
     const upload = uploadMachine({ failures: 0 });
     const { actor } = editorOf(upload);
     const [entry] = actor.options.effects["saving"] ?? [];
@@ -485,6 +492,8 @@ describe("embed forward", () => {
         error: "uploadBroke",
         forward: ["retry", "dismiss"],
         snapshot: "uploadChanged",
+        keep: "upload",
+        running: expect.any(Function),
       },
       targets: {
         retry: [],
@@ -494,6 +503,48 @@ describe("embed forward", () => {
         uploadDismissed: ["editing"],
         uploadBroke: ["broken"],
       },
+    });
+  });
+
+  test("an effect input with childBuilt gets each child before the child gets an event", () => {
+    const { actor } = editorOf(uploadMachine({ failures: 0 }));
+    const [entry] = actor.options.effects["saving"] ?? [];
+    const built: string[] = [];
+    const abort = new AbortController();
+    const input = {
+      signal: abort.signal,
+      clock: VirtualClock(),
+      emit: () => undefined,
+      childBuilt: (child: NamedChild) => built.push(child.state.name),
+    };
+    Reflect.apply(entry?.fn ?? (() => undefined), undefined, [input]);
+    abort.abort();
+    expect(built).toEqual(["uploading"]);
+  });
+
+  test("the tag's running gives the child while the parent is in the embedding state, then undefined", () => {
+    const { actor, clock } = editorOf(uploadMachine({ failures: 1 }));
+    const [entry] = actor.options.effects["saving"] ?? [];
+    const tag: unknown = Reflect.get(entry?.fn ?? {}, "embedded");
+    const running: unknown =
+      typeof tag === "object" && tag !== null ? Reflect.get(tag, "running") : undefined;
+    function childState(): unknown {
+      const child: unknown =
+        typeof running === "function" ? Reflect.apply(running, undefined, []) : "no running";
+      const now: unknown =
+        typeof child === "object" && child !== null ? Reflect.get(child, "state") : child;
+      return typeof now === "object" && now !== null ? Reflect.get(now, "name") : now;
+    }
+    const before = childState();
+    actor.send(save.create());
+    const inside = childState();
+    clock.advance(50);
+    actor.send(dismiss.create());
+    expect({ before, inside, after: childState(), parent: actor.state.name }).toEqual({
+      before: undefined,
+      inside: "uploading",
+      after: undefined,
+      parent: "editing",
     });
   });
 

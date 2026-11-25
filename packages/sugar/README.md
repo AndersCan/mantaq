@@ -341,6 +341,7 @@ const editor = machine("editor", {
           error: uploadBroke,
           forward: [retry, dismiss],
           snapshot: uploadChanged,
+          keep: "upload",
         });
         m.on(saving, {
           event: uploadChanged,
@@ -366,12 +367,17 @@ The child handles a forwarded event before the parent handler returns. So when t
 
 Embed sends `uploadChanged` to the parent when the child is built and again after each change of the child. Its payload is the snapshot of the child. The parent must handle it in `in`, as for any internal event. Here the handler keeps the snapshot in the context of the parent. Embed sends the first snapshot event on entry. If another effect of `in` sends an event that makes the parent leave `in` at once, register that effect after `embed`. Otherwise the queued snapshot event reaches the next state, which does not handle it, and the parent enters `__error`. A `done` event of a child that ends on entry behaves the same way. So `editor.snapshot().context.upload` always holds the last child snapshot, also for a subscriber that starts late. The UI shows the retry and dismiss buttons when the parent is in `saving` and the path of the child is `["couldNotUpload"]`. After the parent leaves `saving`, the field keeps the last snapshot of the child, so the UI must also check the state of the parent.
 
+`keep` names the context field where the `snapshot` handler keeps the child snapshot, here `upload`. Embed does not write the field. It puts the name in the `embedded` tag as `keep`, so that tools can read the child state from the context of the parent. The live driver of `@mantaq/inspect` reads it to report the state of the child. `keep` needs `snapshot`.
+
+A tool that drives the parent can put a function `childBuilt` on the effect input. Embed calls it with each child that it builds, before the child gets an event. The `embedded` tag also has `running()`, which returns the child that runs now, typed as `unknown` because it is for tools only. A tool that starts after the child was built uses it, for example a child that the first state of the parent embeds. A live viewer can use both to hold the effects of the child.
+
 The types also require these things:
 
 - Each `forward` event is an input of the parent and an input of the child. The child input takes the payload of the parent event.
 - The `snapshot` event is an internal event of the parent. Its payload type takes the snapshot of the child.
+- The `keep` field is a field of the parent context. Its type takes the snapshot of the child.
 
-Events reach the child only through `forward`. Nothing else sends events into the child.
+Embed sends events to the child only through `forward`.
 
 ### Effect utilities: `withPromise` vs manual handling
 

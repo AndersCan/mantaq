@@ -55,6 +55,8 @@ export interface VizState {
   doc: string | null;
   /** Id of another machine in the same document that this state embeds. That machine stays its own entry in `machines`; its states are not copied here. Omitted = a plain state. */
   machine?: string;
+  /** Inputs of this machine that `embed` sends on to `machine` while this state is current (its `forward` option). Omitted = none, or no `machine`. */
+  forward?: string[];
 }
 
 export interface VizEvent {
@@ -285,6 +287,14 @@ export interface VizRemovedChild extends VizLiveChild {
   until: number;
 }
 
+/** A current state that embeds a machine (its `VizState.machine`), and where that machine is. */
+export interface VizLiveEmbed {
+  /** Id of the state that embeds it, as the diagram names it ("pickingUp", "upload.saving"). */
+  state: string;
+  /** The child's current state id, from the context field that the embed's `keep` names; omitted without `keep`, or while that field holds no snapshot. */
+  current?: string;
+}
+
 /** Where a running actor is, after the steps in `steps`. */
 export interface VizLiveState {
   state: string;
@@ -306,6 +316,8 @@ export interface VizLiveState {
   effectMode: "held" | "real";
   /** Held effects of the active state still waiting for an answer (their state not left), in the order they started. [] in real mode. */
   waiting: string[];
+  /** Each current state that embeds a machine: the root's own states, its regions' and its returned machines'. With `keep`, a child that ended is left out; without it, an entry only says the state is current. Omitted: the driver does not report them. */
+  embeds?: VizLiveEmbed[];
 }
 
 /**

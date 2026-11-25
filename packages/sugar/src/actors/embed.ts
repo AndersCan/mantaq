@@ -84,6 +84,14 @@ type SnapshotFits<Changed, Built> =
       : { readonly payloadMustTakeTheChildSnapshot: ChildSnapshotOf<Built> }
     : unknown;
 
+/** Context fields of the parent whose type takes every child snapshot. */
+type SnapshotFieldOf<ActorContext, Built> = {
+  [Field in keyof ActorContext]-?: [ChildSnapshotOf<Built>] extends [ActorContext[Field]]
+    ? Field
+    : never;
+}[keyof ActorContext] &
+  string;
+
 /** An event whose `create` takes a child snapshot as its payload. */
 interface SnapshotEvent {
   readonly type: string;
@@ -101,6 +109,10 @@ export interface Embedded {
   readonly forward: readonly string[];
   /** Parent internal event type that carries each child snapshot, or undefined when the parent does not ask for one. */
   readonly snapshot: string | undefined;
+  /** Context field of the parent where its `snapshot` handler keeps the child snapshot, or undefined when the parent does not say. */
+  readonly keep: string | undefined;
+  /** The child running now, or undefined. For tools only: a tool that drives the parent and starts after the child was built can hold its effects. */
+  readonly running: () => unknown;
 }
 
 interface EmbedOptions<
@@ -108,6 +120,7 @@ interface EmbedOptions<
   Inputs extends readonly AnyEventRef[],
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
+  ActorContext,
   Built extends Made,
   Forward extends ReadonlyArray<Inputs[number]>,
   Changed extends Internal[number],
@@ -121,6 +134,8 @@ interface EmbedOptions<
   forward?: Forward & ForwardFits<Forward, Built>;
   /** A parent internal event that carries the child snapshot, once on entry and then after each child change. The parent handles it in `in`. */
   snapshot?: Changed & SnapshotFits<Changed, Built>;
+  /** The context field where the parent's `snapshot` handler keeps the child snapshot. Embed does not write it; tools read the child state from it. */
+  keep?: [Changed] extends [never] ? never : SnapshotFieldOf<ActorContext, Built>;
 }
 
 /**
@@ -139,7 +154,7 @@ export function embed<
   Changed extends Internal[number] = never,
 >(
   builder: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Clock>,
-  options: EmbedOptions<States, Inputs, Internal, Outputs, Built, Forward, Changed>,
+  options: EmbedOptions<States, Inputs, Internal, Outputs, ActorContext, Built, Forward, Changed>,
 ): void {
   const { machine } = options;
   const error: VoidEvent = options.error;
@@ -160,6 +175,7 @@ export function embed<
       return;
     }
     const child = actorOf(machine.create({ clock }));
+    tellBuilt(input, { child });
     running = child;
     input.signal.addEventListener("abort", () => {
       if (running === child) running = undefined;
@@ -185,6 +201,8 @@ export function embed<
     error: error.type,
     forward: forward.map((event) => event.type),
     snapshot: snapshotEvent?.type,
+    keep: options.keep,
+    running: () => running,
   };
   /** `sends` lists the mapped events and the snapshot event; typed as maybe-undeclared so `emit` also takes the forwarded child outputs. */
   builder.effect<NonFinalStateRef<[...States]>, ReadonlyArray<Internal[number]> | undefined>(
@@ -198,6 +216,16 @@ export function embed<
   for (const event of forward) {
     builder.on(options.in, { event, handler: (sent) => running?.send(sent) });
   }
+}
+
+interface BuiltChild {
+  child: AnyActor<unknown>;
+}
+
+/** A tool that drives the parent can pass `childBuilt` on the effect input: it gets each child before the child gets any event, for example to hold the child's effects. */
+function tellBuilt(input: object, built: BuiltChild): void {
+  const childBuilt: unknown = Reflect.get(input, "childBuilt");
+  if (typeof childBuilt === "function") Reflect.apply(childBuilt, undefined, [built.child]);
 }
 
 function actorOf(built: Made): AnyActor<unknown> {

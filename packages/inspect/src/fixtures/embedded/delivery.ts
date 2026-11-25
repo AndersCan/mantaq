@@ -1,5 +1,6 @@
 /** A delivery scans the parcel at pickup and again at the door, with the same scan machine. */
 import { Actor, event, machine, state } from "@mantaq/core";
+import type { Snapshot } from "@mantaq/core";
 import { embed } from "@mantaq/sugar";
 import { scan } from "./scan.ts";
 
@@ -22,21 +23,36 @@ const scanPassed = event("scanPassed")();
 const scanFailed = event("scanFailed")();
 /** The scan machine broke. */
 const scanBroke = event("scanBroke")();
+/** The courier reports the label as unreadable; the running scan takes it. */
+const misread = event("misread")();
+/** The scan changed; carries its snapshot. */
+const scanChanged = event("scanChanged")<Snapshot>();
+
+interface DeliveryContext {
+  /** The last snapshot of the running scan. */
+  scan: Snapshot | undefined;
+}
+
+const noScan: DeliveryContext = { scan: undefined };
 
 export const delivery = machine("delivery", {
   create: ({ clock }) =>
     Actor({
-      inputs: [arrive],
-      internal: [scanPassed, scanFailed, scanBroke],
+      inputs: [arrive, misread],
+      internal: [scanPassed, scanFailed, scanBroke, scanChanged],
       states: [pickingUp, onTheWay, handingOver, delivered, returned],
       initial: pickingUp,
+      context: noScan,
       clock,
       setup: (builder) => {
         const endings = {
           machine: scan,
           done: { scanned: scanPassed, rejected: scanFailed },
           error: scanBroke,
-        };
+          forward: [misread],
+          snapshot: scanChanged,
+          keep: "scan",
+        } as const;
         embed(builder, { in: pickingUp, ...endings });
         embed(builder, { in: handingOver, ...endings });
         builder.on(pickingUp, {
@@ -55,6 +71,10 @@ export const delivery = machine("delivery", {
           handler: () => ({ state: delivered }),
         });
         for (const scanning of [pickingUp, handingOver]) {
+          builder.on(scanning, {
+            event: scanChanged,
+            handler: (changed, { context }) => context.set({ scan: changed.payload }),
+          });
           builder.on(scanning, {
             event: scanFailed,
             to: [returned],

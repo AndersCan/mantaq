@@ -9,8 +9,11 @@ import type {
   VizRemovedChild,
   VizStep,
 } from "@mantaq/viz";
+import { drivesChild, runningEmbeds } from "./embeds/live-embeds.ts";
+import { embedTagOf } from "./embeds/state-embeds.ts";
 import { actorMapsOf } from "./maps.ts";
 import type { ActorMapLike } from "./maps.ts";
+import type { EmbedPart } from "./embeds/live-embeds.ts";
 import {
   applyStep,
   isActor,
@@ -85,24 +88,69 @@ function hasSignal(value: unknown): value is { signal: AbortSignal } {
   );
 }
 
-/** Swap each effect body for a stub that only records its signal; recurse into regions. */
+/** Hold a child's effects; what they would report cannot reach it (only `forward` does), so they stay out of the root's `waiting`. */
+function holdChild(child: unknown): void {
+  if (isActor(child)) holdEffects(child, []);
+}
+
+/** An embed that forwards inputs or keeps its child snapshot still builds its child, so forwarded inputs reach it; the child's effects are held in turn. */
+function heldEmbed(effect: unknown): (input: unknown) => unknown {
+  function runHeld(input: unknown): unknown {
+    if (typeof effect !== "function") return undefined;
+    const given = typeof input === "object" && input !== null ? input : {};
+    return Reflect.apply(effect, undefined, [{ ...given, childBuilt: holdChild }]);
+  }
+  return runHeld;
+}
+
+interface TaggedOptions {
+  /** The effect fn that `effect` replaces. */
+  from: unknown;
+}
+
+/** The `embedded` tag of an effect fn, carried to the fn that replaces it, so tools still find the child. */
+function tagged<Effect extends object>(effect: Effect, options: TaggedOptions): Effect {
+  const { from } = options;
+  const tag: unknown = typeof from === "function" ? Reflect.get(from, "embedded") : undefined;
+  return tag === undefined ? effect : Object.assign(effect, { embedded: tag });
+}
+
+/** Hold the children that the actor's current state already runs: core built them with the actor, before its effects could be swapped. */
+function holdRunningChildren(actor: AnyActor<unknown>): void {
+  for (const entry of actor.options?.effects?.[actor.state.name] ?? []) {
+    const tag = embedTagOf(entry);
+    if (tag !== undefined) holdChild(tag.running());
+  }
+}
+
+/**
+ * Swap each effect body for a stub that only records its signal; recurse into regions. An embed that drives
+ * its child keeps running, with the child's effects held, also for a child the current state built already.
+ */
 function holdEffects(actor: AnyActor<unknown>, held: HeldEffect[]): void {
   for (const list of Object.values(actor.options?.effects ?? {})) {
     for (const [index, entry] of list.entries()) {
       if (!isEffectEntry(entry)) continue;
-      list[index] = {
-        ...entry,
-        fn: (input: unknown) => {
-          if (hasSignal(input)) held.push({ name: entry.name, signal: input.signal });
-        },
-      };
+      if (drivesChild(entry)) {
+        list[index] = { ...entry, fn: tagged(heldEmbed(entry.fn), { from: entry.fn }) };
+        continue;
+      }
+      const { name } = entry;
+      function stub(input: unknown): void {
+        if (hasSignal(input)) held.push({ name, signal: input.signal });
+      }
+      list[index] = { ...entry, fn: tagged(stub, { from: entry.fn }) };
     }
   }
+  holdRunningChildren(actor);
   for (const region of Object.values(actor.regions)) holdEffects(region, held);
 }
 
 export interface DriverOptions {
-  /** `held` (default): effect bodies do not run and the viewer asks what they report; first-state effects still run, because core runs them while the actor is built. `real`: they run. */
+  /**
+   * `held` (default): effect bodies do not run and the viewer asks what they report. First-state effects run while core builds the actor.
+   * An embed that forwards or keeps builds its child, held the same way; the child's first-state effects run on each entry and dry run. `real`: all run.
+   */
   effectMode?: "held" | "real";
 }
 
@@ -512,6 +560,7 @@ function liveView(session: Session, effectMode: "held" | "real"): VizLiveState {
     payload: payloadOf(actor),
     effectMode,
     waiting: waiting.map((each) => each.name),
+    embeds: runningEmbeds(embedParts(actor, actors)),
   };
 }
 
@@ -526,6 +575,18 @@ interface Session extends Stepping {
   children: Map<string, MapChild>;
   removed: VizRemovedChild[];
   watch: (ref: MapChildRef) => void;
+}
+
+/** The parts whose states can embed machines: the machine, its regions and its returned machines. */
+function embedParts(
+  actor: AnyActor<unknown>,
+  actors: Readonly<Record<string, AnyActor<unknown>>>,
+): EmbedPart[] {
+  const parts: EmbedPart[] = [{ actor, prefix: "" }];
+  for (const part of withActors(regionActors(actor), actors)) {
+    parts.push({ actor: part.actor, prefix: `${part.path}.` });
+  }
+  return parts;
 }
 
 /**
