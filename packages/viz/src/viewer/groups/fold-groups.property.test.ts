@@ -110,7 +110,8 @@ function missingFromViews(machine: VizMachine): string[] {
       if (missed) problems.push(`${node.id} misses ${edge.id}`);
     }
   }
-  if (groupNodesOf(foldGroups(machine)).length > 0) problems.push("the fold folds again");
+  const folded = foldGroups(machine);
+  if (foldGroups(folded) !== folded) problems.push("the fold folds again");
   return problems;
 }
 

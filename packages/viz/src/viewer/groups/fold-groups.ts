@@ -35,7 +35,7 @@ interface Folded {
   membersOfEdge: ReadonlyMap<string, VizEdge[]>;
 }
 
-/** Each machine's fold, so the same machine folds once and keeps its layout. */
+/** Each machine's fold, so the same machine folds once and keeps its layout. A fold is its own fold, so the helpers answer alike for both. */
 const folds = new WeakMap<VizMachine, Folded>();
 
 function foldedOf(machine: VizMachine): Folded {
@@ -43,6 +43,7 @@ function foldedOf(machine: VizMachine): Folded {
   if (known !== undefined) return known;
   const folded = fold(machine);
   folds.set(machine, folded);
+  folds.set(folded.machine, folded);
   return folded;
 }
 
@@ -219,8 +220,9 @@ function renamedEdge(edge: VizEdge, options: EdgeEnds): VizEdge {
 }
 
 /**
- * The edge drawn for a bucket. Several members have several handlers, so a
- * merged arrow drops the reading and the doc, and sums the coverage.
+ * The edge drawn for a bucket, with the coverage of all its members. Members
+ * from one source share one handler and keep its reading. Members from several
+ * sources have several handlers, so the arrow drops the reading and the doc.
  */
 function drawnEdge(bucket: Bucket, options: DrawnId): VizEdge {
   const { first, id } = options;
@@ -228,14 +230,12 @@ function drawnEdge(bucket: Bucket, options: DrawnId): VizEdge {
   if (from === first.from && target === first.to) return first;
   const moved = { ...first, id, from, to: target };
   const ends = [from, target ?? ""];
-  if (members.length === 1) return renamedEdge(moved, { nodes: options.nodes, ends });
-  return {
-    ...moved,
-    explanation: null,
-    doc: null,
-    coverage: summed(members.map((member) => member.coverage)),
-    tested: summed(members.map((member) => member.tested)),
-  };
+  const coverage = summed(members.map((member) => member.coverage));
+  const tested = summed(members.map((member) => member.tested));
+  const oneHandler = members.every((member) => member.from === first.from);
+  const read = oneHandler ? renamedEdge(moved, { nodes: options.nodes, ends }) : moved;
+  if (oneHandler) return { ...read, coverage, tested };
+  return { ...read, explanation: null, doc: null, coverage, tested };
 }
 
 function arrowOf(bucket: Bucket, options: Arrowing): GroupArrow {

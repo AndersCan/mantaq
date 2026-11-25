@@ -77,8 +77,8 @@ describe("foldGroups on the grouped checkout", () => {
     expect(drawn).toEqual(["inCart", "@payment", "@payment", "@shipping", "@shipping"]);
   });
 
-  test("the same machine folds to the same machine", () => {
-    expect(foldGroups(grouped)).toBe(foldGroups(grouped));
+  test("the same machine folds to the same machine, and a fold is its own fold", () => {
+    expect(foldGroups(foldGroups(grouped))).toBe(foldGroups(grouped));
   });
 
   test("a machine without groups folds to its own states and edges", () => {
@@ -183,6 +183,27 @@ describe("foldGroups labels", () => {
       edges: [guarded, edgeOf("editing", { event: "pay", to: "paying" })],
     });
     expect(foldGroups(merged).edges.map((edge) => edgeLines(edge))).toEqual([["pay"]]);
+  });
+
+  test("arrows from one handler into a group keep its condition beside its else", () => {
+    const branches = [
+      { conditions: ["x"], target: { kind: "state" as const, state: "b1" } },
+      { conditions: ["!(x)", "y"], target: { kind: "state" as const, state: "b2" } },
+      { conditions: ["!(x)", "!(y)"], target: { kind: "state" as const, state: "c" } },
+    ];
+    const handled = machineOf({
+      states: [
+        stateOf("a"),
+        stateOf("b1", { group: "g" }),
+        stateOf("b2", { group: "g" }),
+        stateOf("c"),
+      ],
+      edges: ["b1", "b2", "c"].map((to) => readEdge(edgeOf("a", { event: "e", to }), { branches })),
+    });
+    expect(foldGroups(handled).edges.map((edge) => edgeLines(edge))).toEqual([
+      ["e", "x || !x && y"],
+      ["e", "else"],
+    ]);
   });
 
   test("an arrow into a group keeps its condition beside its else", () => {
