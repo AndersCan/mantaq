@@ -57,15 +57,14 @@ test("a dropped message's Step line uses the banner colour", () => {
   expect(bareRule(".viz [data-live-dropped]")).toMatch(/color:\s*var\(--banner-fg\)/);
 });
 
-test("the panel stays below the graph and in view while the graph scrolls", () => {
+test("the panel stays below the graph, never pinned over it, and the canvas leaves it room in one window", () => {
   expect(css).not.toContain("@container");
   const main = bare.split("}").find((b) => b.trim().startsWith(".viz .viz-main {")) ?? "";
   expect(main).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   const panel = rule(".viz .panel {");
-  expect(panel).toMatch(/position:\s*sticky/);
-  expect(panel).toMatch(/bottom:\s*0/);
+  expect(panel).not.toMatch(/position:/);
   expect(panel).toMatch(/background:\s*var\(--bg\)/);
-  expect(panel).not.toMatch(/(^|[\s;{])top:/);
+  expect(listed(".viz .canvas")).toMatch(/max-height:\s*calc\(75dvh - 5rem\)/);
   const tabPanel = rule(".viz .tab-panel {");
   expect(tabPanel).toMatch(/overflow:\s*auto/);
   expect(tabPanel).toMatch(/max-height:\s*25vh/);
@@ -128,10 +127,13 @@ test("the next arrows march one dash period forever; only reduced motion stops t
   expect(bare.replace(reduced[0] ?? "", "")).not.toMatch(/animation:\s*none/);
 });
 
-test("a focused arrow or state scrolls clear of the pinned panel", () => {
-  expect(rule(".viz .canvas [tabindex] {")).toMatch(
-    /scroll-margin-bottom:\s*calc\(60vh \+ \d+px\)/,
-  );
+test("Full screen keeps its one line while the path and its lines wrap beside it", () => {
+  const toggle = listed(".viz .fullscreen-toggle");
+  expect([
+    toggle.match(/flex:\s*none/) !== null,
+    toggle.match(/white-space:\s*nowrap/) !== null,
+  ]).toEqual([true, true]);
+  expect(listed(".viz .viz-bar-start")).toMatch(/min-width:\s*0/);
 });
 
 test("a chip's hit rect is transparent, takes the pointer, and no chip paint rule reaches it", () => {

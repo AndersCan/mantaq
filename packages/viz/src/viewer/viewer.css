@@ -80,8 +80,9 @@
     color-scheme: dark;
   }
 }
-/* Panel always below the graph, so the graph keeps the full width,
-   and in view while the graph scrolls. */
+/* Panel always below the graph, so the graph keeps the full width. The
+   canvas is capped so the graph and the panel fit one window together; the
+   panel is never pinned over the canvas. */
 .viz .viz-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -91,9 +92,6 @@
 .viz .canvas {
   overflow: auto;
   position: relative;
-}
-
-.viz:has(.focus-path) .canvas {
   max-height: calc(75dvh - 5rem);
 }
 
@@ -101,8 +99,6 @@
   border-top: 1px solid var(--region-bg);
   padding-top: 8px;
   min-width: 0;
-  position: sticky;
-  bottom: 0;
   background: var(--bg);
 }
 
@@ -149,10 +145,6 @@
 
 .viz .tab-panel[data-tab-panel="screen"] {
   max-height: 60vh;
-}
-
-.viz .canvas [tabindex] {
-  scroll-margin-bottom: calc(60vh + 80px);
 }
 
 .viz .panel dl {
@@ -560,7 +552,14 @@
 .viz .viz-bar {
   display: flex;
   justify-content: flex-end;
+  align-items: flex-start;
   gap: 8px;
+}
+
+/* The path and its lines wrap; the button keeps its one line. */
+.viz .fullscreen-toggle {
+  flex: none;
+  white-space: nowrap;
 }
 
 .viz:fullscreen {
@@ -674,6 +673,7 @@
   align-items: center;
   gap: 8px;
   margin-right: auto;
+  min-width: 0;
 }
 
 .viz .focus-path ol {
