@@ -256,6 +256,26 @@ describe("a shared arrow with no member at the current state", () => {
       button: shared(root)?.getAttribute("role") ?? "plain",
     }).toEqual({ title: why, line: why, button: "plain" });
   });
+
+  test("its open Details say the same why as its hover title after the walk moves", () => {
+    const { driver } = fakeDriver(true);
+    const listeners: Array<(state: VizLiveState) => void> = [];
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver: { ...driver, listen: (onChange) => listeners.push(onChange) } },
+    );
+    press(help(root));
+    const moved = driver.step({ kind: "event", event: "begin", payload: {} });
+    for (const onChange of listeners) onChange(moved);
+    const title = shared(root)?.querySelector(":scope > title.why")?.textContent;
+    expect({ title, line: details(root)?.querySelector(".blocked-note")?.textContent }).toEqual({
+      title: "go goes to idle, not home",
+      line: "go goes to idle, not home",
+    });
+  });
 });
 
 describe("a shared node over a folded group", () => {

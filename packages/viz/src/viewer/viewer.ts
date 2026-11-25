@@ -1,6 +1,13 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
 import { decodeFocus, enteredBy, focusReader, unknownFocusText } from "./mount/focus.ts";
-import { drawCallbacks, followedLook, membersWhy, pickChild, sayWhy } from "./mount/arrow-click.ts";
+import {
+  drawCallbacks,
+  drawnArrowClick,
+  followedLook,
+  pickChild,
+  sayWhy,
+  whyOf,
+} from "./mount/arrow-click.ts";
 import { listenEscape } from "./mount/escape.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
@@ -122,7 +129,8 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
       select: showDetails,
       ...(focus().canvas === "board" ? { hint: "Click a machine to see its states." } : {}),
       send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }),
-      why: (members) => membersWhy({ machine, view, driver }, { members }),
+      why: (arrow) =>
+        whyOf(drawnArrowClick({ machine, view, driver }, { shown: shown(), id: arrow }).click),
     });
     const screen = screenOf(doc, { options, machine, view, driver });
     const tabs = panelTabs(doc, { view, parts: stepTab, details, screen, refresh });

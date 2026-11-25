@@ -250,8 +250,8 @@ export interface RenderPanelOptions {
   select: (selection: Selection) => void;
   /** What Details shows under an arrow's title to send it. */
   send?: (edge: VizEdge) => HTMLElement | undefined;
-  /** Why the walk sends none of a drawn arrow's real edges now; undefined when it can, or without a walk. */
-  why?: (members: ReadonlyArray<VizEdge>) => string | undefined;
+  /** Why a click on the drawn arrow with this id sends nothing now; undefined when it sends, or without a walk. */
+  why?: (arrow: string) => string | undefined;
   /** Shown when nothing is selected. */
   hint?: string;
 }
@@ -267,7 +267,7 @@ function whyLine(doc: Document, options: WhyLineOptions): HTMLElement | undefine
   const { machine, real, arrow, why } = options;
   const ids = realMembersOf(machine, { shared: shareArrows(machine), arrow });
   const members = real.edges.filter((edge) => ids.includes(edge.id));
-  const text = why?.(members);
+  const text = why?.(arrow);
   if (text === undefined) return undefined;
   const event = members[0]?.event ?? "";
   return html(doc, "p", { class: "blocked-note", "data-blocked-note": event }, [text]);

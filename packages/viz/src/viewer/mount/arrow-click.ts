@@ -137,13 +137,13 @@ export function drawnArrowClick(
   return { selection, edge, click: { kind: "plain", why: membersWhy(from, { members }) } };
 }
 
-export interface MembersWhyOptions {
+interface MembersWhyOptions {
   /** The real edges one drawn arrow stands for. */
   members: ReadonlyArray<VizEdge>;
 }
 
 /** Why a click on a drawn arrow sends none of its real edges: the walk is elsewhere; undefined with no walk. */
-export function membersWhy(from: ArrowSendContext, options: MembersWhyOptions): string | undefined {
+function membersWhy(from: ArrowSendContext, options: MembersWhyOptions): string | undefined {
   const { machine, view } = from;
   if (view.live === null) return undefined;
   return whyNoneHere(machine, { edges: options.members, live: view.live, picked: view.picked });
