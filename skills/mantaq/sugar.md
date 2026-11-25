@@ -5,18 +5,19 @@ Ergonomic layer over `@mantaq/core`: `npm install @mantaq/sugar`.
 This lists what exists and when to reach for it. Get exact signatures from
 `node_modules/@mantaq/sugar/dist/*.d.ts` or the [example tests](https://github.com/AndersCan/mantaq/tree/main/packages/examples).
 
-| Helper                                           | Use for                                                                 |
-| ------------------------------------------------ | ----------------------------------------------------------------------- |
-| `states(...)`, `events(...)`                     | Create many state/event refs in one call.                               |
-| `matches(actor, "a.b")`                          | Is the actor in state `a`, region `b`? Dotted path through regions.     |
-| `isIn(snapshot, name)`, `activeLeaves(snapshot)` | Any-depth state check; list of deepest active states.                   |
-| `tag(...states)`                                 | Group states under one `has(snapshot)` check.                           |
-| `withTimeout`                                    | Effect helper: emit one event after a delay on the injected clock.      |
-| `withPromise`                                    | Effect helper: turn a promise into success/error events, abort-guarded. |
-| `createActorMap`                                 | Spawn, send to and kill same-shaped child actors by key at runtime.     |
-| `onOutput`                                       | Route a child actor's declared outputs to a handler (manual wiring).    |
-| `broadcast`                                      | Send one event to every child of a map.                                 |
-| `actorSpec`, `definePart`, `use`, `withParts`    | Split a large `setup` into typed, reusable fragments.                   |
+| Helper                                           | Use for                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------- |
+| `states(...)`, `events(...)`                     | Create many state/event refs in one call.                                 |
+| `matches(actor, "a.b")`                          | Is the actor in state `a`, region `b`? Dotted path through regions.       |
+| `isIn(snapshot, name)`, `activeLeaves(snapshot)` | Any-depth state check; list of deepest active states.                     |
+| `tag(...states)`                                 | Group states under one `has(snapshot)` check.                             |
+| `withTimeout`                                    | Effect helper: emit one event after a delay on the injected clock.        |
+| `withPromise`                                    | Effect helper: turn a promise into success/error events, abort-guarded.   |
+| `createActorMap`                                 | Spawn, send to and kill same-shaped child actors by key at runtime.       |
+| `onOutput`                                       | Route a child actor's declared outputs to a handler (manual wiring).      |
+| `broadcast`                                      | Send one event to every child of a map.                                   |
+| `actorSpec`, `definePart`, `use`, `withParts`    | Split a large `setup` into typed, reusable fragments.                     |
+| `embed`                                          | Run a child machine in one parent state: split a machine that is too big. |
 
 ## Notes
 
@@ -26,6 +27,7 @@ This lists what exists and when to reach for it. Get exact signatures from
 - Dispose an actor map when its owner is disposed.
 - Return actor maps from the factory next to the actor, `return { actor, photos }`, so the viz draws and drives the children, and fuzzing sends to the ones it started.
 - Fuzzing sends to a child by the key a step started it with, so give the event that starts it a payload sample (`source` or `payloads`).
+- `actorSpec` and parts split one machine's code into files; the diagram stays one big machine. `embed` splits the machine itself, so each diagram stays small. See `patterns.md` "Big Machine".
 - Prefer sugar over raw core where it fits. Reach for the map, broadcast, tag and parts helpers when the need arises, not preemptively.
 
 ## Pool: machines that pass work

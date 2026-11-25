@@ -7,6 +7,7 @@ Review actor code against the Rules in `SKILL.md`, then check what typechecking 
 - Async work lives in effects. Transition handlers stay pure: read context, decide state, emit.
 - States model the domain. No `isLoading` / `hasError` flags in context doing a state's job.
 - One way to do things. No competing patterns for the same behavior.
+- A machine with more than about 12 states, or with handlers registered in a loop over many states, is split: each self-contained group becomes a machine that a parent state runs with `embed` (`patterns.md` "Big Machine").
 
 ## Determinism
 

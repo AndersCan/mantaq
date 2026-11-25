@@ -39,6 +39,7 @@ export default defineConfig({
         "src/tutorial/meal-07.ts",
         "src/tutorial/meal-08.ts",
         "src/tutorial/meal-09.ts",
+        "../../packages/examples/order/order.ts",
       ],
       // Seeded, so every build draws the same coverage.
       fuzz: { seed: 1, iterations: 5000 },
@@ -100,6 +101,7 @@ export default defineConfig({
             { label: "Test Harness", slug: "guides/testing-guide" },
             { label: "Machines in an app", slug: "guides/machines-in-an-app" },
             { label: "Visualizer", slug: "guides/visualizer" },
+            { label: "Split a big machine", slug: "guides/split-a-big-machine" },
             { label: "Design gate", slug: "guides/design-gate" },
             { label: "Test an app without mantaq", slug: "guides/app-without-mantaq" },
           ],
