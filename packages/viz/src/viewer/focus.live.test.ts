@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, test } from "vite-plus/test";
 import { edgeOf, machineOf, stateOf } from "./groups/shop-machines.ts";
-import type { FocusLink, ViewerOptions } from "./embed.ts";
+import type { ViewerOptions } from "./embed.ts";
 import type { EnteredGroup } from "./graph.ts";
 import { mountViewer } from "./embed.ts";
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
@@ -405,36 +405,6 @@ describe("the path in the address bar", () => {
     expect(shown(root).outside).toBe(
       "The walk is in inCart, outside group shipping. Go back to walk on.",
     );
-  });
-
-  test("the host's Back and Forward move along the path to the address's, and leave the walk where it is", () => {
-    const follows: Array<(link: FocusLink) => void> = [];
-    const told: string[][] = [];
-    const { root } = mount({
-      steps: ["checkout"],
-      followFocus: (follower) => follows.push(follower.follow),
-      onNavigate: (where) => told.push([where.by, ...where.steps, "|", ...where.focus]),
-    });
-    const follow = follows[0];
-    follow?.({ focus: ["@payment"] });
-    const forward = shown(root);
-    follow?.({ machine: "elsewhere", focus: [] });
-    const other = shown(root).path;
-    follow?.({ machine: "shop", focus: [] });
-    expect({ forward, other, back: shown(root).path, told }).toStrictEqual({
-      forward: {
-        ...inPayment,
-        current: ["chargingCard"],
-        sends: ["chargingCard-charged-confirming"],
-        outside: "",
-      },
-      other: ["shop", "payment"],
-      back: [],
-      told: [
-        ["link", "checkout", "|", "@payment"],
-        ["link", "checkout", "|"],
-      ],
-    });
   });
 
   test("a link whose path does not resolve opens as far as it does, and the bar says so until the next move or step", () => {

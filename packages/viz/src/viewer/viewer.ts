@@ -21,9 +21,6 @@ import { renderPanel } from "./panel.ts";
 import { sendFor } from "./mount/send-details.ts";
 import type { ViewerOptions } from "./mount/viewer-options.ts";
 
-/** The latest mount on each root: a viewer drawn again on the same root replaces the one before. */
-const mounts = new WeakMap<HTMLElement, object>();
-
 /**
  * Mount a viewer for an viz document into `root`. With a `driver` the walk runs
  * the real actor; without one the viewer draws the diagram and Details only.
@@ -47,25 +44,12 @@ export function mountViewer(
     redraw: () => undefined,
     canvas: { refit: () => undefined, viewport: () => undefined },
     escape: () => false,
-    follow: () => undefined,
   };
   const opened = view.focus.length > 0 ? "claim" : "plain";
   listenEscape(root, { escape: () => redraws.escape(), opened });
   listenFullscreen(root);
   listenNavigation(root, { viewport: () => redraws.canvas.viewport() });
   watchDriver(view, { driver, redraw: () => redraws.redraw() });
-  const mount = {};
-  mounts.set(root, mount);
-  function mounted(): boolean {
-    return root.isConnected && mounts.get(root) === mount;
-  }
-  options.followFocus?.({
-    follow: (link) => {
-      const other = link.machine !== undefined && link.machine !== first?.id;
-      if (mounted() && !other) redraws.follow(link.focus);
-    },
-    mounted,
-  });
   function showControls(): void {
     view.diagramOnly = false;
     view.tab = "step";
@@ -93,7 +77,6 @@ interface Redraws {
   redraw: () => void;
   canvas: Pick<Canvas, "refit" | "viewport">;
   escape: () => boolean;
-  follow: (tokens: string[]) => void;
 }
 
 interface DrawContext {
@@ -203,7 +186,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     if (!drawsSelection(move.after.drawn, { selection: view.selection })) {
       view.selection = undefined;
     }
-    navigated(options, { machine, view, by: move.by });
+    navigated(options, { machine, view, by: "path" });
     const entered = enteredBy(move);
     if (entered !== undefined) options.onEnterGroup?.(entered);
   }
@@ -220,7 +203,6 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   });
   context.redraws.canvas = canvas;
   context.redraws.escape = () => closeSelection(panel, { view, refresh }) || canvas.back();
-  context.redraws.follow = (tokens) => canvas.follow(decodeFocus(tokens, { root: machine }));
   root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
   canvas.framed();
   canvas.refit();

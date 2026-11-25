@@ -8,7 +8,7 @@
 // nothing; a dead button planted on one page must be caught, so a weakened sweep fails too.
 // On the group guide it replays the walk the guide describes at a docs-column and a phone
 // width: into the payment group, enter it, click arrows inside, leave it by an arrow, go
-// back by the path and by the browser's Back. No click needs a sideways scroll first, and
+// back by the path, then reload, and the walk adds no history entry. No click needs a sideways scroll first, and
 // after each step the labels of the next arrows show in the canvas. The checkout of the
 // visualizer guide is walked the same way, at both widths, the back arrows included.
 // The click sweep also opens the guide with a group entered, by a link, and must click the

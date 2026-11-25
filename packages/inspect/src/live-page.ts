@@ -15,13 +15,8 @@ import type { ViewerOptions } from "@mantaq/viz/viewer";
 
 type WalkOptions = ReturnType<typeof linkOptions>;
 
-/** Where the reader took each root's viewer since the page loaded: the machine, the walk and the path. */
-interface Walked {
-  machine: string;
-  steps: string[];
-  payloads: string[];
-  focus: string[];
-}
+/** Where the reader took each root's viewer since the page loaded: the machine, the walk and the path, as the viewer reports them. */
+type Walked = Omit<Parameters<NonNullable<ViewerOptions["onNavigate"]>>[0], "by">;
 
 const walked = new WeakMap<HTMLElement, Walked>();
 

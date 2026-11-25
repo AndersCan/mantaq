@@ -7,6 +7,7 @@ import { checkout as checkoutMachine } from "./fixtures/checkout.ts";
 import { stateRouting } from "./fixtures/state-routing.ts";
 import { nestedRegions } from "./fixtures/nested-regions.ts";
 import { stubborn } from "./fixtures/machine-values.ts";
+import { grouped } from "./fixtures/grouped.ts";
 import { timed as timedMachine } from "./fixtures/timed.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven, mountLiveDriven, takeTargets } from "./live-page.ts";
@@ -33,6 +34,21 @@ function setField(root: HTMLElement, options: SetFieldOptions): void {
   if (box === null) throw new Error(`no ${options.field} box`);
   box.value = options.text;
   box.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+async function groupedText(): Promise<string> {
+  const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "grouped.ts"), {
+    load: async () => ({ grouped }),
+    fuzz: false,
+  });
+  return serializeViz(vizDocument(inspected.machines));
+}
+
+/** Clicks `enter` on the payment group node, as a person does. */
+function enterPayment(root: HTMLElement): void {
+  const enter = root.querySelector('.machine-enter[data-enter-group="@payment"]');
+  enter?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+  enter?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
 
 async function documentText(fuzz = false): Promise<string> {
@@ -485,14 +501,24 @@ describe("mountDriven with several machines", () => {
   });
 
   test("clicking a machine shows it and drops the focus path, and the address stays as it was", async () => {
-    history.replaceState(null, "", "?machine=checkout&step=1&focus=basicInfo");
+    history.replaceState(undefined, "", "?machine=grouped");
+    const doc = JSON.parse(await groupedText());
+    const machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
     const root = document.createElement("div");
-    mountDriven(root, { source: "test", text: await twoText(), targets: {} });
-    (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
-    expect(location.search).toBe("?machine=checkout&step=1&focus=basicInfo");
-    const buttons = [...root.querySelectorAll("nav.machines button")] as HTMLButtonElement[];
-    expect(buttons.map((b) => b.disabled)).toEqual([false, true]);
-    expect(root.querySelector(".focus-path")).toBeNull();
+    mountDriven(root, { source: "test", text: JSON.stringify({ ...doc, machines }), targets: {} });
+    enterPayment(root);
+    const entered = root.querySelector(".focus-path") !== null;
+    root.querySelectorAll<HTMLButtonElement>("nav.machines button")[1]?.click();
+    const disabled = [...root.querySelectorAll<HTMLButtonElement>("nav.machines button")].map(
+      (button) => button.disabled,
+    );
+    const path = root.querySelector(".focus-path") !== null;
+    expect({ entered, disabled, path, search: location.search }).toEqual({
+      entered: true,
+      disabled: [false, true],
+      path: false,
+      search: "?machine=grouped",
+    });
   });
 });
 
@@ -518,6 +544,28 @@ describe("mountDriven walk ownership", () => {
     expect({ shown, search: location.search }).toEqual({
       shown: { walked: "shippingAddress", redrawn: "shippingAddress", other: "basicInfo" },
       search: "?machine=checkout",
+    });
+  });
+
+  test("a redraw keeps the group entered and the step taken inside it", async () => {
+    history.replaceState(undefined, "", "?machine=grouped");
+    function live() {
+      const clock = VirtualClock();
+      return { actor: grouped.create({ clock }), clock };
+    }
+    const targets = { grouped: live };
+    const context = { source: "test", text: await groupedText(), targets };
+    const root = document.createElement("div");
+    mountDriven(root, context);
+    enterPayment(root);
+    sendVia(root);
+    const walked = current(root);
+    mountDriven(root, context);
+    const crumbs = [...root.querySelectorAll(".focus-path li")].map((crumb) => crumb.textContent);
+    expect({ walked, redrawn: current(root), crumbs }).toEqual({
+      walked: "chargingCard",
+      redrawn: "chargingCard",
+      crumbs: ["grouped", "payment"],
     });
   });
 
