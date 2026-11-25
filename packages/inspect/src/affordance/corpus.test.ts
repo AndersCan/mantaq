@@ -21,6 +21,7 @@ const FLOORS: Record<string, { stands: number; clicks: number }> = {
   timed: { stands: 21, clicks: 41 },
   lockedDoor: { stands: 24, clicks: 42 },
   photoQueue: { stands: 32, clicks: 82 },
+  order: { stands: 725, clicks: 1774 },
 };
 
 for (const sweepCase of [...exampleCases(), ...fixtureCases()]) {

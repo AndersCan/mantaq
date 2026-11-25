@@ -6,6 +6,7 @@ import { inspect } from "../inspect.ts";
 import { isActor } from "../fuzz/run.ts";
 import { join } from "node:path";
 import { lockedDoor } from "../fixtures/locked-door.ts";
+import { orderMachine } from "../../../examples/order/order.ts";
 import type { Machine } from "@mantaq/core";
 import { parts } from "../fixtures/parts.ts";
 import { photoQueue } from "../fixtures/photo-queue.ts";
@@ -83,7 +84,14 @@ export function exampleCases(): SweepCase[] {
   return cases;
 }
 
-/** Fixtures that draw what the examples do not: a board, a pool's children, regions, shared arrows, groups, a timer, a guard, a queue. */
+/** The order of the group guide: the walk the guide takes into `payment`, out to `delivery`, and back to the shop. */
+function orderCase(): SweepCase {
+  const source = join(EXAMPLE_ROOT, "packages", "examples", "order", "order.ts");
+  const walk = ["placeOrder", "declined", "retryCard", "charged", "shipped", "arrived"];
+  return caseOf(orderMachine, { source, walks: [[...walk, "nobodyAnswered", "sentBack"]] });
+}
+
+/** Fixtures that draw what the examples do not: a board, a pool's children, regions, shared arrows, groups, a timer, a guard, a queue. Then the order of the group guide. */
 export function fixtureCases(): SweepCase[] {
   return [
     fixtureCase(parts, { file: "parts.ts", walks: [["go"]] }),
@@ -97,5 +105,6 @@ export function fixtureCases(): SweepCase[] {
     fixtureCase(timed, { file: "timed.ts", walks: [["start"]] }),
     fixtureCase(lockedDoor, { file: "locked-door.ts", walks: [["pushDoor"]] }),
     fixtureCase(photoQueue, { file: "photo-queue.ts", walks: [['photoAdded={"photoId":"p1"}']] }),
+    orderCase(),
   ];
 }
