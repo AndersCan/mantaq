@@ -36,6 +36,12 @@ describe("payload changes", () => {
     });
   });
 
+  test("a machine id with a colon round-trips", () => {
+    const payloads = { "shop:checkout": { pay: { coupon: "a" } } };
+    const options = { machines: ["shop", "shop:checkout"], shown: "shop" };
+    expect(decodePayloads(encodePayloads(payloads), options)).toEqual(payloads);
+  });
+
   test("an old bare entry belongs to the machine the link opens, also when its event has a colon", () => {
     const decoded = decodePayloads(['pay={"coupon":"a"}', 'step:two={"n":1}'], shop);
     expect(decoded).toEqual({ checkout: { pay: { coupon: "a" }, "step:two": { n: 1 } } });

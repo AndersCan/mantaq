@@ -1,8 +1,7 @@
 import { arrowCandidates, payloadFor } from "../fill.ts";
-import { blockedEdges, sentByParts, whyNotHere } from "../blocked.ts";
-import { currentsOf, localName, walkedChild } from "../compartments.ts";
+import { blockedEdges, leavesElsewhere, sentByParts, whyNotHere } from "../blocked.ts";
+import { currentsOf, walkedChild } from "../compartments.ts";
 import type { EnteredRun, EnteredWalk } from "./entered/entered-walk.ts";
-import { isAnyState, scopeOf } from "../../schema.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type {
   VizActorRef,
@@ -15,6 +14,7 @@ import type {
 import { changedFields } from "../send/payloads.ts";
 import { isNever } from "../../is-never.ts";
 import { movesFrom } from "../../moves.ts";
+import { scopeOf } from "../../schema.ts";
 
 /** `send` also covers a blocked arrow: the click sends, and `blocked` says why the guard will not take the arrow. */
 export type ArrowSend =
@@ -36,13 +36,17 @@ export interface ArrowSendContext {
 function enteredSend(run: EnteredRun, edge: VizEdge): ArrowSend {
   if (edge.kind !== "transition" && edge.kind !== "stay") return { kind: "none" };
   const { machine, current, forward, parent } = run;
-  if (!movesFrom(machine, current).some((move) => move.edge.id === edge.id)) {
-    const source = isAnyState(edge.from) ? "any state" : localName(edge.from);
-    const text = `${edge.event} can't be sent: ${machine.id} is in ${localName(current)}, this arrow leaves ${source}.`;
-    return { kind: "elsewhere", text };
-  }
+  const elsewhere = leavesElsewhere(machine, { edge, current, who: machine.id });
+  if (elsewhere !== undefined) return { kind: "elsewhere", text: elsewhere };
   if (forward.includes(edge.event)) {
     return { kind: "send", actor: run.actor, blocked: undefined };
+  }
+  const internal = machine.events.some((event) => event.id === edge.event && event.internal);
+  if (internal) {
+    return {
+      kind: "refuse",
+      text: `${edge.event} is internal to ${machine.id}: only ${machine.id} sends it.`,
+    };
   }
   const listed = forward.join(", ");
   const forwarded = forward.length === 0 ? "it forwards no events" : `it forwards ${listed}`;

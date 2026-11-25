@@ -52,7 +52,7 @@ test("inside the running scan, a forwarded arrow steps delivery and the scan the
     after: (await reading.getAttribute("class"))?.split(" ").includes("current"),
   }).toStrictEqual({
     current: true,
-    locked: "read can't be sent: delivery does not forward it to scan; it forwards misread.",
+    locked: "read is internal to scan: only scan sends it.",
     steps: ["misread"],
     note: "scan runs only while delivery is in pickingUp. It is in returned now, so scan is shown without its state.",
     after: false,

@@ -68,14 +68,15 @@ export interface DecodeOptions {
   shown: string;
 }
 
-/** Splits `machine:event`; without a known machine in front, the whole head is an event of `shown`. */
+/** Splits `machine:event` at the longest known machine id in front; without one, the whole head is an event of `shown`. */
 function payloadOf(head: string, options: DecodeOptions): PayloadOf {
-  const colon = head.indexOf(":");
-  const machine = head.slice(0, colon);
-  if (colon > 0 && options.machines.includes(machine)) {
-    return { machine, event: head.slice(colon + 1) };
+  let found: string | undefined;
+  for (const machine of options.machines) {
+    const longer = found === undefined || machine.length > found.length;
+    if (head.startsWith(`${machine}:`) && longer) found = machine;
   }
-  return { machine: options.shown, event: head };
+  if (found === undefined) return { machine: options.shown, event: head };
+  return { machine: found, event: head.slice(found.length + 1) };
 }
 
 /** The inverse of `encodePayloads`, also reading old bare entries; an entry with no event, no `=`, or JSON that is not an object is skipped. */

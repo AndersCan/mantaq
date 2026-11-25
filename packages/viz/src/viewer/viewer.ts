@@ -178,6 +178,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   }
   function moved(move: FocusMove): void {
     if (move.before.machine !== move.after.machine) view.selection = null;
+    if (move.before.machine !== move.after.machine) view.sent = undefined;
     navigated(options, { machine, view });
     const entered = enteredBy(move);
     if (entered !== undefined) options.onEnter?.(entered);
