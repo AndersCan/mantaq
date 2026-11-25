@@ -136,10 +136,10 @@ async function checkSplitGuide(site) {
   const errors = [];
   page.on("pageerror", (error) => errors.push(`split: page error: ${error.message}`));
   await page.goto(`${site.origin}${base}guides/split-a-big-machine/`);
-  const failed = await stepThroughOrder(page).then(
-    (found) => found,
-    (error) => [`split: the guide diagram does not step into its machines: ${error.message}`],
-  );
+  const failed = [];
+  await stepThroughOrder({ page, failed }).then(undefined, (error) => {
+    failed.push(`split: the guide diagram does not step into its machines: ${error.message}`);
+  });
   await page.close();
   return [...failed, ...errors];
 }
@@ -149,9 +149,9 @@ function nodeIds(states) {
   return states.evaluateAll((nodes) => nodes.map((node) => node.dataset.nodeId));
 }
 
-/** Enters `payment`, then walks `delivery` to the door and signs; returns what differs. */
-async function stepThroughOrder(page) {
-  const failed = [];
+/** Enters `payment`, then walks `delivery` to the door and signs; pushes what differs to `walk.failed`, so it survives a later timeout. */
+async function stepThroughOrder(walk) {
+  const { page, failed } = walk;
   const machine = page.locator(".mantaq-machine").first();
   const opened = machine.getByRole("navigation", { name: "Machines opened" });
   await machine.locator("g.state.current").first().waitFor({ timeout: 10_000 });
@@ -168,8 +168,8 @@ async function stepThroughOrder(page) {
   }
   await page.keyboard.press("Escape");
   await machine
-    .locator('g.edge[data-edge-id="reviewingOrder-placeOrder-payingForOrder"]')
-    .dispatchEvent("click");
+    .locator('g.edge[data-edge-id="reviewingOrder-placeOrder-payingForOrder"] text')
+    .click();
   await machine
     .locator('g.state.current[data-node-id="shippingOrder"]')
     .waitFor({ timeout: 3_000 });
@@ -179,8 +179,8 @@ async function stepThroughOrder(page) {
   await machine.getByRole("button", { name: "advance 2000 ms → courierArrived" }).click();
   const door = await nodeIds(machine.locator("g.state.current"));
   await machine
-    .locator('g.edge[data-edge-id="waitingAtDoor-signForParcel-parcelHandedOver"]')
-    .dispatchEvent("click");
+    .locator('g.edge[data-edge-id="waitingAtDoor-signForParcel-parcelHandedOver"] text')
+    .click();
   await opened.getByRole("button", { name: "order" }).click();
   const end = await nodeIds(machine.locator("g.state.current"));
   if ([packing, door, end].join(" ") !== "packingParcel waitingAtDoor orderDelivered") {
@@ -188,5 +188,8 @@ async function stepThroughOrder(page) {
       `split: stepping into delivery marks ${packing}, then ${door}, and signForParcel ends in ${end}`,
     );
   }
-  return failed;
+  await page.goto(`${page.url().split("?")[0]}?machine=order&step=placeOrder&focus=shippingOrder`);
+  await machine
+    .locator('g.state.current[data-node-id="packingParcel"]')
+    .waitFor({ timeout: 10_000 });
 }

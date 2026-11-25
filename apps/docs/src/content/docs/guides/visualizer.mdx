@@ -33,7 +33,7 @@ A final state ends the walk. **Back** and **Reset** undo steps. `?machine=checko
 
 On the live page (the Vite plugin) each step runs the real actor, so guards are evaluated.
 
-A state that embeds another machine shows the id of that machine and an **enter** control. Enter draws the embedded machine on its own, without the walk. The walk and its steps stay as they were. The path above the diagram names each machine you opened. Click a name to go back to that machine, or press Escape to go back one. `?focus=` keeps the path in the address bar, so a link opens the same machine.
+A state that embeds another machine shows the id of that machine and an **enter** control. Enter draws the embedded machine on its own. While the walk is in the embedding state, the viewer marks the current state of that machine, and a click on an arrow that the parent forwards sends a step to the parent. In any other state, the viewer draws the machine without its state. See [Split a big machine](../split-a-big-machine/#what-the-viewer-shows). The path above the diagram names each machine you opened. Click a name to go back to that machine, or press Escape to go back one. `?focus=` keeps the path in the address bar, so a link opens the same machine.
 
 ### Nodes
 

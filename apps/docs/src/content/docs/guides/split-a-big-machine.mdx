@@ -122,11 +122,11 @@ An entered machine runs live while the parent is in the state that embeds it. Th
 1. Click the `placeOrder` arrow. The card provider of the page accepts every card, so `order` goes on to `shippingOrder`.
 2. Enter `shippingOrder`. The viewer marks `packingParcel`.
 3. On the **Step** tab, click `advance 1000 ms`, then `advance 2000 ms`. The viewer marks `waitingAtDoor`.
-4. Click the `signForParcel` arrow. `order` forwards `signForParcel`, so the click sends it to `order` as a step of the parent. `delivery` ends in `parcelHandedOver`, and `order` goes to `orderDelivered`.
+4. Click the `signForParcel` arrow. `order` forwards `signForParcel`, so the click sends it to `order` as a step of the parent. `delivery` ends in `parcelHandedOver`, and `order` goes to `orderDelivered`. So the viewer draws `delivery` without a current state. Click `order` in the path to see the end of the walk.
 
 The other arrows out of the current state of the child have a lock and send nothing. Only `delivery` sends `nobodyAnswered`, because it is an internal event of `delivery`. If the parent is in another state, the viewer draws the child without a current state and says why under the diagram. It does the same for an embed without `keep`. After step 1, enter `payingForOrder` to see this: `payment` already ended.
 
-The diagram on this page runs the effects of the example (`runEffects` on `<Machine>`). By default the live panel holds each effect and asks what it reports. It cannot ask that for the effects of a child, so the walk would stop in `parcelOnTheWay`.
+The diagram on this page runs the effects of the example (`runEffects` on `<Machine>`). By default the live panel holds each effect and asks what it reports. It cannot ask that for the effects of a child yet, so the walk would stop in `parcelOnTheWay`. Back and links with steps after `placeOrder` do not replay this walk correctly yet, because the card provider answers after the step.
 
 On the dev server, the machine picker lists only the machines that no other machine embeds. You reach `payment` and `delivery` through their machine nodes.
 

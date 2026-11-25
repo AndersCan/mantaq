@@ -14,8 +14,11 @@ const page = readFileSync(
   join(import.meta.dirname, "content/docs/guides/split-a-big-machine.mdx"),
   "utf8",
 );
-/** Code blocks of the guide; a block with a title (the machine before the split) is not an excerpt. */
-const excerpts = [...page.matchAll(/^```ts\n([\s\S]*?)^```$/gm)].map((match) => match[1] ?? "");
+const before = 'title="order.ts before the split"';
+const blocks = [...page.matchAll(/^```ts(.*)\n([\s\S]*?)^```$/gm)];
+/** Every ts block of the guide is an excerpt, except the machine before the split. */
+const excerptBlocks = blocks.filter((block) => block[1]?.trim() !== before);
+const excerpts = excerptBlocks.map((block) => block[2] ?? "");
 
 /** The code on one line, so the line width of the formatter does not count. */
 function flat(code: string): string {
@@ -41,6 +44,9 @@ function isFromSource(excerpt: string): boolean {
 }
 
 test("each code excerpt of the split guide is in the order example source", () => {
-  expect(excerpts.length).toBeGreaterThan(0);
+  expect({ excerpts: excerpts.length, skipped: blocks.length - excerpts.length }).toStrictEqual({
+    excerpts: 3,
+    skipped: 1,
+  });
   expect(excerpts.filter((excerpt) => !isFromSource(excerpt))).toStrictEqual([]);
 });
