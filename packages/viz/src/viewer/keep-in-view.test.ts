@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { scrollToShow } from "./keep-in-view.ts";
+import { scrollToShow, scrollToShowAround } from "./keep-in-view.ts";
 
 const box = (left: number, max = 5700) => ({ left, width: 300, max });
 
@@ -32,4 +32,40 @@ test.each([
   [{ left: 1990, right: 2030 }, 0, 1600],
 ])("shows rows %j from top %d at %d", (span, top, expected) => {
   expect(scrollToShow(band(top), span)).toBe(expected);
+});
+
+test.each([
+  [
+    "the node and its labels fit: they all show",
+    { left: 500, right: 560 },
+    [{ left: 700, right: 760 }],
+    476,
+  ],
+  [
+    "the labels are too wide: the most whole labels with the node",
+    { left: 500, right: 560 },
+    [
+      { left: 200, right: 260 },
+      { left: 600, right: 660 },
+      { left: 700, right: 760 },
+    ],
+    484,
+  ],
+  [
+    "a tie: the view that moves the least",
+    { left: 500, right: 560 },
+    [
+      { left: 300, right: 360 },
+      { left: 900, right: 960 },
+    ],
+    276,
+  ],
+  [
+    "the node alone is too wide: its start shows",
+    { left: 100, right: 500 },
+    [{ left: 0, right: 60 }],
+    84,
+  ],
+])("%s", (_, node, labels, expected) => {
+  expect(scrollToShowAround(box(0), { node, labels })).toBe(expected);
 });

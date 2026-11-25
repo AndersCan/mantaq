@@ -1,4 +1,11 @@
-import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../graph.ts";
+import {
+  BOARD_PX_PER_UNIT,
+  flowFor,
+  overlapWarning,
+  renderBoard,
+  renderGraph,
+  roomAtFloor,
+} from "../graph.ts";
 import { drawnNodeName, drawnNodeOf } from "../groups/fold-groups.ts";
 import type { EnteredGroup, GraphCallbacks, Selection } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
@@ -46,6 +53,15 @@ interface Landing {
   onto?: string;
   /** Default "path": the reader. "link": the host, following an address. */
   by?: FocusMove["by"];
+}
+
+/** Layout units a graph has across the canvas at the smallest label size; unset while the canvas has no width. */
+function graphRoom(root: HTMLElement): { room?: number } {
+  const doc = root.ownerDocument;
+  const width = (root.querySelector<HTMLElement>(".canvas") ?? root).clientWidth;
+  const style = doc.defaultView?.getComputedStyle(doc.documentElement);
+  const rem = Number.parseFloat(style?.fontSize ?? "") || 16;
+  return width > 0 ? { room: roomAtFloor(width, { rem }) } : {};
 }
 
 /** What the canvas draws for the focus path (a board of boxes, one machine or a group entered), and every move along the path. */
@@ -96,7 +112,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
   /** Focuses the node that draws `state` now: the state, or its group node. */
   function landOn(state: string): void {
     const id = drawnNodeOf(options.focus().drawn, { state });
-    keepInView(root, id);
+    keepInView(root, { node: id, with: "alone" });
     const node = root.querySelector<SVGGElement>(`.graph g[data-node-id="${CSS.escape(id)}"]`);
     if (node === null) return;
     // A plain node takes focus only with a tabindex; -1 keeps it out of the tab order, as a plain node that has focus is.
@@ -108,7 +124,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
       root.querySelector<SVGGElement>(".graph g.state.current") ??
       root.querySelector<SVGGElement>(".graph g.state.initial");
     const id = at?.getAttribute("data-node-id");
-    if (typeof id === "string") keepInView(root, id);
+    if (typeof id === "string") keepInView(root, { node: id, with: "sendable" });
     root.querySelector<HTMLElement>(".focus-path [aria-current]")?.focus({ preventScroll: true });
   }
   function returnTo(left: FocusStep | undefined): void {
@@ -147,14 +163,24 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (focus.canvas === "board") {
       return [renderBoard(doc, focus.machine, { width: drawnUnits, open })];
     }
-    const graph = renderGraph(doc, focus.drawn, { ...options.callbacks(), enter, leave });
+    const graph = renderGraph(doc, focus.drawn, {
+      ...options.callbacks(),
+      enter,
+      leave,
+      ...graphRoom(root),
+    });
     if (focus.part !== undefined) graph.setAttribute("data-zoom", focus.part);
     return [graph];
   }
+  /** Draws again when the drawing no longer suits the canvas width: a board laid out for another width, or a graph whose ranks should run the other way. */
   function refit(): void {
-    if (options.focus().canvas !== "board" || canvasUnits() === drawnUnits) return;
+    const { canvas, drawn: shown } = options.focus();
+    const flow = root.querySelector(".canvas .graph")?.getAttribute("data-flow");
+    const turned = typeof flow === "string" && flowFor(shown, graphRoom(root)) !== flow;
+    if (canvas === "board" ? canvasUnits() === drawnUnits : !turned) return;
     swap();
     options.mark();
+    keepCurrentInView(root, { focus: options.focus(), view });
   }
   return { drawn, refit, framed: titled, walked, back, follow };
 }
@@ -229,10 +255,11 @@ function shownCurrents(from: KeepCurrentOptions): string[] {
   return part === undefined ? live : live.filter((id) => partOf(machine, id) === part);
 }
 
-/** Scrolls to the live state, or the group node that draws it; in a shown machine, to a state drawn there, never the page. */
+/** Scrolls to the live state, or the group node that draws it, with the arrows a click sends from it when they fit; in a shown machine, to a state drawn there, never the page. */
 export function keepCurrentInView(root: HTMLElement, from: KeepCurrentOptions): void {
   const now = shownCurrents(from)[0];
-  if (now !== undefined) keepInView(root, drawnNodeOf(from.focus.drawn, { state: now }));
+  if (now === undefined) return;
+  keepInView(root, { node: drawnNodeOf(from.focus.drawn, { state: now }), with: "sendable" });
 }
 
 /** Where the walk is while a group is entered and the walk is in none of its states; undefined otherwise. */
