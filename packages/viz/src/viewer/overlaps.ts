@@ -648,8 +648,16 @@ export interface MovedLabel {
   label: Box;
 }
 
-/** Counts what a label moved in `layout` comes too near, as `overlapsOf` would report it. */
-export function labelClashCounter(layout: MachineLayout): (moved: MovedLabel) => number {
+/** What a label moved in a layout comes too near, as `overlapsOf` would report it. */
+export interface LabelClashes {
+  /** How many things the label comes too near at `moved.label`. */
+  count: (moved: MovedLabel) => number;
+  /** Keeps the label at `moved.label` for the counts after. */
+  settle: (moved: MovedLabel) => void;
+}
+
+/** The label clashes of `layout`, measured on shapes made once. */
+export function labelClashesOf(layout: MachineLayout): LabelClashes {
   const shapes = shapesOf(layout);
   function count(moved: MovedLabel): number {
     const one = shapes.edges.find((each) => each.id === moved.edge);
@@ -664,7 +672,11 @@ export function labelClashCounter(layout: MachineLayout): (moved: MovedLabel) =>
     }
     return found;
   }
-  return count;
+  function settle(moved: MovedLabel): void {
+    const one = shapes.edges.find((each) => each.id === moved.edge);
+    if (one !== undefined) one.label = moved.label;
+  }
+  return { count, settle };
 }
 
 /** One line per overlap, for a failing assertion's message. */

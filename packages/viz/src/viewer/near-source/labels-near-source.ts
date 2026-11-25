@@ -1,6 +1,7 @@
 import type { LabelBox, MachineLayout, PlacedEdge } from "../layout.ts";
 import { LABEL_PAD } from "../geometry.ts";
-import { labelClashCounter } from "../overlaps.ts";
+import type { LabelClashes } from "../overlaps.ts";
+import { labelClashesOf } from "../overlaps.ts";
 
 /** A point of an arrow's line. */
 type Point = PlacedEdge["points"][number];
@@ -63,16 +64,21 @@ function tries(placed: PlacedEdge, segment: Segment): number[] {
   return places;
 }
 
+interface NearOptions {
+  clashes: LabelClashes;
+}
+
 /** The arrow's label as near the state it leaves as it fits along the line it hangs under, with nothing nearer to it than before. */
-function nearSource(layout: MachineLayout, placed: PlacedEdge): PlacedEdge {
+function nearSource(placed: PlacedEdge, options: NearOptions): PlacedEdge {
   const segment = placed.target === placed.edge.from ? undefined : hungUnder(placed);
-  if (segment === undefined) return placed;
-  const clashes = labelClashCounter(layout);
+  const places = segment === undefined ? [] : tries(placed, segment);
+  if (places.length === 0) return placed;
+  const { count } = options.clashes;
   const edge = placed.edge.id;
-  const now = clashes({ edge, label: placed.label });
-  for (const at of tries(placed, segment)) {
+  const now = count({ edge, label: placed.label });
+  for (const at of places) {
     const moved = shifted(placed, { at });
-    if (clashes({ edge, label: moved.label }) <= now) return moved;
+    if (count({ edge, label: moved.label }) <= now) return moved;
   }
   return placed;
 }
@@ -83,11 +89,13 @@ function nearSource(layout: MachineLayout, placed: PlacedEdge): PlacedEdge {
  * state sends beside it, and a narrow canvas shows them with the state.
  */
 export function labelsNearSource(layout: MachineLayout): MachineLayout {
-  let placed = layout;
-  for (const [index, edge] of layout.edges.entries()) {
-    const moved = nearSource(placed, edge);
-    if (moved === edge) continue;
-    placed = { ...placed, edges: placed.edges.with(index, moved) };
+  const clashes = labelClashesOf(layout);
+  let { edges } = layout;
+  for (const [index, placed] of layout.edges.entries()) {
+    const moved = nearSource(placed, { clashes });
+    if (moved === placed) continue;
+    clashes.settle({ edge: placed.edge.id, label: moved.label });
+    edges = edges.with(index, moved);
   }
-  return placed;
+  return { ...layout, edges };
 }
