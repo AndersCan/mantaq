@@ -590,7 +590,7 @@ export interface FlowOptions {
   room?: number;
 }
 
-/** Left to right when that fits the room or the room is unknown; else top to bottom when that is narrower and overlaps no more. */
+/** Left to right when that fits the room or the room is unknown; else top to bottom when that fits the room and overlaps no more. A turned drawing that is still too wide stays left to right: there the labels of arrows that fan out from one state stack in one column, and the canvas shows them with the state. */
 export function flowFor(machine: VizMachine, options: FlowOptions): Flow {
   const { room } = options;
   const across = Either.getRight(layoutOnce(machine, { flow: "across" }));
@@ -598,8 +598,8 @@ export function flowFor(machine: VizMachine, options: FlowOptions): Flow {
   if (fits || !canTurn(machine)) return "across";
   const down = Either.getRight(layoutOnce(machine, { flow: "down" }));
   if (down === undefined) return "across";
-  const narrower = down.layout.width < across.layout.width;
-  return narrower && down.overlaps.length <= across.overlaps.length ? "down" : "across";
+  const downFits = down.layout.width <= room;
+  return downFits && down.overlaps.length <= across.overlaps.length ? "down" : "across";
 }
 
 /** What a graph is drawn with: what its clicks do, and the room it has. */

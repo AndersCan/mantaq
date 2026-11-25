@@ -8,10 +8,13 @@
 // nothing; a dead button planted on one page must be caught, so a weakened sweep fails too.
 // On the group guide it replays the walk the guide describes at a docs-column and a phone
 // width: into the payment group, enter it, click arrows inside, leave it by an arrow, go
-// back by the path and by the browser's Back. No click needs a sideways scroll first.
+// back by the path and by the browser's Back. No click needs a sideways scroll first, and
+// after each step the labels of the next arrows show in the canvas. The checkout of the
+// visualizer guide is walked the same way, at both widths, the back arrows included.
 // The click sweep also opens the guide with a group entered, by a link.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { GROUP_GUIDE, GROUP_GUIDE_ENTERED, groupWalkFailures } from "./lib/group-walk.mjs";
+import { VISUALIZER_GUIDE, visualizerWalkFailures } from "./lib/next-labels.mjs";
 import { clickFailures } from "./lib/viewer-sweep.mjs";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -127,6 +130,7 @@ try {
 await pool.close();
 
 failures.push(...(await groupWalkFailures({ browser, origin, base })));
+failures.push(...(await visualizerWalkFailures({ browser, origin, base })));
 
 const mustSweep = [...pages, GROUP_GUIDE, ...GROUP_GUIDE_ENTERED];
 const clicks = await clickFailures({ browser, origin, base, dist, mustSweep });
@@ -139,6 +143,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `docs-live-check: ${pages.length} Getting started pages, the pool box and the walk of /${GROUP_GUIDE} run live`,
+  `docs-live-check: ${pages.length} Getting started pages, the pool box and the walks of /${GROUP_GUIDE} and /${VISUALIZER_GUIDE} run live`,
 );
 console.log(`docs-live-check: ${clicks.summary}`);

@@ -1,9 +1,11 @@
 /**
  * Replays the walk of the group guide on the built docs, clicking each button by its
  * label, then Back, Forward and a reload. Each button is in the canvas's view before
- * its click, and the current state after each step. The viewer shows what the guide
- * says, and only a move along the path adds a history entry. Half on screen, the panel does not cover the canvas.
+ * its click, and the current state and the labels of the next arrows after each step.
+ * The viewer shows what the guide says, and only a move along the path adds a history
+ * entry. Half on screen, the panel does not cover the canvas.
  */
+import { unseenLabels } from "./next-labels.mjs";
 
 /** The page of the guide, under the site's base. */
 export const GROUP_GUIDE = "guides/group-states/";
@@ -204,10 +206,10 @@ export async function groupWalkFailures(options) {
   return walks.flat();
 }
 
-/** What the reader would have to scroll for after `options.step`: the current state out of the canvas's view, a machine at the top taller than the window, or an entered group wider than the canvas at a docs-column width. */
+/** What the reader would have to scroll for after `options.step`: the current state or a next arrow's label out of the canvas's view, a machine at the top taller than the window, or an entered group wider than the canvas at a docs-column width. */
 async function viewFailures(options) {
   const { tab, step, screen } = options;
-  const failures = [];
+  const failures = await unseenLabels(tab);
   const current = tab.locator(".viz .graph g.current").first();
   if (!(await current.evaluate(inCanvasView))) {
     failures.push("the state the walk is in is out of the canvas's view");
@@ -233,6 +235,8 @@ async function screenWalk(options) {
   await tab.locator(".viz .graph g.current").first().waitFor({ timeout: MOUNT_MS });
   const start = await tab.evaluate(() => history.length);
   const failures = [];
+  const at = `${GROUP_GUIDE} at ${screen.name} width, at the start`;
+  for (const said of await unseenLabels(tab)) failures.push(`${at}: ${said}`);
   for (const [index, step] of STEPS.entries()) {
     const number = index + 1;
     const where = `${GROUP_GUIDE} at ${screen.name} width, step ${number}`;

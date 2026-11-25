@@ -19,7 +19,7 @@ export interface SayWhyOptions {
 /** Diagram only: the line under the board says what the send of the selected arrow did, by its step number, and why the arrow sends nothing now; empty when there is neither. */
 export function sayWhy(root: HTMLElement, options: SayWhyOptions): void {
   const { from } = options;
-  const { selection, sent } = from.view;
+  const { selection } = from.view;
   const line = root.querySelector(".viz-main > .blocked-note");
   if (line === null) return;
   if (selection?.kind !== "edge") {
@@ -27,7 +27,7 @@ export function sayWhy(root: HTMLElement, options: SayWhyOptions): void {
     return;
   }
   const { edge, click } = drawnArrowClick(from, { shown: options.shown, id: selection.id });
-  const justSent = edge !== undefined && sent?.edge === edge.id;
+  const justSent = edge !== undefined && isJustSent(edge, { view: from.view });
   const step = justSent ? stepLine(root.ownerDocument, from) : [];
   const why = justSent ? from.view.blocked.get(edge.id) : whyOf(click);
   const gap = step.length > 0 && why !== undefined ? ". " : "";
@@ -44,6 +44,15 @@ function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
   const lead = took ? `Step ${number}: ` : "Not sent: ";
   const step = [lead, ...outcomeText(doc, from.machine, last)];
   return last.error ? [...step, `. It threw: ${last.error}`] : step;
+}
+
+export interface JustSentOptions {
+  view: ViewState;
+}
+
+/** True while `edge` is the arrow the newest click sent: the line under the board and Details say what it did, and the arrow keeps the selected look. */
+export function isJustSent(edge: VizEdge | undefined, options: JustSentOptions): boolean {
+  return edge !== undefined && options.view.sent?.edge === edge.id;
 }
 
 /** Why a click on an arrow sends nothing: the one reason text the hover title, the line under the board and its `?` share. */

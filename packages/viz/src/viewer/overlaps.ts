@@ -642,6 +642,43 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
   );
 }
 
+/** A label of `edge` drawn at `label` (centre and size) instead of where the layout put it. */
+interface MovedLabel {
+  edge: string;
+  label: Box;
+}
+
+/** What a label moved in a layout comes too near, as `overlapsOf` would report it. */
+export interface LabelClashes {
+  /** How many things the label comes too near at `moved.label`. */
+  count: (moved: MovedLabel) => number;
+  /** Keeps the label at `moved.label` for the counts after. */
+  settle: (moved: MovedLabel) => void;
+}
+
+/** The label clashes of `layout`, measured on shapes made once. */
+export function labelClashesOf(layout: MachineLayout): LabelClashes {
+  const shapes = shapesOf(layout);
+  function count(moved: MovedLabel): number {
+    const one = shapes.edges.find((each) => each.id === moved.edge);
+    if (one === undefined) return 0;
+    let found = 0;
+    labelOverlaps({ ...one, label: moved.label }, shapes, () => {
+      found += 1;
+    });
+    for (const other of shapes.edges) {
+      if (other.id >= one.id || other.label === null) continue;
+      if (boxToBox(moved.label, other.label) < LABEL_PAD) found += 1;
+    }
+    return found;
+  }
+  function settle(moved: MovedLabel): void {
+    const one = shapes.edges.find((each) => each.id === moved.edge);
+    if (one !== undefined) one.label = moved.label;
+  }
+  return { count, settle };
+}
+
 /** One line per overlap, for a failing assertion's message. */
 export function overlapLines(overlaps: ReadonlyArray<Overlap>): string[] {
   return overlaps.map((o) => `${o.rule}: ${o.a} / ${o.b} (${o.gap}px)`);

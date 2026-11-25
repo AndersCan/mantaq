@@ -89,14 +89,22 @@ describe("a layout whose ranks run down", () => {
 });
 
 describe("the flow a canvas gets", () => {
-  test("across while it fits or the canvas has no width, down when across is too wide and down is narrower", () => {
+  test("across while it fits or the canvas has no width, down when across is too wide and down fits, across again when neither fits", () => {
     const payment = paymentOf(order);
     const across = Either.getRight(layoutMachine(payment))?.layout.width ?? 0;
+    const down = Either.getRight(layoutMachine(payment, { flow: "down" }))?.layout.width ?? 0;
     expect({
       unmeasured: flowFor(payment, {}),
       roomy: flowFor(payment, { room: across }),
       narrow: flowFor(payment, { room: across - 1 }),
+      phone: flowFor(payment, { room: down - 1 }),
       regions: flowFor({ ...payment, regions: ["shop"] }, { room: 1 }),
-    }).toStrictEqual({ unmeasured: "across", roomy: "across", narrow: "down", regions: "across" });
+    }).toStrictEqual({
+      unmeasured: "across",
+      roomy: "across",
+      narrow: "down",
+      phone: "across",
+      regions: "across",
+    });
   });
 });

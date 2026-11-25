@@ -1,6 +1,7 @@
 import { code, elapsed, listOf, outcomeText, sentEventLine } from "../explore.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
 import { arrowSend } from "./arrow-send.ts";
+import { isJustSent } from "./arrow-click.ts";
 import type { ArrowSendContext } from "./arrow-send.ts";
 import type { EventClick } from "./event-send.ts";
 import { html } from "../dom.ts";
@@ -78,7 +79,7 @@ interface SentHereOptions {
 function sentHere(doc: Document, from: SentHereOptions): HTMLElement | undefined {
   const { view, edge } = from;
   const { sent } = view;
-  if (sent?.edge !== edge.id) return undefined;
+  if (sent === undefined || !isJustSent(edge, { view })) return undefined;
   const outcome = sentOutcome(doc, { machine: from.machine, view });
   if (outcome === undefined) return undefined;
   return html(doc, "p", { "data-details-sent": "" }, [...sentEventLine(doc, sent), ...outcome]);

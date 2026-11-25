@@ -4,6 +4,7 @@ import type { VizEdge, VizFuzzMessage, VizMachine, VizState } from "../schema.ts
 import { edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
+import { labelsNearSource } from "./near-source/labels-near-source.ts";
 import { hasQueue } from "./queue.ts";
 import { localName } from "./compartments.ts";
 import { isSharedNode, shareArrows } from "./shared.ts";
@@ -1195,7 +1196,7 @@ export function placeMachine(base: VizMachine, options: LayoutOptions = {}): Mac
     geo.height = Math.max(geo.height, Math.max(...ys) + shift + LABEL_PAD);
     built = assemble(machine, specs, geo, regions);
   }
-  return flow === "down" ? turnedBack(built.layout, machine) : built.layout;
+  return flow === "down" ? turnedBack(built.layout, machine) : labelsNearSource(built.layout);
 }
 
 function pointBack(point: Point): Point {
