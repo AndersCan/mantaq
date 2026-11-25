@@ -24,4 +24,28 @@ describe("machineWithEmbeds", () => {
       scan: ["scan"],
     });
   });
+
+  test("follows embeds two levels down", () => {
+    const chain = [];
+    for (const [id, target] of [
+      ["order", "payment"],
+      ["payment", "receipt"],
+      ["receipt", undefined],
+    ]) {
+      const base = document.machines[0];
+      if (base === undefined || id === undefined) continue;
+      const states = base.states.map((state) => {
+        const copy = { ...state };
+        delete copy.machine;
+        return target === undefined ? copy : { ...copy, machine: target };
+      });
+      chain.push({ ...base, id, states });
+    }
+    const chosen = chain[0];
+    const kept =
+      chosen === undefined
+        ? []
+        : machineWithEmbeds({ ...document, machines: chain }, { machine: chosen });
+    expect(kept.map((machine) => machine.id)).toEqual(["order", "payment", "receipt"]);
+  });
 });
