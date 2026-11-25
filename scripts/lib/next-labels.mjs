@@ -31,18 +31,21 @@ const STEP_MS = 3_000;
 /** How long the viewer may take to mount. */
 const MOUNT_MS = 10_000;
 
-/** Runs in the page: the name of each next arrow whose label is not inside the canvas's view. */
+/** Runs in the page: the name of each next arrow whose label is not inside the canvas's view, or is under the page's sticky header (its `scroll-padding-top`). */
 function labelsOutOfView() {
   const out = [];
   for (const arrow of document.querySelectorAll('.viz .graph g.edge.next[role="button"]')) {
     const canvas = arrow.closest(".canvas");
     const box = canvas.getBoundingClientRect();
+    const covered =
+      Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
     const right = box.left + canvas.clientWidth;
     const bottom = box.top + canvas.clientHeight;
     for (const line of arrow.querySelectorAll(":scope > text")) {
       const rect = line.getBoundingClientRect();
       const across = rect.left >= box.left && rect.right <= right;
-      const shown = across && rect.top >= box.top && rect.bottom <= bottom;
+      const below = rect.top >= Math.max(box.top, covered);
+      const shown = across && below && rect.bottom <= bottom;
       if (!shown) out.push(arrow.getAttribute("aria-label"));
     }
   }
@@ -66,6 +69,8 @@ export async function unseenLabels(tab) {
 async function checkoutWalk(options) {
   const { screen } = options;
   const tab = await options.browser.newPage({ viewport: screen.viewport });
+  const errors = [];
+  tab.on("pageerror", (error) => errors.push(error.message));
   await tab.goto(`${options.origin}${options.base}${VISUALIZER_GUIDE}`);
   await tab.locator(".viz .graph g.current").first().waitFor({ timeout: MOUNT_MS });
   const at = `${VISUALIZER_GUIDE} at ${screen.name} width`;
@@ -83,9 +88,14 @@ async function checkoutWalk(options) {
     }
     const target = name.split(" to ").at(-1);
     const current = tab.locator(`.viz .graph g.current[data-node-id="${target}"]`);
-    await current.waitFor({ timeout: STEP_MS });
+    const moved = await current.waitFor({ timeout: STEP_MS }).then(() => "moved", firstLine);
+    if (moved !== "moved") {
+      failures.push(`${where}: after "${name}" the walk is not in ${target}: ${moved}`);
+      break;
+    }
     for (const said of await unseenLabels(tab)) failures.push(`${where}: ${said}`);
   }
+  for (const error of errors) failures.push(`${VISUALIZER_GUIDE}: page error: ${error}`);
   await tab.close();
   return failures;
 }
