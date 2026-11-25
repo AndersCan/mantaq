@@ -143,10 +143,13 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     rewindView(view, { driver, length });
     walked();
   }
-  function showDetails(selection: Selection): void {
+  function choose(selection: Selection): void {
     view.selection = selection;
     const previewed = view.tab === "screen" && selection.kind === "state";
     if (!previewed) view.tab = "details";
+  }
+  function showDetails(selection: Selection): void {
+    choose(selection);
     refresh();
   }
   function openDetails(selection: Selection): void {
@@ -167,7 +170,17 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     const entered = enteredBy(move);
     if (entered !== undefined) options.onEnterGroup?.(entered);
   }
-  const canvas = canvasOf({ doc, root, view, focus, callbacks, moved, afterSwap: refresh, mark });
+  const canvas = canvasOf({
+    doc,
+    root,
+    view,
+    focus,
+    callbacks,
+    moved,
+    afterSwap: refresh,
+    mark,
+    choose,
+  });
   context.redraws.refit = canvas.refit;
   root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
   canvas.framed();

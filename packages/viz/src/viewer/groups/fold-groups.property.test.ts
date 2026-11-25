@@ -13,6 +13,7 @@ import fc from "fast-check";
 import { groupedArbitrary } from "./grouped.arbitrary.ts";
 import { groupMachine } from "./group-machine.ts";
 import { layoutMachine } from "../layout.ts";
+import { shareArrows } from "../shared.ts";
 
 const run = { seed: 0x6a0, numRuns: 1000 };
 
@@ -110,7 +111,8 @@ function missingFromViews(machine: VizMachine): string[] {
     for (const edge of machine.edges) {
       const anyHere = isAnyState(edge.from) && scopeOf(edge.from) === node.scope;
       const member = [edge.from, edge.to].some((end) => end !== null && node.states.includes(end));
-      const missed = (anyHere || member) && view?.edges.includes(edge) !== true;
+      const drawn = view?.edges.some((each) => each.id === edge.id) === true;
+      const missed = (anyHere || member) && !drawn;
       if (missed) problems.push(`${node.id} misses ${edge.id}`);
     }
   }
@@ -130,6 +132,30 @@ function labelProblems(machine: VizMachine): string[] {
     );
     const unchanged = handler.every((edge) => folded.edges.includes(edge));
     if (!handler.includes(drawn) || !unchanged) problems.push(`${drawn.id} reads a moved handler`);
+  }
+  return problems;
+}
+
+/** Arrows an entered group draws that read "else" while a partner of a handler they stand for is not drawn there. */
+function elseProblems(machine: VizMachine): string[] {
+  const problems: string[] = [];
+  for (const node of groupNodesOf(machine)) {
+    const view = groupMachine(machine, { group: node.id });
+    if (view === undefined) continue;
+    const drawn = new Set(view.edges.map((edge) => edge.id));
+    const shared = shareArrows(view);
+    for (const arrow of shared.edges) {
+      if (!edgeCondition(arrow)?.startsWith("else")) continue;
+      const members = shared.arrows.find((each) => each.id === arrow.id)?.members ?? [arrow];
+      const gone = machine.edges.filter(
+        (other) =>
+          other.kind === "transition" &&
+          other.to !== null &&
+          !drawn.has(other.id) &&
+          members.some((member) => member.from === other.from && member.event === other.event),
+      );
+      if (gone.length > 0) problems.push(`${node.id} reads else on ${arrow.id}`);
+    }
   }
   return problems;
 }
@@ -166,6 +192,15 @@ describe("groups on generated machines", () => {
     fc.assert(
       fc.property(groupedArbitrary, (machine) => {
         expect(labelProblems(machine)).toEqual([]);
+      }),
+      run,
+    );
+  });
+
+  test("G6: an entered group draws an else only with every partner of its handler", () => {
+    fc.assert(
+      fc.property(groupedArbitrary, (machine) => {
+        expect(elseProblems(machine)).toEqual([]);
       }),
       run,
     );

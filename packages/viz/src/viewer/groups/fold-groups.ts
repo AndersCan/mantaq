@@ -1,5 +1,6 @@
-import { actorMapOf, groupNameProblem, scopeOf } from "../../schema.ts";
+import { actorMapOf, groupNameProblem, isAnyState, scopeOf } from "../../schema.ts";
 import type { VizCoverage, VizEdge, VizFuzzMessage, VizMachine, VizState } from "../../schema.ts";
+import { localName } from "../compartments.ts";
 
 /** A group drawn as one node: `<scope>.@<name>`, or `@<name>` at the root, so `scopeOf` stays the members' scope. */
 export interface GroupNode {
@@ -63,6 +64,23 @@ export interface GroupNodeQuery {
 /** The group node a drawn id names; undefined for a state. */
 export function groupNodeAt(machine: VizMachine, options: GroupNodeQuery): GroupNode | undefined {
   return foldedOf(machine).nodes.find((each) => each.id === options.node);
+}
+
+/**
+ * A drawn node as text names it, as the canvas draws it: a group node by its
+ * group's name, an `onAny` source as "any state", a state by its name in its
+ * region, or by its full id when another real state of the machine has that
+ * name, so the fold and the real machine name a state alike.
+ */
+export function drawnNodeName(machine: VizMachine, options: GroupNodeQuery): string {
+  const { node } = options;
+  if (isAnyState(node)) return "any state";
+  const group = groupNodeAt(machine, { node });
+  if (group !== undefined) return `group ${group.name}`;
+  const name = localName(node);
+  const { states } = realMachineOf(machine);
+  const shared = states.some((state) => state.id !== node && localName(state.id) === name);
+  return shared ? node : name;
 }
 
 /** The group nodes of the real machine; its fold gives the same. */
@@ -204,7 +222,7 @@ interface DrawnId extends Arrowing {
 }
 
 /** The real source and event of an edge: one handler. */
-function handlerKey(edge: VizEdge): string {
+export function handlerKey(edge: VizEdge): string {
   return `${edge.from}\u0000${edge.event}`;
 }
 

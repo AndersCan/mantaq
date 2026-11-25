@@ -1,7 +1,8 @@
-import { groupNodesOf, realMachineOf } from "./fold-groups.ts";
+import { groupNodesOf, handlerKey, realMachineOf } from "./fold-groups.ts";
 import { isAnyState, scopeOf } from "../../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../../schema.ts";
 import type { GroupNode } from "./fold-groups.ts";
+import { ownConditionOnly } from "../labels.ts";
 
 /** Each machine's entered groups by node id, so a group entered again is the same machine and keeps its layout. */
 const enteredGroups = new WeakMap<VizMachine, Map<string, VizMachine>>();
@@ -16,8 +17,9 @@ interface GroupQuery {
 
 /**
  * The view inside a group: its own states, the outside states its edges come
- * from or reach as stubs, and the real edges unchanged. The real machine and
- * its fold give the same view. Undefined for an unknown group.
+ * from or reach as stubs, and the real edges, each labelled with its own
+ * condition when its partner branch is left out. The real machine and its fold
+ * give the same view. Undefined for an unknown group.
  */
 export function groupMachine(machine: VizMachine, options: GroupQuery): VizMachine | undefined {
   const real = realMachineOf(machine);
@@ -97,9 +99,20 @@ function holds(region: string, options: Kept): boolean {
   return options.states.some((state) => state.id.startsWith(`${region}.`));
 }
 
+/** The edges that touch the group; one whose handler also moves to a state by an edge the view leaves out labels its own condition, since an "else" needs its partner drawn. */
+function viewEdges(machine: VizMachine, options: Entering): VizEdge[] {
+  const kept = machine.edges.filter((edge) => touches(edge, options));
+  const left = new Set<string>();
+  for (const edge of machine.edges) {
+    const partner = edge.kind === "transition" && edge.to !== null;
+    if (partner && !kept.includes(edge)) left.add(handlerKey(edge));
+  }
+  return kept.map((edge) => (left.has(handlerKey(edge)) ? ownConditionOnly(edge) : edge));
+}
+
 function enter(machine: VizMachine, options: Entering): VizMachine {
   const { node } = options;
-  const edges = machine.edges.filter((edge) => touches(edge, options));
+  const edges = viewEdges(machine, options);
   const states = viewStates(machine, { node, edges });
   const ids = new Set(states.map((state) => state.id));
   for (const edge of edges) if (isAnyState(edge.from)) ids.add(edge.from);

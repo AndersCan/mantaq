@@ -23,11 +23,9 @@ import type {
   WalkInside,
 } from "./layout.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
+import { drawnNodeName } from "./groups/fold-groups.ts";
 import { Either } from "@mantaq/utils";
-import { groupNodeAt } from "./groups/fold-groups.ts";
-import { isAnyState } from "../schema.ts";
 import { isNever } from "../is-never.ts";
-import { localName } from "./compartments.ts";
 import { placeBoard } from "./board.ts";
 import type { Point } from "@dagrejs/dagre";
 
@@ -48,10 +46,6 @@ export interface GraphCallbacks {
 export interface EnteredGroup {
   node: string;
   name: string;
-}
-
-function sourceText(from: string): string {
-  return isAnyState(from) ? "any state" : from;
 }
 
 function classes(names: Record<string, boolean>): string {
@@ -202,7 +196,8 @@ function stateGroup(placed: PlacedState | PlacedMachine, options: NodeOptions): 
 function stubTitle(state: string, options: NodeOptions): SVGTitleElement[] {
   const group = enteredGroupOf(options.drawn);
   if (group === undefined || group.states.includes(state)) return [];
-  const outside = `${localName(state)} is outside group ${group.name}.`;
+  const name = drawnNodeName(options.drawn, { node: state });
+  const outside = `${name} is outside group ${group.name}.`;
   const shown =
     options.callbacks.leave === undefined
       ? outside
@@ -226,10 +221,7 @@ function anyAria(placed: PlacedAny, options: NodeOptions): string {
   if (placed.states.length === 0) return "any non-final state (onAny handlers)";
   if (placed.label === "any state") return "any state";
   const names: string[] = [];
-  for (const id of placed.states) {
-    const group = groupNodeAt(options.drawn, { node: id });
-    names.push(group === undefined ? localName(id) : `group ${group.name}`);
-  }
+  for (const node of placed.states) names.push(drawnNodeName(options.drawn, { node }));
   const listed = names.join(", ");
   return `these ${placed.states.length} states: ${listed}`;
 }
@@ -336,7 +328,7 @@ function machineGroup(placed: PlacedMachine, options: NodeOptions): SVGGElement 
   );
   state.append(machineGlyph(placed, options), name);
   const names: string[] = [];
-  for (const id of holds.states) names.push(localName(id));
+  for (const node of holds.states) names.push(drawnNodeName(options.drawn, { node }));
   const listed = names.join(", ");
   state.setAttribute("aria-label", `group ${holds.group}, ${count}: ${listed}`);
   state.setAttribute("data-states", JSON.stringify(holds.states));
@@ -390,20 +382,15 @@ interface AriaOptions {
   sources: number | undefined;
 }
 
-/** A drawn end as a sentence names it: a group node by its group's name. */
-function endText(id: string, options: AriaOptions): string {
-  const node = groupNodeAt(options.machine, { node: id });
-  return node === undefined ? sourceText(id) : `group ${node.name}`;
-}
-
 function edgeAria(edge: VizEdge, options: AriaOptions): string {
   const text = edge.event;
-  const target = edge.to === null ? "undetermined" : endText(edge.to, options);
+  const { machine } = options;
+  const target = edge.to === null ? "undetermined" : drawnNodeName(machine, { node: edge.to });
   const when = whenText(edge);
   if (options.sources !== undefined) {
     return `${options.sources} states on ${text} to ${target}${when}`;
   }
-  const from = endText(edge.from, options);
+  const from = drawnNodeName(machine, { node: edge.from });
   if (edge.kind === "stay") return `${from} on ${text} stays`;
   return `${from} on ${text} to ${target}${when}`;
 }

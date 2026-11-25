@@ -1,9 +1,9 @@
 import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../graph.ts";
-import { currentsOf, localName } from "../compartments.ts";
-import type { EnteredGroup, GraphCallbacks } from "../graph.ts";
+import { drawnNodeName, drawnNodeOf } from "../groups/fold-groups.ts";
+import type { EnteredGroup, GraphCallbacks, Selection } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
-import { drawnNodeOf } from "../groups/fold-groups.ts";
+import { currentsOf } from "../compartments.ts";
 import { enteredGroupOf } from "../groups/group-machine.ts";
 import { html } from "../dom.ts";
 import { keepInView } from "../keep-in-view.ts";
@@ -22,6 +22,8 @@ export interface CanvasOptions {
   moved: (move: FocusMove) => void;
   afterSwap: () => void;
   mark: () => void;
+  /** Selects what a move lands on, so the next draw rings it and shows its Details. */
+  choose: (selection: Selection) => void;
 }
 
 export interface Canvas {
@@ -131,6 +133,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     moveTo([...options.focus().steps, { kind: "enter", node, name }]);
   }
   function leave(state: string): void {
+    options.choose({ kind: "state", id: state });
     moveTo(options.focus().steps.slice(0, -1), { onto: state });
   }
   function drawn(): Node[] {
@@ -219,7 +222,7 @@ function outsideText(from: KeepCurrentOptions): string | undefined {
   if (group === undefined || currents.length === 0) return undefined;
   if (currents.some((state) => group.states.includes(state))) return undefined;
   const names: string[] = [];
-  for (const state of currents) names.push(localName(state));
+  for (const node of currents) names.push(drawnNodeName(from.focus.drawn, { node }));
   const listed = names.join(", ");
   const drawn = currents.some((state) => from.focus.drawn.states.some((each) => each.id === state));
   const hint = drawn ? "" : " Go back to walk on.";

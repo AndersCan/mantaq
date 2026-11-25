@@ -35,7 +35,20 @@ export function markDiagram(root: HTMLElement, context: MarkDiagramContext): voi
     const state = drawnNodeOf(context.shown, { state: view.live.state });
     drawQueue(graph, { state, queue: queueOf(machine, view.live.context) });
   }
-  markSelection(root, { selection: view.selection });
+  markSelection(root, { selection: drawnSelection(view.selection, { shown: context.shown }) });
+}
+
+interface ShownOptions {
+  shown: VizMachine;
+}
+
+/** A selected state as drawn: its group node when the canvas folds it into one. */
+function drawnSelection(
+  selection: Selection | undefined,
+  options: ShownOptions,
+): Selection | undefined {
+  if (selection?.kind !== "state") return selection;
+  return { kind: "state", id: drawnNodeOf(options.shown, { state: selection.id }) };
 }
 
 /** A state is a button while a click opens its Details in a panel that is shown; an arrow, while a click sends it. Every other arrow says why on hover. A stub's look is its own: it goes back where it can. */

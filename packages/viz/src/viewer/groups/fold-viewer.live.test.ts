@@ -191,6 +191,128 @@ describe("a grouped machine in the viewer", () => {
     });
   });
 
+  test("Details of a group node names each arrow end as the canvas does, and lists a move inside the group once", () => {
+    const { root } = mount();
+    click(root.querySelector('.graph g.state[data-node-id="@payment"]'));
+    const rows: Record<string, string[]> = {};
+    for (const row of root.querySelectorAll(".details dd")) {
+      const links: string[] = [];
+      for (const link of row.querySelectorAll("[data-edge-link], [data-state-link]")) {
+        links.push(link.textContent);
+      }
+      rows[row.getAttribute("data-field") ?? ""] = links;
+    }
+    expect(rows).toStrictEqual({
+      states: ["chargingCard", "confirming"],
+      outgoing: ["group payment —cancel→ inCart", "group payment —confirmed→ group shipping"],
+      incoming: ["inCart —checkout→ group payment"],
+      inside: ["group payment —charged→ group payment"],
+    });
+  });
+
+  test("in a region, Details and the shared node name each state as the canvas draws it", () => {
+    const states = [
+      stateOf("order.inCart", { initial: true }),
+      stateOf("order.chargingCard", { group: "payment" }),
+      stateOf("order.confirming", { group: "payment" }),
+      stateOf("order.paid"),
+      stateOf("order.shipped"),
+      stateOf("order.cancelled", { final: true }),
+    ];
+    const edges = [
+      edgeOf("order.inCart", { event: "checkout", to: "order.chargingCard" }),
+      edgeOf("order.confirming", { event: "confirmed", to: "order.paid" }),
+    ];
+    for (const from of ["order.inCart", "order.chargingCard", "order.confirming", "order.paid"]) {
+      edges.push(edgeOf(from, { event: "abort", to: "order.cancelled" }));
+    }
+    const order = machineOf({ regions: ["order"], states, edges });
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [order] });
+    click(root.querySelector('.graph g.state[data-node-id="order.@payment"]'));
+    const links: string[] = [];
+    for (const link of root.querySelectorAll("[data-edge-link]")) links.push(link.textContent);
+    const shared = root.querySelector(".graph g.any-node")?.getAttribute("aria-label");
+    const rows: string[] = [];
+    for (const row of root.querySelectorAll(".details dd")) {
+      rows.push(row.getAttribute("data-field") ?? "");
+    }
+    click(root.querySelector('[data-state-link="order.confirming"]'));
+    expect({
+      links,
+      shared,
+      rows,
+      title: root.querySelector(".details h2")?.textContent,
+      ringed: root.querySelector(".graph g.selected[data-node-id]")?.getAttribute("data-node-id"),
+    }).toStrictEqual({
+      rows: ["states", "outgoing", "incoming"],
+      title: "State confirming",
+      ringed: "order.@payment",
+      links: [
+        "group payment —confirmed→ paid",
+        "group payment —abort→ cancelled",
+        "inCart —checkout→ group payment",
+      ],
+      shared: "these 3 states: inCart, group payment, paid",
+    });
+  });
+
+  test("two parallel regions that reuse a state name keep the region in arrow names", () => {
+    const parallel = machineOf({
+      regions: ["left", "right"],
+      states: [
+        stateOf("left.idle", { initial: true }),
+        stateOf("left.done", { group: "finish" }),
+        stateOf("left.idle2", { group: "finish" }),
+        stateOf("right.idle", { initial: true }),
+        stateOf("right.done"),
+        stateOf("right.paused"),
+      ],
+      edges: [
+        edgeOf("left.idle", { event: "go", to: "left.done" }),
+        edgeOf("right.idle", { event: "go", to: "right.done" }),
+        edgeOf("right.done", { event: "rest", to: "right.paused" }),
+        edgeOf("right.paused", { event: "wake", to: "right.idle" }),
+      ],
+    });
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [parallel] });
+    const names: string[] = [];
+    for (const edge of root.querySelectorAll(".graph g.edge")) {
+      names.push(edge.getAttribute("aria-label") ?? "");
+    }
+    click(
+      root.querySelector(
+        '.graph g.edge[data-edge-id="right.paused-wake-right.idle"] ~ g.edge-help',
+      ),
+    );
+    expect({ names, title: root.querySelector(".details h2")?.textContent }).toStrictEqual({
+      names: [
+        "left.idle on go to group finish",
+        "right.idle on go to right.done",
+        "right.done on rest to paused",
+        "paused on wake to right.idle",
+      ],
+      title: "paused —wake→ right.idle",
+    });
+  });
+
+  test("a state picked in Details of a group node rings the group node", () => {
+    const { root } = mount();
+    click(root.querySelector('.graph g.state[data-node-id="@payment"]'));
+    click(root.querySelector('[data-state-link="confirming"]'));
+    const ringed: string[] = [];
+    for (const node of root.querySelectorAll(".graph g.selected[data-node-id]")) {
+      ringed.push(node.getAttribute("data-node-id") ?? "");
+    }
+    expect({
+      ringed,
+      details: root.querySelector("[data-selected-state]")?.getAttribute("data-selected-state"),
+    }).toStrictEqual({ ringed: ["@payment"], details: "confirming" });
+  });
+
   test("a node that shares an arrow out of a group is current while the walk is inside the group", () => {
     const states = [...shop.states, stateOf("refunding"), stateOf("cancelled", { final: true })];
     const edges = [...shop.edges];

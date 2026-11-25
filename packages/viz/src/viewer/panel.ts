@@ -1,11 +1,11 @@
-import { coveredByAny, isAnyState } from "../schema.ts";
+import { coveredByAny } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { localName } from "./compartments.ts";
 import { activatable, html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 import { edgeCondition } from "./labels.ts";
 import { isDrawn } from "./layout.ts";
-import { groupArrowsOf, groupNodeAt, realMachineOf } from "./groups/fold-groups.ts";
+import { drawnNodeName, groupArrowsOf, groupNodeAt, realMachineOf } from "./groups/fold-groups.ts";
 import type { GroupArrow, GroupNode } from "./groups/fold-groups.ts";
 import { realMembersOf } from "./groups/acting-member.ts";
 import { shareArrows } from "./shared.ts";
@@ -25,47 +25,56 @@ function list(doc: Document, rows: ReadonlyArray<Row>): HTMLDListElement {
   );
 }
 
-function sourceText(from: string): string {
-  return isAnyState(from) ? "any state" : from;
+interface EdgeListOptions {
+  /** The machine the edges are drawn in, so each end reads as the canvas names it. */
+  machine: VizMachine;
+  select: (selection: Selection) => void;
+  /** Whether each link shows its edge's condition, which tells apart the edges of one event. */
+  conditions: "shown" | "hidden";
 }
 
-function edgeLink(
-  doc: Document,
-  edge: VizEdge,
-  select: (selection: Selection) => void,
-  withCondition: boolean,
-): HTMLLIElement {
-  const condition = withCondition ? edgeCondition(edge) : null;
-  const when = condition === null ? "" : ` [${condition}]`;
+interface EdgeLinkOptions extends EdgeListOptions {
+  edge: VizEdge;
+}
+
+function edgeLink(doc: Document, options: EdgeLinkOptions): HTMLLIElement {
+  const { edge, machine, select } = options;
+  const condition = options.conditions === "shown" ? edgeCondition(edge) : undefined;
+  const when = typeof condition === "string" ? ` [${condition}]` : "";
+  const from = drawnNodeName(machine, { node: edge.from });
+  const target = typeof edge.to === "string" ? drawnNodeName(machine, { node: edge.to }) : "?";
   const link = html(doc, "span", { class: "link", "data-edge-link": edge.id }, [
-    `${sourceText(edge.from)} —${edge.event}${when}→ ${edge.to ?? "?"}`,
+    `${from} —${edge.event}${when}→ ${target}`,
   ]);
   activatable(link, () => select({ kind: "edge", id: edge.id }));
   return html(doc, "li", {}, [link]);
 }
 
-function edgeList(
-  doc: Document,
-  edges: ReadonlyArray<VizEdge>,
-  select: (selection: Selection) => void,
-  withCondition: boolean,
-): Node | string {
+interface EdgesOptions extends EdgeListOptions {
+  edges: ReadonlyArray<VizEdge>;
+}
+
+function edgeList(doc: Document, options: EdgesOptions): Node | string {
+  const { edges } = options;
   if (edges.length === 0) return "none";
-  return html(
-    doc,
-    "ul",
-    {},
-    edges.map((edge) => edgeLink(doc, edge, select, withCondition)),
-  );
+  const links: HTMLLIElement[] = [];
+  for (const edge of edges) links.push(edgeLink(doc, { ...options, edge }));
+  return html(doc, "ul", {}, links);
+}
+
+interface DrawnIn {
+  /** The machine the edge is drawn in. */
+  machine: VizMachine;
 }
 
 /** `idle —apply [score < 600]→ rejected`: the edge as the diagram draws it, with its condition. */
-function edgeTitle(edge: VizEdge): string {
-  const from = isAnyState(edge.from) ? "any state" : localName(edge.from);
-  const to = edge.to === null ? "?" : localName(edge.to);
+function edgeTitle(edge: VizEdge, options: DrawnIn): string {
+  const { machine } = options;
+  const from = drawnNodeName(machine, { node: edge.from });
+  const target = typeof edge.to === "string" ? drawnNodeName(machine, { node: edge.to }) : "?";
   const condition = edgeCondition(edge);
   const when = condition === null ? "" : ` [${condition}]`;
-  return `${from} —${edge.event}${when}→ ${to}`;
+  return `${from} —${edge.event}${when}→ ${target}`;
 }
 
 /** The other arrows of this edge's event from the same state, in the order the code branches. */
@@ -105,41 +114,37 @@ function edgePanel(doc: Document, options: EdgePanelOptions): HTMLElement {
   const { edge, machine, select, send } = options;
   const siblings = sameEvent(machine, edge);
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
-    html(doc, "h2", {}, [edgeTitle(edge)]),
+    html(doc, "h2", {}, [edgeTitle(edge, { machine })]),
     send?.(edge) ?? null,
     docLine(doc, "edge", edge.doc),
     siblings.length === 0
       ? null
-      : list(doc, [["same event", edgeList(doc, siblings, select, true)]]),
+      : list(doc, [
+          ["same event", edgeList(doc, { edges: siblings, machine, select, conditions: "shown" })],
+        ]),
   ]);
+}
+
+interface SharedPanelOptions {
+  arrow: SharedArrow;
+  /** The drawn machine the arrow is shared in. */
+  machine: VizMachine;
+  select: (selection: Selection) => void;
 }
 
 /** One arrow several states share: the states, each a link to its own arrow. */
-function sharedPanel(
-  doc: Document,
-  arrow: SharedArrow,
-  select: (selection: Selection) => void,
-): HTMLElement {
+function sharedPanel(doc: Document, options: SharedPanelOptions): HTMLElement {
+  const { arrow, machine, select } = options;
   const { drawn, members } = arrow;
-  const to = drawn.to === null ? "?" : localName(drawn.to);
+  const target = typeof drawn.to === "string" ? drawnNodeName(machine, { node: drawn.to }) : "?";
   const condition = edgeCondition(drawn);
   const when = condition === null ? "" : ` [${condition}]`;
+  const title = `${members.length} states —${arrow.event}${when}→ ${target}`;
   return html(doc, "section", { class: "details", "data-selected-edge": arrow.id }, [
-    html(doc, "h2", {}, [`${members.length} states —${arrow.event}${when}→ ${to}`]),
-    edgeList(doc, members, select, false),
+    html(doc, "h2", {}, [title]),
+    edgeList(doc, { edges: members, machine, select, conditions: "hidden" }),
     docLine(doc, "edge", members[0]?.doc ?? null),
   ]);
-}
-
-interface FoldOf {
-  machine: VizMachine;
-}
-
-/** A drawn end of a fold as Details names it: a group node by its group's name. */
-function endName(id: string | null, options: FoldOf): string {
-  if (id === null) return "?";
-  const node = groupNodeAt(options.machine, { node: id });
-  return node === undefined ? localName(id) : `group ${node.name}`;
 }
 
 interface GroupArrowOptions {
@@ -152,12 +157,13 @@ interface GroupArrowOptions {
 function groupArrowPanel(doc: Document, options: GroupArrowOptions): HTMLElement {
   const { arrow, machine, select } = options;
   const { drawn, members } = arrow;
-  const from = isAnyState(drawn.from) ? "any state" : endName(drawn.from, { machine });
-  const target = endName(drawn.to, { machine });
+  const from = drawnNodeName(machine, { node: drawn.from });
+  const target = typeof drawn.to === "string" ? drawnNodeName(machine, { node: drawn.to }) : "?";
   const title = `${from} —${drawn.event}→ ${target}`;
+  const edges = edgeList(doc, { edges: members, machine, select, conditions: "shown" });
   return html(doc, "section", { class: "details", "data-selected-edge": arrow.id }, [
     html(doc, "h2", {}, [title]),
-    list(doc, [["edges", edgeList(doc, members, select, true)]]),
+    list(doc, [["edges", edges]]),
   ]);
 }
 
@@ -167,33 +173,61 @@ interface GroupPanelOptions {
   select: (selection: Selection) => void;
 }
 
-/** A group folded into one node: its states, each a link to its own Details, and the arrows drawn in and out. */
+/** Where a drawn arrow runs relative to a group node: out of it, into it, or a loop on it, which is a move between its own states. */
+type GroupSide = "outgoing" | "incoming" | "inside";
+
+interface SideOptions {
+  node: string;
+}
+
+function sideOf(edge: VizEdge, options: SideOptions): GroupSide | undefined {
+  const { node } = options;
+  const leaves = edge.from === node;
+  const reaches = edge.to === node;
+  if (leaves && reaches) return "inside";
+  if (leaves) return "outgoing";
+  return reaches ? "incoming" : undefined;
+}
+
+/** A group folded into one node: its states, each a link to its own Details, and the arrows drawn out, in and inside it, each once. */
 function groupPanel(doc: Document, options: GroupPanelOptions): HTMLElement {
   const { node, machine, select } = options;
   const links: HTMLLIElement[] = [];
   for (const id of node.states) {
-    const link = html(doc, "span", { class: "link", "data-state-link": id }, [localName(id)]);
+    const name = drawnNodeName(machine, { node: id });
+    const link = html(doc, "span", { class: "link", "data-state-link": id }, [name]);
     activatable(link, () => select({ kind: "state", id }));
     links.push(html(doc, "li", {}, [link]));
   }
-  const outgoing = machine.edges.filter((edge) => isDrawn(edge) && edge.from === node.id);
-  const incoming = machine.edges.filter((edge) => isDrawn(edge) && edge.to === node.id);
+  const sides = new Map<GroupSide, VizEdge[]>();
+  for (const edge of machine.edges) {
+    const side = isDrawn(edge) ? sideOf(edge, { node: node.id }) : undefined;
+    if (side !== undefined) sides.set(side, [...(sides.get(side) ?? []), edge]);
+  }
+  function edgesOn(side: GroupSide): Node | string {
+    const edges = sides.get(side) ?? [];
+    return edgeList(doc, { edges, machine, select, conditions: "hidden" });
+  }
+  const inside: Row[] = sides.has("inside") ? [["inside", edgesOn("inside")]] : [];
   return html(doc, "section", { class: "details", "data-selected-state": node.id }, [
     html(doc, "h2", {}, [`Group ${node.name}`]),
     list(doc, [
       ["states", html(doc, "ul", {}, links)],
-      ["outgoing", edgeList(doc, outgoing, select, false)],
-      ["incoming", edgeList(doc, incoming, select, false)],
+      ["outgoing", edgesOn("outgoing")],
+      ["incoming", edgesOn("incoming")],
+      ...inside,
     ]),
   ]);
 }
 
-function statePanel(
-  doc: Document,
-  state: VizState,
-  context: { machine: VizMachine; select: (selection: Selection) => void },
-): HTMLElement {
-  const { machine, select } = context;
+interface StatePanelOptions {
+  state: VizState;
+  machine: VizMachine;
+  select: (selection: Selection) => void;
+}
+
+function statePanel(doc: Document, options: StatePanelOptions): HTMLElement {
+  const { state, machine, select } = options;
   const outgoing = machine.edges.filter(
     (edge) =>
       isDrawn(edge) &&
@@ -201,11 +235,11 @@ function statePanel(
   );
   const incoming = machine.edges.filter((edge) => isDrawn(edge) && edge.to === state.id);
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
-    html(doc, "h2", {}, [`State ${state.id}`]),
+    html(doc, "h2", {}, [`State ${drawnNodeName(machine, { node: state.id })}`]),
     docLine(doc, "state", state.doc),
     list(doc, [
-      ["outgoing", edgeList(doc, outgoing, select, false)],
-      ["incoming", edgeList(doc, incoming, select, false)],
+      ["outgoing", edgeList(doc, { edges: outgoing, machine, select, conditions: "hidden" })],
+      ["incoming", edgeList(doc, { edges: incoming, machine, select, conditions: "hidden" })],
     ]),
   ]);
 }
@@ -266,11 +300,11 @@ function selectedPanel(doc: Document, options: RenderPanelOptions): HTMLElement 
         return withLine(groupArrowPanel(doc, { arrow: grouped, machine, select }), { line });
       }
       const arrow = shareArrows(machine).arrows.find((candidate) => candidate.id === id);
-      return arrow && withLine(sharedPanel(doc, arrow, select), { line });
+      return arrow && withLine(sharedPanel(doc, { arrow, machine, select }), { line });
     }
     case "state": {
       const state = real.states.find((candidate) => candidate.id === id);
-      if (state) return statePanel(doc, state, { machine: real, select });
+      if (state) return statePanel(doc, { state, machine: real, select });
       const node = groupNodeAt(machine, { node: selection.id });
       return node && groupPanel(doc, { node, machine, select });
     }

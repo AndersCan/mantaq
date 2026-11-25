@@ -84,6 +84,15 @@ function idsOf(elements: Iterable<Element>, options: IdsOptions): string[] {
   return ids;
 }
 
+/** The drawn nodes and arrows that show the selection ring. */
+function ringed(root: HTMLElement): string[] {
+  const ids: string[] = [];
+  for (const each of root.querySelectorAll(".canvas g.selected:is(.state, .edge)")) {
+    ids.push(each.getAttribute("data-node-id") ?? each.getAttribute("data-edge-id") ?? "");
+  }
+  return ids;
+}
+
 /** What the viewer shows: the states drawn, which are stubs, the path above, the walk and what a click sends. */
 function shown(root: HTMLElement) {
   const crumbs: string[] = [];
@@ -201,14 +210,36 @@ describe("entering a group", () => {
     });
   });
 
-  test("a stub goes back, onto the node that draws its state", () => {
+  test("a stub goes back, onto the node that draws its state, selected with its Details open", () => {
     const { root } = mount();
     enter(root, { id: "@payment" });
     press(node(root, { id: "packing" }));
     expect({
       shown: shown(root),
       focused: root.ownerDocument.activeElement?.getAttribute("data-node-id"),
-    }).toStrictEqual({ shown: atShop, focused: "@shipping" });
+      ringed: ringed(root),
+      details: root.querySelector("[data-selected-state]")?.getAttribute("data-selected-state"),
+    }).toStrictEqual({
+      shown: atShop,
+      focused: "@shipping",
+      ringed: ["@shipping"],
+      details: "packing",
+    });
+  });
+
+  test("the arrow just taken keeps its ring when the group is entered and left", () => {
+    const { root } = mount();
+    press(arrow(root, { id: "inCart-checkout-chargingCard" }));
+    const taken = ringed(root);
+    enter(root, { id: "@payment" });
+    const entered = ringed(root);
+    press(arrow(root, { id: "chargingCard-charged-confirming" }));
+    escape(root.querySelector(".canvas svg"));
+    expect({ taken, entered, left: ringed(root) }).toStrictEqual({
+      taken: ["inCart-checkout-chargingCard"],
+      entered: ["inCart-checkout-chargingCard"],
+      left: ["chargingCard-charged-confirming"],
+    });
   });
 });
 
