@@ -44,7 +44,7 @@ carry data alongside "where it is". Everything below describes that model.
 | **Final state** | A state that means "done". Entering it ends the machine. | `state("success")().final()`. Entering it signals completion. |
 | **Extended state** | Data the machine carries next to its current state. The "machine" and its "data" are two different things. | `context`. Survives transitions, read and written by handlers. |
 | **Active state configuration** | The full picture of where the machine is, including nested and parallel states. | `actor.snapshot()`. The live state tree. |
-| **Compound state** | A state that contains other states. A machine inside a machine. | A child `Actor` attached to a parent. |
+| **Compound state** | A state that contains other states. A machine inside a machine. | A state that runs another machine with `embed` from `@mantaq/sugar`. The child is built when the parent enters the state and disposed when the parent leaves it. Its final states and `__error` reach the parent as events. The viz draws the state as one machine node that you can enter. Use it to split a big machine. |
 | **Orthogonal regions** | Parallel parts of a machine, all running at the same time. | Peer child actors in `regions`. They are always active, not tied to a parent state. |
 | **History state** | A mark that remembers the last active substate, so a return picks up where the machine left off. | Not supported. |
 | **Choice** | A branch point decided by conditions at the moment the event arrives. | Branching in a handler (`if` on the current state or data). |

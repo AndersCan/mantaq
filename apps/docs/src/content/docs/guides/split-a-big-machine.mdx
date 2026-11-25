@@ -1,0 +1,154 @@
+---
+title: Split a big machine
+description: Split a machine that grew too big into a parent that embeds smaller machines, with embed from @mantaq/sugar.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+import orderSource from "../../../../../../packages/examples/order/order.ts?raw";
+import paymentSource from "../../../../../../packages/examples/order/payment.ts?raw";
+import deliverySource from "../../../../../../packages/examples/order/delivery.ts?raw";
+
+## What
+
+`embed` from `@mantaq/sugar` runs a second machine while the parent machine is in one state. You use it to split a big machine into a parent and a few small child machines.
+
+## Why
+
+A machine grows one state at a time. After some time it has more than about 12 states. The same handler is registered in a loop over many states, and the diagram is too full to read. A group of states that only talk to each other is a machine of its own. When you move each group into its own machine, each diagram stays small and each machine gets its own tests. The parent shows only the steps of the journey.
+
+## How
+
+<div data-pagefind-ignore>
+
+<Machine src="../../packages/examples/order/order.ts" />
+
+</div>
+
+The diagram shows the parent machine `order`. `payingForOrder` and `shippingOrder` are machine nodes. A machine node is one state with its arrows in and out. Under its name it shows the id of the machine it embeds (`payment` or `delivery`) and an enter control. Enter `payingForOrder` to see the states of `payment`, or open [`payment` inside `order`](?machine=order&focus=payingForOrder) from a link.
+
+### The machine before the split
+
+Before the split, `order` was one machine with 10 states: `reviewingOrder`, `chargingCard`, `couldNotChargeCard`, `packingParcel`, `parcelOnTheWay`, `waitingAtDoor`, `orderDelivered`, `orderReturned`, `orderCancelled` and `couldNotCompleteOrder`. The shopper can cancel before the money is taken, so the cancel handler was registered in a loop:
+
+```ts
+for (const cancellable of [reviewingOrder, chargingCard, couldNotChargeCard]) {
+  builder.on(cancellable, {
+    event: cancelOrder,
+    to: [orderCancelled],
+    handler: () => ({ state: orderCancelled }),
+  });
+}
+```
+
+The example is small on purpose. It has fewer than 12 states, but it shows the other two signs. The card states only send events to each other, and so do the parcel states. Each group has one way in and a few ways out, and the cancel loop goes over the card states. So each group is a machine:
+
+- `payment` holds `chargingCard`, `couldNotChargeCard` and the final state `paymentTaken`.
+- `delivery` holds `packingParcel`, `parcelOnTheWay`, `waitingAtDoor` and the final states `parcelHandedOver` and `parcelTakenBack`.
+- `order` keeps the journey. `payingForOrder` embeds `payment`, and `shippingOrder` embeds `delivery`.
+
+### Map the ends of the child to parent events
+
+```ts
+embed(builder, {
+  in: shippingOrder,
+  machine: delivery,
+  done: { parcelHandedOver: parcelDelivered, parcelTakenBack: parcelReturned },
+  error: deliveryBroke,
+  forward: [signForParcel],
+});
+builder.on(shippingOrder, {
+  event: parcelDelivered,
+  to: [orderDelivered],
+  handler: () => ({ state: orderDelivered }),
+});
+```
+
+When the parent enters `shippingOrder`, embed builds `delivery` with the clock of the parent. When the parent leaves `shippingOrder`, embed disposes the child.
+
+`done` maps each final state of the child to an internal event of the parent. When `delivery` enters `parcelHandedOver`, the parent receives `parcelDelivered`. The types reject a `done` that does not name every final state of the child.
+
+If the child enters `__error`, the parent receives the `error` event. If one of its effects or handlers throws, the child enters `__error`. In `order`, `paymentBroke` and `deliveryBroke` take the order to `couldNotCompleteOrder`. `order.error.test.ts` reaches it with a card provider that throws.
+
+The parent handles the `done` and `error` events with ordinary `builder.on` calls, so the diagram draws their arrows. The `done` and `error` events have no payload.
+
+### Forward the events of the screen
+
+The courier device sends `signForParcel` to the order actor, because the app holds only the parent. `forward: [signForParcel]` sends it on to the running `delivery` while the parent is in `shippingOrder`. In the same way, `forward: [retryPayment]` sends the retry button of the screen to `payment`. Outside the embedding state there is no child, and the parent ignores the event.
+
+Each forwarded event must be an input of the parent and an input of the child. Do not add a second handler for a forwarded event in the same state. The parent keeps one handler per state and event, so the handler that registers last replaces the other one.
+
+### Watch the child with a snapshot
+
+```ts
+embed(builder, {
+  in: payingForOrder,
+  machine: paymentMachine({ port }),
+  done: { paymentTaken: paymentWentThrough },
+  error: paymentBroke,
+  forward: [retryPayment],
+  snapshot: paymentChanged,
+});
+builder.on(payingForOrder, {
+  event: paymentChanged,
+  handler: (changed, { context }) => context.set({ payment: changed.payload }),
+});
+```
+
+If the card was declined, the screen shows a retry button. That state is in the child. `snapshot: paymentChanged` makes embed send `paymentChanged` with the snapshot of the child, once on entry and again after each change of the child. The parent keeps the snapshot in its context. If the parent is in `payingForOrder` and `context.payment.path` is `["couldNotChargeCard"]`, the screen shows the retry button.
+
+After the parent leaves `payingForOrder`, the context keeps the last snapshot of the child. So the screen must also look at the state of the parent.
+
+### Give the child its ports
+
+Embed builds the child with the clock of the parent and no other option. `payment` needs a card provider, so `paymentMachine({ port })` builds the machine with that port. The parent calls it in its own `create`, with the port that the app or the test gives to `order.create`. `delivery` needs only the clock, so the parent embeds the `delivery` machine as it is.
+
+### What the viewer shows
+
+The viewer draws each embedding state as a machine node. It does not draw the states of the child next to the states of the parent.
+
+1. Click the enter control on `payingForOrder`. With the keyboard, press Tab until the enter control has focus, then press Enter. The viewer draws `payment` on its own.
+2. Read the path of machine names above the diagram. It names each machine that you opened, here `order` and `payment`.
+3. Click `order` in the path to go back to it. Escape goes back one machine.
+4. Copy the address. `?focus=payingForOrder` keeps the path in it, so the link opens `payment` inside `order`.
+
+The view inside an entered machine is static. It shows the states and arrows of the child, without the walk. Details has no **Send** button there, and the **Step** tab still drives the parent. Live steps inside an entered machine come later.
+
+On the dev server, the machine picker lists only the machines that no other machine embeds. You reach `payment` and `delivery` through their machine nodes.
+
+### Test the parent and the children
+
+```ts
+test("a declined card shows retry through the payment snapshot, and retry goes to the child", async () => {
+  const { actor } = startOrder(["declined", "accepted"]);
+  actor.send(placeOrder.create());
+  await actor.settled();
+  const declined = screen(actor);
+  actor.send(retryPayment.create());
+  await actor.settled();
+  expect({ declined, retried: screen(actor) }).toStrictEqual({
+    declined: { order: ["payingForOrder"], payment: ["couldNotChargeCard"] },
+    retried: { order: ["shippingOrder"], payment: ["paymentTaken"] },
+  });
+});
+```
+
+The test drives only the parent, as the app does. `startOrder` gives `order` a `VirtualClock` and a fake card provider that answers `declined`, then `accepted`. `screen` reads the path of the parent and the path of the child from `context.payment`. `actor.settled()` also waits for the effects of the child. The tests are in [`packages/examples/order/`](https://github.com/AndersCan/mantaq/tree/main/packages/examples/order): `order.test.ts` has the journeys, and `order.error.test.ts` has a card provider that throws.
+
+### When to split
+
+If one of these is true, split the machine:
+
+- It has more than about 12 states.
+- The same handler is registered in a loop over many states.
+- A group of states has one way in, a few ways out, and no other arrows to the other states.
+
+If the handlers of a group read and write the context of the parent, keep the group in the parent. The child cannot read the context of the parent. For parts that run all the time next to each other, use `regions`. For a count of children that changes at run time, use `createActorMap`.
+
+### The code
+
+<Code code={orderSource} lang="ts" title="order.ts" />
+
+<Code code={paymentSource} lang="ts" title="payment.ts" />
+
+<Code code={deliverySource} lang="ts" title="delivery.ts" />
