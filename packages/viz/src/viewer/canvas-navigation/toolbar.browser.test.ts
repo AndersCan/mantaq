@@ -477,7 +477,7 @@ test("Ctrl+wheel with the pointer on the tools zooms the canvas, not the page", 
   const page = await viewerPage();
   await page.getByRole("button", { name: "Zoom in" }).click();
   const before = await shownOf(page);
-  const tools = await page.locator(".viz-tools").boundingBox();
+  const tools = await page.getByRole("group", { name: "Zoom and pan" }).boundingBox();
   await page.mouse.move((tools?.x ?? 0) + 4, (tools?.y ?? 0) + 4);
   const cancelled = page.evaluate(
     () =>
