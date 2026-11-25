@@ -1,6 +1,6 @@
 import { html, svg } from "../dom.ts";
 import type { Viewport, ViewportState } from "../viewport/viewport.ts";
-import { zoomInFrom, zoomOutFrom } from "../viewport/zoom.ts";
+import { zoomInFrom, zoomOutFrom, zoomPercent } from "../viewport/zoom.ts";
 import { isNever } from "../../is-never.ts";
 
 /** What a toolbar button does to the viewport. */
@@ -189,10 +189,14 @@ function showState(toolbar: HTMLElement, options: ShowStateOptions): void {
         pressed(button, { on: state.tool === action });
         break;
       case "zoomOut":
-        turnedOff(button, { off: zoomOutFrom(state.scale) >= state.scale });
+        turnedOff(button, {
+          off: zoomPercent(zoomOutFrom(state.scale)) >= zoomPercent(state.scale),
+        });
         break;
       case "zoomIn":
-        turnedOff(button, { off: zoomInFrom(state.scale) <= state.scale });
+        turnedOff(button, {
+          off: zoomPercent(zoomInFrom(state.scale)) <= zoomPercent(state.scale),
+        });
         break;
       case "fit":
         turnedOff(button, { off: fitted });
@@ -204,8 +208,8 @@ function showState(toolbar: HTMLElement, options: ShowStateOptions): void {
 }
 
 function percentOf(scale: number): string {
-  const rounded = Math.round(scale * 100);
-  return `${rounded}%`;
+  const percent = zoomPercent(scale);
+  return `${percent}%`;
 }
 
 interface TurnedOffOptions {

@@ -169,12 +169,13 @@ interface Band {
   end: number;
 }
 
-/** How much of the window's top is covered: by the page, as with a sticky header (its `scroll-padding-top`), and by the viewer's bar where it sticks (in full screen, or with a path). */
+/** How much of the window's top is covered: by the page outside full screen, as with a sticky header (its `scroll-padding-top`), and by the viewer's bar where it sticks (in full screen, or with a path). */
 export function coveredTop(root: HTMLElement): number {
   const doc = root.ownerDocument;
   const view = doc.defaultView;
   const style = view?.getComputedStyle(doc.documentElement);
-  const page = Number.parseFloat(style?.scrollPaddingTop ?? "") || 0;
+  const header = Number.parseFloat(style?.scrollPaddingTop ?? "") || 0;
+  const page = doc.fullscreenElement === root ? 0 : header;
   const bar = root.querySelector(".viz-bar");
   if (bar === null || view?.getComputedStyle(bar).position !== "sticky") return page;
   return Math.max(page, bar.getBoundingClientRect().bottom);

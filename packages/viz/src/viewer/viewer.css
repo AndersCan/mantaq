@@ -625,9 +625,10 @@
   white-space: nowrap;
 }
 
+/* As tall as a line of text, so the icon buttons match the text buttons. */
 .viz .viz-tool-icon {
   width: 1.15em;
-  height: 1.15em;
+  height: 1lh;
 }
 
 /* The tool in use reads as pressed: filled, with no pointer, as a click on it changes nothing. */
