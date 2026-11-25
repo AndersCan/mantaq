@@ -6,6 +6,8 @@ export interface StateEmbed {
   /** State id as the diagram names it, with the region or part name in front. */
   state: string;
   machine: Machine;
+  /** Inputs that the embed sends on to the child. Omitted = none. */
+  forward?: string[];
 }
 
 interface StateEmbedsOptions {
@@ -22,6 +24,8 @@ export interface EmbedTag {
   snapshot: string | undefined;
   /** Context field of the parent where its snapshot handler keeps the child snapshot; undefined when the parent does not say. */
   keep: string | undefined;
+  /** The child running now; undefined when none is, or when the tag has no `running`. */
+  running: () => unknown;
 }
 
 function isStringList(value: unknown): value is string[] {
@@ -40,11 +44,13 @@ export function embedTagOf(entry: unknown): EmbedTag | undefined {
   const forward: unknown = Reflect.get(tag, "forward");
   const snapshot: unknown = Reflect.get(tag, "snapshot");
   const keep: unknown = Reflect.get(tag, "keep");
+  const running: unknown = Reflect.get(tag, "running");
   return {
     machine,
     forward: isStringList(forward) ? forward : [],
     snapshot: typeof snapshot === "string" ? snapshot : undefined,
     keep: typeof keep === "string" ? keep : undefined,
+    running: () => (typeof running === "function" ? Reflect.apply(running, tag, []) : undefined),
   };
 }
 
@@ -57,8 +63,10 @@ export function stateEmbeds(
   const found: StateEmbed[] = [];
   for (const [state, entries] of Object.entries(actor.options?.effects ?? {})) {
     for (const entry of entries) {
-      const machine = embedTagOf(entry)?.machine;
-      if (machine !== undefined) found.push({ state: `${prefix}${state}`, machine });
+      const tag = embedTagOf(entry);
+      if (tag === undefined) continue;
+      const forward = tag.forward.length === 0 ? {} : { forward: [...tag.forward] };
+      found.push({ state: `${prefix}${state}`, machine: tag.machine, ...forward });
     }
   }
   return found;

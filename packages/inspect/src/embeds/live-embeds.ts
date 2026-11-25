@@ -68,8 +68,6 @@ export function runningEmbeds(parts: ReadonlyArray<EmbedPart>): VizLiveEmbed[] {
     if (tag === undefined || kept?.done === true) continue;
     running.push({
       state: `${prefix}${local}`,
-      machine: tag.machine.id,
-      forward: [...tag.forward],
       ...(kept === undefined ? {} : { current: kept.state }),
     });
   }

@@ -4,9 +4,10 @@ import { Either } from "@mantaq/utils";
 import { validateViz } from "../validate.ts";
 
 describe("validateViz reads embedded machines", () => {
-  test("a state that embeds another machine keeps its reference", () => {
+  test("a state that embeds another machine keeps its reference and the inputs it forwards", () => {
+    const paying = { id: "paying", machine: "payment", forward: ["cancel"] };
     const document = documentOf([
-      { id: "checkout", states: [{ id: "paying", machine: "payment" }, { id: "done" }] },
+      { id: "checkout", states: [paying, { id: "done" }] },
       { id: "payment", states: [{ id: "charging" }] },
     ]);
     expect(Either.getRight(validateViz(JSON.parse(JSON.stringify(document))))).toEqual(document);

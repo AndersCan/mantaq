@@ -10,6 +10,7 @@ import type {
   VizStep,
 } from "@mantaq/viz";
 import { drivesChild, runningEmbeds } from "./embeds/live-embeds.ts";
+import { embedTagOf } from "./embeds/state-embeds.ts";
 import { actorMapsOf } from "./maps.ts";
 import type { ActorMapLike } from "./maps.ts";
 import type { EmbedPart } from "./embeds/live-embeds.ts";
@@ -87,51 +88,68 @@ function hasSignal(value: unknown): value is { signal: AbortSignal } {
   );
 }
 
-interface HeldEmbedOptions {
-  /** The embed's own effect fn; its `embedded` tag goes on the new one, so tools still find the child. */
-  effect: unknown;
-  held: HeldEffect[];
+/** Hold a child's effects; what they would report cannot reach it (only `forward` does), so they stay out of the root's `waiting`. */
+function holdChild(child: unknown): void {
+  if (isActor(child)) holdEffects(child, []);
 }
 
 /** An embed that forwards inputs or keeps its child snapshot still builds its child, so forwarded inputs reach it; the child's effects are held in turn. */
-function heldEmbed(options: HeldEmbedOptions): (input: unknown) => unknown {
-  const { effect, held } = options;
-  function childBuilt(child: unknown): void {
-    if (isActor(child)) holdEffects(child, held);
-  }
+function heldEmbed(effect: unknown): (input: unknown) => unknown {
   function runHeld(input: unknown): unknown {
     if (typeof effect !== "function") return undefined;
     const given = typeof input === "object" && input !== null ? input : {};
-    return Reflect.apply(effect, undefined, [{ ...given, childBuilt }]);
+    return Reflect.apply(effect, undefined, [{ ...given, childBuilt: holdChild }]);
   }
-  const tag: unknown = typeof effect === "function" ? Reflect.get(effect, "embedded") : undefined;
-  return Object.assign(runHeld, { embedded: tag });
+  return runHeld;
 }
 
-/** Swap each effect body for a stub that only records its signal; recurse into regions. An embed that drives its child keeps running, with the child's effects held. */
+interface TaggedOptions {
+  /** The effect fn that `effect` replaces. */
+  from: unknown;
+}
+
+/** The `embedded` tag of an effect fn, carried to the fn that replaces it, so tools still find the child. */
+function tagged<Effect extends object>(effect: Effect, options: TaggedOptions): Effect {
+  const { from } = options;
+  const tag: unknown = typeof from === "function" ? Reflect.get(from, "embedded") : undefined;
+  return tag === undefined ? effect : Object.assign(effect, { embedded: tag });
+}
+
+/** Hold the children that the actor's current state already runs: core built them with the actor, before its effects could be swapped. */
+function holdRunningChildren(actor: AnyActor<unknown>): void {
+  for (const entry of actor.options?.effects?.[actor.state.name] ?? []) {
+    const tag = embedTagOf(entry);
+    if (tag !== undefined && drivesChild(entry)) holdChild(tag.running());
+  }
+}
+
+/**
+ * Swap each effect body for a stub that only records its signal; recurse into regions. An embed that drives
+ * its child keeps running, with the child's effects held, also for a child the current state built already.
+ */
 function holdEffects(actor: AnyActor<unknown>, held: HeldEffect[]): void {
   for (const list of Object.values(actor.options?.effects ?? {})) {
     for (const [index, entry] of list.entries()) {
       if (!isEffectEntry(entry)) continue;
       if (drivesChild(entry)) {
-        list[index] = { ...entry, fn: heldEmbed({ effect: entry.fn, held }) };
+        list[index] = { ...entry, fn: tagged(heldEmbed(entry.fn), { from: entry.fn }) };
         continue;
       }
-      list[index] = {
-        ...entry,
-        fn: (input: unknown) => {
-          if (hasSignal(input)) held.push({ name: entry.name, signal: input.signal });
-        },
-      };
+      const { name } = entry;
+      function stub(input: unknown): void {
+        if (hasSignal(input)) held.push({ name, signal: input.signal });
+      }
+      list[index] = { ...entry, fn: tagged(stub, { from: entry.fn }) };
     }
   }
+  holdRunningChildren(actor);
   for (const region of Object.values(actor.regions)) holdEffects(region, held);
 }
 
 export interface DriverOptions {
   /**
-   * `held` (default): effect bodies do not run and the viewer asks what they report; first-state effects still run, because core runs them while the actor is built.
-   * An embed that forwards inputs or keeps its child snapshot still builds its child, whose effects are held the same way. `real`: they run.
+   * `held` (default): effect bodies do not run and the viewer asks what they report. First-state effects run while core builds the actor.
+   * An embed that forwards or keeps builds its child, held the same way; the child's first-state effects run on each entry and dry run. `real`: all run.
    */
   effectMode?: "held" | "real";
 }

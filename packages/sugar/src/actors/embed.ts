@@ -111,6 +111,8 @@ export interface Embedded {
   readonly snapshot: string | undefined;
   /** Context field of the parent where its `snapshot` handler keeps the child snapshot, or undefined when the parent does not say. */
   readonly keep: string | undefined;
+  /** The child running now, or undefined. For a tool that drives the parent and starts after the child was built, for example to hold its effects. */
+  readonly running: () => AnyActor<unknown> | undefined;
 }
 
 interface EmbedOptions<
@@ -200,6 +202,7 @@ export function embed<
     forward: forward.map((event) => event.type),
     snapshot: snapshotEvent?.type,
     keep: options.keep,
+    running: () => running,
   };
   /** `sends` lists the mapped events and the snapshot event; typed as maybe-undeclared so `emit` also takes the forwarded child outputs. */
   builder.effect<NonFinalStateRef<[...States]>, ReadonlyArray<Internal[number]> | undefined>(
@@ -219,7 +222,7 @@ interface BuiltChild {
   child: AnyActor<unknown>;
 }
 
-/** A tool that drives the parent, such as the live viewer's driver, can pass `childBuilt` on the effect input: it gets each child before the child gets any event, for example to hold the child's effects. */
+/** A tool that drives the parent can pass `childBuilt` on the effect input: it gets each child before the child gets any event, for example to hold the child's effects. */
 function tellBuilt(input: object, built: BuiltChild): void {
   const childBuilt: unknown = Reflect.get(input, "childBuilt");
   if (typeof childBuilt === "function") Reflect.apply(childBuilt, undefined, [built.child]);

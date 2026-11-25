@@ -277,6 +277,7 @@ describe("embed", () => {
         error: "checkBroke",
         forward: [],
         snapshot: undefined,
+        running: expect.any(Function),
       },
     });
   });
@@ -492,6 +493,7 @@ describe("embed forward", () => {
         forward: ["retry", "dismiss"],
         snapshot: "uploadChanged",
         keep: "upload",
+        running: expect.any(Function),
       },
       targets: {
         retry: [],
@@ -518,6 +520,32 @@ describe("embed forward", () => {
     Reflect.apply(entry?.fn ?? (() => undefined), undefined, [input]);
     abort.abort();
     expect(built).toEqual(["uploading"]);
+  });
+
+  test("the tag's running gives the child while the parent is in the embedding state, then undefined", () => {
+    const { actor, clock } = editorOf(uploadMachine({ failures: 1 }));
+    const [entry] = actor.options.effects["saving"] ?? [];
+    const tag: unknown = Reflect.get(entry?.fn ?? {}, "embedded");
+    const running: unknown =
+      typeof tag === "object" && tag !== null ? Reflect.get(tag, "running") : undefined;
+    function childState(): unknown {
+      const child: unknown =
+        typeof running === "function" ? Reflect.apply(running, undefined, []) : "no running";
+      const now: unknown =
+        typeof child === "object" && child !== null ? Reflect.get(child, "state") : child;
+      return typeof now === "object" && now !== null ? Reflect.get(now, "name") : now;
+    }
+    const before = childState();
+    actor.send(save.create());
+    const inside = childState();
+    clock.advance(50);
+    actor.send(dismiss.create());
+    expect({ before, inside, after: childState(), parent: actor.state.name }).toEqual({
+      before: undefined,
+      inside: "uploading",
+      after: undefined,
+      parent: "editing",
+    });
   });
 
   test("a forwarded input keeps its payload", () => {

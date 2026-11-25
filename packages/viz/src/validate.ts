@@ -63,6 +63,9 @@ function readState(reader: Reader, options: StateRecord): VizState {
   if (machine !== undefined && typeof machine !== "string") {
     report(reader, { path: `${path}.machine`, message: "expected string" });
   }
+  if (record["forward"] !== undefined) {
+    state.forward = readStrings(reader, { record, key: "forward", path });
+  }
   return state;
 }
 

@@ -136,6 +136,7 @@ describe("embed mutation", () => {
         error: "checkBroke",
         forward: ["retry"],
         snapshot: "checkChanged",
+        running: expect.any(Function),
       },
       paths: [["working"], ["passed"]],
       state: "accepted",
@@ -217,6 +218,7 @@ describe("embed mutation", () => {
         error: "checkBroke",
         forward: [],
         snapshot: undefined,
+        running: expect.any(Function),
       },
     });
   });

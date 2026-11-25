@@ -369,7 +369,7 @@ Embed sends `uploadChanged` to the parent when the child is built and again afte
 
 `keep` names the context field where the `snapshot` handler keeps the child snapshot, here `upload`. Embed does not write the field. It puts the name in the `embedded` tag as `keep`, so that tools can read the child state from the context of the parent. The live driver of `@mantaq/inspect` reads it to report the state of the child. `keep` needs `snapshot`.
 
-A tool that drives the parent can put a function `childBuilt` on the effect input. Embed calls it with each child that it builds, before the child gets an event. The live driver of `@mantaq/inspect` uses it to hold the effects of the child.
+A tool that drives the parent can put a function `childBuilt` on the effect input. Embed calls it with each child that it builds, before the child gets an event. The `embedded` tag also has `running()`, which returns the child that runs now. A tool that starts after the child was built uses it, for example a child that the first state of the parent embeds. A live viewer can use both to hold the effects of the child.
 
 The types also require these things:
 

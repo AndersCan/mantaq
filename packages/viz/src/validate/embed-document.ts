@@ -5,6 +5,8 @@ import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 interface ShopState {
   id: string;
   machine?: string;
+  /** Inputs that the state sends on to `machine`. */
+  forward?: string[];
   /** Omitted: a plain state in the middle. */
   role?: "initial" | "final";
 }
@@ -36,6 +38,7 @@ function stateOf(shopState: ShopState): VizState {
     doc: null,
   };
   if (shopState.machine !== undefined) state.machine = shopState.machine;
+  if (shopState.forward !== undefined) state.forward = shopState.forward;
   return state;
 }
 

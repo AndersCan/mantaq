@@ -15,8 +15,6 @@ const deliveryTarget: FuzzTarget = {
   },
 };
 
-const scanning = { machine: "scan", forward: ["misread"] };
-
 const drafting = state("drafting")();
 const printing = state("printing")();
 const print = event("print")();
@@ -68,6 +66,8 @@ const noLabel: ShipmentContext = { label: undefined };
 interface ShipmentOptions {
   printed: Printed;
   keep: "label" | "none";
+  /** The state the shipment starts in: idle, or already shipping, so the actor's build starts the label. */
+  start: "idle" | "shipping";
 }
 
 /** A shipment that runs the label while it ships, and forwards print to it. */
@@ -81,7 +81,7 @@ function shipmentTarget(options: ShipmentOptions): FuzzTarget {
         inputs: [start, print],
         internal: [labelDone, labelBroke, labelChanged],
         states: [idle, shipping],
-        initial: idle,
+        initial: options.start === "idle" ? idle : shipping,
         context: noLabel,
         clock,
         setup: (builder) => {
@@ -116,7 +116,7 @@ describe("running embeds in the driver", () => {
       misread: [misread.state, misread.last?.event, misread.embeds],
       after: misread.after.map((entry) => [entry.event, entry.to]),
     }).toEqual({
-      started: ["held", [{ state: "pickingUp", ...scanning, current: "reading" }]],
+      started: ["held", [{ state: "pickingUp", current: "reading" }]],
       misread: ["returned", "misread", []],
       after: [
         ["scanChanged", "pickingUp"],
@@ -137,44 +137,73 @@ describe("running embeds in the driver", () => {
       delivered: delivered.state,
     }).toEqual({
       onTheWay: ["onTheWay", []],
-      handingOver: ["handingOver", [{ state: "handingOver", ...scanning, current: "reading" }], 1],
+      handingOver: ["handingOver", [{ state: "handingOver", current: "reading" }], 1],
       delivered: "delivered",
     });
   });
 
-  test("in held mode a child's later effects are held, and in real mode they run", () => {
+  test("in held mode a child's later effects are held and stay out of waiting, and in real mode they run", () => {
     function printerRuns(effectMode: "held" | "real") {
       const printed = { runs: 0 };
-      const driver = createDriver(shipmentTarget({ printed, keep: "label" }), { effectMode });
+      const target = shipmentTarget({ printed, keep: "label", start: "idle" });
+      const driver = createDriver(target, { effectMode });
       driver.reset();
       driver.step({ kind: "event", event: "start", payload: null });
       const live = driver.step({ kind: "event", event: "print", payload: null });
       driver.dryRun?.([{ kind: "event", event: "start", payload: null }]);
       return { runs: printed.runs, embeds: live.embeds, waiting: live.waiting };
     }
-    const shown = { state: "shipping", machine: "label", forward: ["print"], current: "printing" };
+    const shown = { state: "shipping", current: "printing" };
     expect({ held: printerRuns("held"), real: printerRuns("real") }).toEqual({
-      held: { runs: 0, embeds: [shown], waiting: ["printer"] },
+      held: { runs: 0, embeds: [shown], waiting: [] },
       real: { runs: 1, embeds: [shown], waiting: [] },
     });
   });
 
-  test("an embed without keep is reported without the child's state", () => {
-    const driver = createDriver(shipmentTarget({ printed: { runs: 0 }, keep: "none" }));
+  test("a child that the first state built while the actor was built is held too, also in dry runs", () => {
+    const printed = { runs: 0 };
+    const driver = createDriver(shipmentTarget({ printed, keep: "label", start: "shipping" }));
     driver.reset();
-    const live = driver.step({ kind: "event", event: "start", payload: null });
-    expect(live.embeds).toEqual([{ state: "shipping", machine: "label", forward: ["print"] }]);
+    const live = driver.step({ kind: "event", event: "print", payload: null });
+    const tried = driver.dryRun?.([
+      { kind: "event", event: "print", payload: null },
+      { kind: "advance", ms: 10 },
+    ]);
+    expect({ runs: printed.runs, embeds: live.embeds, tried: tried?.length }).toEqual({
+      runs: 0,
+      embeds: [{ state: "shipping", current: "printing" }],
+      tried: 2,
+    });
   });
 
-  test("a forwarded input is drawn as a stay arrow on each embedding state", () => {
-    const { edges } = toVizMachine({
+  test("an embed without keep is reported without the child's state", () => {
+    const target = shipmentTarget({ printed: { runs: 0 }, keep: "none", start: "idle" });
+    const driver = createDriver(target);
+    driver.reset();
+    const live = driver.step({ kind: "event", event: "start", payload: null });
+    expect(live.embeds).toEqual([{ state: "shipping" }]);
+  });
+
+  test("a forwarded input is drawn as a stay arrow on each embedding state, and the state lists it", () => {
+    const { edges, states } = toVizMachine({
       id: "delivery",
       actor: delivery.create({ clock: VirtualClock() }),
     });
     const forwarded = edges.filter((edge) => edge.event === "misread");
-    expect(forwarded.map((edge) => [edge.from, edge.to, edge.kind, edge.origin])).toEqual([
-      ["handingOver", "handingOver", "stay", "declared"],
-      ["pickingUp", "pickingUp", "stay", "declared"],
-    ]);
+    expect({
+      arrows: forwarded.map((edge) => [edge.from, edge.to, edge.kind, edge.origin]),
+      states: states.flatMap((each) =>
+        each.machine === undefined ? [] : [[each.id, each.forward]],
+      ),
+    }).toEqual({
+      arrows: [
+        ["handingOver", "handingOver", "stay", "declared"],
+        ["pickingUp", "pickingUp", "stay", "declared"],
+      ],
+      states: [
+        ["handingOver", ["misread"]],
+        ["pickingUp", ["misread"]],
+      ],
+    });
   });
 });
