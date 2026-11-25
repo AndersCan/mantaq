@@ -162,3 +162,74 @@ test("panBy scrolls the page for what a canvas with no height limit cannot", asy
   expect(scrolled).toEqual({ canvas: { x: 120, y: 0 }, page: { x: 0, y: 100 } });
   await page.close();
 }, 60_000);
+
+test("zoomAt keeps the point when the zoom out makes the page shorter than its scroll", async () => {
+  const moved = await zoomsPut({
+    css: 'body::after { content: ""; display: block; height: 1000px; } #canvas { width: 200px; overflow: auto; }',
+    scroll: { page: { x: 0, y: 800 }, canvas: { x: 400, y: 0 } },
+    initial: 1,
+    pointer: { x: 140, y: 20 },
+    scales: [0.25, 1],
+  });
+  expect(moved).toEqual([
+    { scale: 0.25, put: true },
+    { scale: 1, put: true },
+  ]);
+}, 60_000);
+
+test("zooming in a canvas with a fixed height leaves the page where it was", async () => {
+  const page = await pageWith(
+    "body { min-height: 4000px; } #canvas { width: 400px; height: 300px; overflow: auto; margin-top: 600px; }",
+  );
+  const pageScroll = await page.evaluate(() => {
+    const create = window.viewportOf;
+    const canvas = document.querySelector<HTMLElement>("#canvas");
+    const drawing = canvas?.querySelector("svg") ?? undefined;
+    if (create === undefined || canvas === null || drawing === undefined) return [];
+    const viewport = create(canvas, { drawing: () => drawing });
+    window.scrollTo({ left: 0, top: 500, behavior: "instant" });
+    const seen = [];
+    viewport.zoomAt({ x: 430, y: 430 }, { scale: 0.25 });
+    seen.push(scrollY);
+    viewport.zoomIn();
+    viewport.zoomIn();
+    viewport.zoomOut();
+    seen.push(scrollY);
+    viewport.fit();
+    seen.push(scrollY);
+    return seen;
+  });
+  expect(pageScroll).toEqual([500, 500, 500]);
+  await page.close();
+}, 60_000);
+
+test("on a page that scrolls, zoomIn keeps the center of the canvas on screen put and fit shows the drawing's top-left", async () => {
+  const page = await pageWith(
+    "body { min-height: 3000px; } #canvas { width: 400px; overflow: auto; }",
+  );
+  const seen = await page.evaluate(() => {
+    const create = window.viewportOf;
+    const canvas = document.querySelector<HTMLElement>("#canvas");
+    const drawing = canvas?.querySelector("svg") ?? undefined;
+    if (create === undefined || canvas === null || drawing === undefined) return undefined;
+    const viewport = create(canvas, { drawing: () => drawing });
+    window.scrollTo({ left: 0, top: 300, behavior: "instant" });
+    const center = { x: 240, y: 270 };
+    function underCenter(): Point {
+      const rect = drawing?.getBoundingClientRect() ?? new DOMRect();
+      const { scale } = viewport.state();
+      return { x: (center.x - rect.left) / scale, y: (center.y - rect.top) / scale };
+    }
+    const before = underCenter();
+    viewport.zoomIn();
+    const after = underCenter();
+    const scale = viewport.state().scale;
+    const centerPut =
+      Math.abs(after.x - before.x) * scale < 1 && Math.abs(after.y - before.y) * scale < 1;
+    viewport.fit();
+    const rect = drawing.getBoundingClientRect();
+    return { centerPut, topLeftShown: Math.abs(rect.left - 40) < 1 && Math.abs(rect.top) < 1 };
+  });
+  expect(seen).toEqual({ centerPut: true, topLeftShown: true });
+  await page.close();
+}, 60_000);

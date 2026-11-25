@@ -51,23 +51,21 @@ test.each([
 test("zooming in at the pointer scrolls so the point under it stays", () => {
   const next = anchoredScroll({
     scroll: { x: 100, y: 40 },
-    pointer: { x: 50, y: 60 },
-    origin: { x: 0, y: 0 },
-    originAfter: { x: 0, y: 0 },
-    from: 1,
-    to: 2,
+    pointer: { x: 150, y: 100 },
+    origin: { x: -100, y: 0 },
+    originAfter: { x: -100, y: 0 },
+    ratio: 2,
   });
-  expect(next).toEqual({ x: 250, y: 140 });
+  expect(next).toEqual({ x: 350, y: 140 });
 });
 
-test("a drawing that moves with the scale, as a centered one does, keeps the point too", () => {
+test("a drawing that moved when the scale changed, as a centered one does, keeps the point too", () => {
   const next = anchoredScroll({
     scroll: { x: 0, y: 0 },
     pointer: { x: 300, y: 100 },
     origin: { x: 200, y: 20 },
     originAfter: { x: 100, y: 20 },
-    from: 1,
-    to: 1.5,
+    ratio: 1.5,
   });
   expect(next).toEqual({ x: -50, y: 40 });
 });

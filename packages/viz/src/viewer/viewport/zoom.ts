@@ -51,25 +51,24 @@ export function fitZoom(drawing: Size, options: FitOptions): number {
 }
 
 export interface ZoomAnchor {
-  /** The scroll offsets before the change. */
+  /** The scroll offsets now, after the scale changed. */
   scroll: Point;
-  /** The pointer, from the top-left of the container's visible box. */
+  /** The pointer, in client coordinates. */
   pointer: Point;
-  /** The drawing's top-left in the scrolled content before the change. */
+  /** The drawing's top-left in client coordinates before the change. */
   origin: Point;
-  /** The drawing's top-left in the scrolled content after the change; it moves when the drawing is centered. */
+  /** The drawing's top-left in client coordinates after the change, as laid out now. */
   originAfter: Point;
-  from: number;
-  to: number;
+  /** How much the drawing grew: its drawn width after the change over its width before. */
+  ratio: number;
 }
 
-/** The scroll offsets that keep the drawing's point under the pointer when the scale goes from `from` to `to`. */
+/** The scroll offsets that put the drawing's point that was under the pointer before the change back under it. */
 export function anchoredScroll(anchor: ZoomAnchor): Point {
-  const { scroll, pointer, origin, originAfter } = anchor;
-  const ratio = anchor.to / anchor.from;
+  const { scroll, pointer, origin, originAfter, ratio } = anchor;
   return {
-    x: originAfter.x + (scroll.x + pointer.x - origin.x) * ratio - pointer.x,
-    y: originAfter.y + (scroll.y + pointer.y - origin.y) * ratio - pointer.y,
+    x: scroll.x + originAfter.x + (pointer.x - origin.x) * ratio - pointer.x,
+    y: scroll.y + originAfter.y + (pointer.y - origin.y) * ratio - pointer.y,
   };
 }
 

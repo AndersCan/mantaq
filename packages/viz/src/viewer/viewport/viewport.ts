@@ -45,7 +45,7 @@ export interface Viewport {
   /** Zooms to the next step, at the center of the part of the container on screen. */
   zoomIn: () => void;
   zoomOut: () => void;
-  /** Scales so the whole drawing fits, and scrolls its top-left to the top-left of the part of the container on screen. */
+  /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's when the container starts above it. */
   fit: () => void;
   /** Zooms to 100%, at the center of the part of the container on screen. */
   actualSize: () => void;
@@ -67,58 +67,66 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
   container.style.setProperty(ZOOM_PROPERTY, String(state.scale));
   container.dataset["tool"] = state.tool;
 
-  /** The drawing's top-left in the container's scrolled content, and its drawn width; the content's start without a drawing. */
+  /** The drawing's top-left in client coordinates and its drawn width; the container's content start without a drawing. */
   function drawingBox(): { origin: Point; width: number } {
     const drawing = options.drawing();
-    if (drawing === undefined) return { origin: { x: 0, y: 0 }, width: 0 };
-    const visible = visibleOrigin(container);
+    if (drawing === undefined) {
+      const visible = visibleOrigin(container);
+      const origin = { x: visible.x - container.scrollLeft, y: visible.y - container.scrollTop };
+      return { origin, width: 0 };
+    }
     const rect = drawing.getBoundingClientRect();
-    const origin = {
-      x: rect.left - visible.x + container.scrollLeft,
-      y: rect.top - visible.y + container.scrollTop,
-    };
-    return { origin, width: rect.width };
+    return { origin: { x: rect.left, y: rect.top }, width: rect.width };
   }
   function changed(next: ViewportState): void {
     state = next;
     for (const listener of listeners) listener(state);
   }
+  /** Scrolls the container to `wanted`; the rest scrolls the page only on an axis where the container's size followed the drawing. */
+  function scrollTo(wanted: Point, sizeBefore: Size): void {
+    container.scrollTo({ left: wanted.x, top: wanted.y, behavior: "instant" });
+    const followed = {
+      x: container.clientWidth !== sizeBefore.width,
+      y: container.clientHeight !== sizeBefore.height,
+    };
+    scrollByChained(container, {
+      x: followed.x ? wanted.x - container.scrollLeft : 0,
+      y: followed.y ? wanted.y - container.scrollTop : 0,
+    });
+  }
   function zoomAt(point: Point, zoom: ZoomAtOptions): void {
     const target = clampZoom(zoom.scale);
     if (target === state.scale) return;
-    const scroll = { x: container.scrollLeft, y: container.scrollTop };
-    const pointer = pointerIn(container, point);
+    const sizeBefore = clientSize(container);
     const before = drawingBox();
     container.style.setProperty(ZOOM_PROPERTY, String(target));
     const after = drawingBox();
     const measured = before.width > 0 && after.width > 0;
-    const next = anchoredScroll({
-      scroll,
-      pointer,
+    const wanted = anchoredScroll({
+      scroll: { x: container.scrollLeft, y: container.scrollTop },
+      pointer: point,
       origin: before.origin,
       originAfter: after.origin,
-      from: measured ? before.width : state.scale,
-      to: measured ? after.width : target,
+      ratio: measured ? after.width / before.width : target / state.scale,
     });
-    scrollByChained(container, {
-      x: next.x - container.scrollLeft,
-      y: next.y - container.scrollTop,
-    });
+    scrollTo(wanted, sizeBefore);
     changed({ ...state, scale: target });
   }
   function fit(): void {
     const drawing = options.drawing();
     const natural = viewBoxSize(drawing?.getAttribute("viewBox") ?? undefined);
     if (drawing === undefined || natural === undefined) return;
-    const box = options.fitBox?.() ?? {
-      width: container.clientWidth,
-      height: container.clientHeight,
-    };
+    const sizeBefore = clientSize(container);
+    const box = options.fitBox?.() ?? sizeBefore;
     const target = fitZoom(natural, { box });
     container.style.setProperty(ZOOM_PROPERTY, String(target));
-    const shown = shownBox(container);
+    const visible = visibleOrigin(container);
     const rect = drawing.getBoundingClientRect();
-    scrollByChained(container, { x: rect.left - shown.left, y: rect.top - shown.top });
+    const wanted = {
+      x: container.scrollLeft + rect.left - Math.max(visible.x, 0),
+      y: container.scrollTop + rect.top - Math.max(visible.y, 0),
+    };
+    scrollTo(wanted, sizeBefore);
     if (target !== state.scale) changed({ ...state, scale: target });
   }
   return {
@@ -149,9 +157,8 @@ function visibleOrigin(container: HTMLElement): Point {
   return { x: rect.left + container.clientLeft, y: rect.top + container.clientTop };
 }
 
-function pointerIn(container: HTMLElement, point: Point): Point {
-  const visible = visibleOrigin(container);
-  return { x: point.x - visible.x, y: point.y - visible.y };
+function clientSize(container: HTMLElement): Size {
+  return { width: container.clientWidth, height: container.clientHeight };
 }
 
 /** The part of the container's visible box inside the window, in client coordinates; the whole box when none of it is. */

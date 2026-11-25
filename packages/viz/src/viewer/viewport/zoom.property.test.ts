@@ -14,7 +14,6 @@ import fc from "fast-check";
 const run = { seed: 0x200, numRuns: 1000 };
 
 const anyScale = fc.double({ min: 0, max: 20, noNaN: true });
-const anyZoom = fc.double({ min: MIN_ZOOM, max: MAX_ZOOM, noNaN: true });
 const anyLength = fc.double({ min: 1, max: 20_000, noNaN: true });
 const anyOffset = fc.double({ min: -5000, max: 5000, noNaN: true });
 const anyPoint = fc.record({ x: anyOffset, y: anyOffset });
@@ -75,51 +74,46 @@ test("the fitted drawing fits the box, and fills it on one side unless the range
   );
 });
 
-test("the drawing's point under the pointer is the same before and after the scale changes", () => {
+const anyRatio = fc.double({ min: MIN_ZOOM / MAX_ZOOM, max: MAX_ZOOM / MIN_ZOOM, noNaN: true });
+const anyAnchor = fc.record({
+  scroll: anyPoint,
+  pointer: anyPoint,
+  origin: anyPoint,
+  originAfter: anyPoint,
+  ratio: anyRatio,
+});
+
+test("after the scroll, the drawing's point under the pointer is the one that was under it before", () => {
   fc.assert(
-    fc.property(
-      fc.record({ scroll: anyPoint, pointer: anyPoint, origin: anyPoint, originAfter: anyPoint }),
-      anyZoom,
-      anyZoom,
-      (anchor, from, to) => {
-        const next = anchoredScroll({ ...anchor, from, to });
-        const before = (anchor.scroll.x + anchor.pointer.x - anchor.origin.x) / from;
-        const after = (next.x + anchor.pointer.x - anchor.originAfter.x) / to;
-        const beforeY = (anchor.scroll.y + anchor.pointer.y - anchor.origin.y) / from;
-        const afterY = (next.y + anchor.pointer.y - anchor.originAfter.y) / to;
-        expect({
-          x: Math.abs(after - before) < 1e-6,
-          y: Math.abs(afterY - beforeY) < 1e-6,
-        }).toEqual({
-          x: true,
-          y: true,
-        });
-      },
-    ),
+    fc.property(anyAnchor, (anchor) => {
+      const next = anchoredScroll(anchor);
+      const shown = {
+        x: anchor.originAfter.x - (next.x - anchor.scroll.x),
+        y: anchor.originAfter.y - (next.y - anchor.scroll.y),
+      };
+      const before = {
+        x: anchor.pointer.x - anchor.origin.x,
+        y: anchor.pointer.y - anchor.origin.y,
+      };
+      const after = {
+        x: (anchor.pointer.x - shown.x) / anchor.ratio,
+        y: (anchor.pointer.y - shown.y) / anchor.ratio,
+      };
+      const close = Math.abs(after.x - before.x) < 1e-6 && Math.abs(after.y - before.y) < 1e-6;
+      expect(close).toBe(true);
+    }),
     run,
   );
 });
 
-test("zooming back at the same pointer returns to the same scroll", () => {
+test("a drawing that neither grew nor moved keeps the scroll", () => {
   fc.assert(
-    fc.property(
-      fc.record({ scroll: anyPoint, pointer: anyPoint, origin: anyPoint }),
-      anyZoom,
-      anyZoom,
-      (anchor, from, to) => {
-        const there = anchoredScroll({ ...anchor, originAfter: anchor.origin, from, to });
-        const back = anchoredScroll({
-          ...anchor,
-          scroll: there,
-          originAfter: anchor.origin,
-          from: to,
-          to: from,
-        });
-        const close =
-          Math.abs(back.x - anchor.scroll.x) < 1e-6 && Math.abs(back.y - anchor.scroll.y) < 1e-6;
-        expect(close).toBe(true);
-      },
-    ),
+    fc.property(anyAnchor, (anchor) => {
+      const next = anchoredScroll({ ...anchor, originAfter: anchor.origin, ratio: 1 });
+      const close =
+        Math.abs(next.x - anchor.scroll.x) < 1e-6 && Math.abs(next.y - anchor.scroll.y) < 1e-6;
+      expect(close).toBe(true);
+    }),
     run,
   );
 });
