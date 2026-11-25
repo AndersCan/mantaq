@@ -3,6 +3,9 @@ import { exampleCases, fixtureCases } from "./corpus.ts";
 import { expect, test } from "vite-plus/test";
 import { failureLines, sweep } from "./sweep.ts";
 
+/** The whole corpus takes about 20 s; a case gets room for a loaded CI runner. */
+const CASE_TIMEOUT_MS = 120_000;
+
 /** What each case sweeps today, at least: a sweep that loses stands (focus, walks) or clicks fails. Raise a floor when the viewer offers more. */
 const FLOORS: Record<string, { stands: number; clicks: number }> = {
   checkout: { stands: 18, clicks: 197 },
@@ -21,13 +24,17 @@ const FLOORS: Record<string, { stands: number; clicks: number }> = {
 };
 
 for (const sweepCase of [...exampleCases(), ...fixtureCases()]) {
-  test(`every element of ${sweepCase.name} that looks clickable changes the view`, async () => {
-    const report = await sweep(sweepCase);
-    const floor = FLOORS[sweepCase.name] ?? { stands: 1, clicks: 1 };
-    const covered = {
-      stands: Math.min(report.stands, floor.stands),
-      clicks: Math.min(report.clicks, floor.clicks),
-    };
-    expect({ failures: failureLines(report), covered }).toEqual({ failures: [], covered: floor });
-  });
+  test(
+    `every element of ${sweepCase.name} that looks clickable changes the view`,
+    async () => {
+      const report = await sweep(sweepCase);
+      const floor = FLOORS[sweepCase.name] ?? { stands: 1, clicks: 1 };
+      const covered = {
+        stands: Math.min(report.stands, floor.stands),
+        clicks: Math.min(report.clicks, floor.clicks),
+      };
+      expect({ failures: failureLines(report), covered }).toEqual({ failures: [], covered: floor });
+    },
+    CASE_TIMEOUT_MS,
+  );
 }
