@@ -244,8 +244,11 @@ describe("a shared arrow with no member at the current state", () => {
     const { driver } = fakeDriver();
     const root = document.createElement("div");
     document.body.append(root);
-    const viz = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] };
-    mountViewer(root, viz, { driver, diagramOnly: true });
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver, diagramOnly: true },
+    );
     press(help(root));
     expect({
       title: shared(hover)?.querySelector(":scope > title.why")?.textContent,
