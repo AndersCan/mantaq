@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "vite-plus/test";
 import type { Browser, Page } from "playwright";
-import { browserTestEnv } from "./env.ts";
+import { browserTestEnv } from "../viewport/env.ts";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { join } from "node:path";
@@ -10,6 +10,8 @@ declare global {
   interface Window {
     /** The steps the viewer's driver got. */
     sent?: unknown[];
+    /** Whether each keydown that reached the window was cancelled. */
+    held?: boolean[];
   }
 }
 
@@ -21,6 +23,7 @@ beforeAll(async () => {
   server = await createServer({
     root: join(import.meta.dirname, ".."),
     configFile: false,
+    optimizeDeps: { include: ["@dagrejs/dagre"] },
     logLevel: "silent",
     server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
   });
@@ -45,14 +48,20 @@ const edges = [edgeOf("__initial__", { event: "", to: "cart", kind: "initial" })
 for (const [index, name] of names.slice(1).entries()) edges.push(edgeOf(names[index], { event: "to" + name, to: name }));
 const machine = machineOf({ states, edges });
 const { driver, sent } = walkDriver(machine, { guarded: new Set() });
-mountViewer(document.querySelector("#viewer"), { schemaVersion: 1, machines: [machine] }, { driver });
+const diagramOnly = new URLSearchParams(location.search).has("diagram-only");
+mountViewer(document.querySelector("#viewer"), { schemaVersion: 1, machines: [machine] }, { driver, diagramOnly });
 window.sent = sent;
 `;
 
+interface ViewerPageOptions {
+  /** "diagram": the viewer opens with Diagram only, so Show controls draws it all again. */
+  shows?: "all" | "diagram";
+}
+
 /** A page with an input above the viewer, the viewer's sheet, and the shop order mounted. */
-async function viewerPage(): Promise<Page> {
+async function viewerPage(options: ViewerPageOptions = {}): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
-  await page.goto(origin);
+  await page.goto(options.shows === "diagram" ? `${origin}?diagram-only` : origin);
   await page.setContent(
     '<link rel="stylesheet" href="/viewer.css"><style>body { margin: 16px; min-height: 3000px; }</style><input id="outside" aria-label="Outside"><div id="viewer"></div>',
   );
@@ -178,6 +187,16 @@ test("the keys zoom in, out, to 100% and to fit, pick the tools, and do nothing 
     seen.push({ scale: now.scale, tool: now.tool });
   }
   await page.keyboard.press("v");
+  await page.evaluate(() => {
+    window.held = [];
+    window.addEventListener("keydown", (event) => window.held?.push(event.defaultPrevented));
+  });
+  await page.keyboard.down("Control");
+  for (const _ of [1, 2, 3]) await page.keyboard.down("Equal");
+  await page.keyboard.up("Equal");
+  await page.keyboard.up("Control");
+  const held = await page.evaluate(() => window.held?.slice(1));
+  const heldScale = (await drawn(page)).scale;
   await page.keyboard.press("Shift+Digit1");
   const fitted = await page.evaluate(() => {
     const canvas = document.querySelector<HTMLElement>(".canvas");
@@ -189,7 +208,7 @@ test("the keys zoom in, out, to 100% and to fit, pick the tools, and do nothing 
   await page.keyboard.press("Shift+Digit0");
   await page.keyboard.press("Control+Equal");
   const after = await drawn(page);
-  expect({ seen, fitted, unchanged: after.scale === before.scale }).toEqual({
+  expect({ seen, held, heldScale, fitted, unchanged: after.scale === before.scale }).toEqual({
     seen: [
       { scale: 1, tool: "select" },
       { scale: 1.5, tool: "select" },
@@ -197,6 +216,8 @@ test("the keys zoom in, out, to 100% and to fit, pick the tools, and do nothing 
       { scale: 0.75, tool: "select" },
       { scale: 0.75, tool: "hand" },
     ],
+    held: [true, true, true],
+    heldScale: 2,
     fitted: { tool: "select", fits: true },
     unchanged: true,
   });
@@ -270,13 +291,18 @@ test("with the Hand tool a drag on an arrow pans, a click on it sends nothing, a
   }, again);
   await page.mouse.click(again.x, again.y);
   const handSent = await page.evaluate(() => window.sent?.length);
+  const outside = page.getByRole("textbox", { name: "Outside" });
+  await outside.focus();
+  await page.mouse.click(again.x, again.y);
   await page.keyboard.press("v");
+  const typed = { value: await outside.inputValue(), tool: (await drawn(page)).tool };
   await page.mouse.click(again.x, again.y);
   const selectSent = await page.evaluate(() => window.sent?.length);
-  expect({ moved: after.scroll.x - before.scroll.x, hit, handSent, selectSent }).toEqual({
+  expect({ moved: after.scroll.x - before.scroll.x, hit, handSent, typed, selectSent }).toEqual({
     moved: 120,
     hit: { canvas: true, cursor: "grab" },
     handSent: 0,
+    typed: { value: "", tool: "select" },
     selectSent: 1,
   });
   await page.close();
@@ -310,5 +336,55 @@ test("the zoom holds after a step and a resize, and the step keeps the new state
       resized: 3,
     },
   );
+  await page.close();
+}, 60_000);
+
+test("the zoom and the tool hold when the viewer draws a new canvas", async () => {
+  const page = await viewerPage({ shows: "diagram" });
+  await zoomTo300(page);
+  await page.keyboard.press("h");
+  await page.getByRole("button", { name: "Show controls" }).click();
+  await page.getByRole("tab", { name: "Step" }).waitFor();
+  const shown = await drawn(page);
+  expect({
+    scale: shown.scale,
+    drawn: Number(shown.shown.toFixed(3)),
+    sizing: shown.sizing,
+    tool: shown.tool,
+  }).toEqual({
+    scale: 3,
+    drawn: 3,
+    sizing: "chosen",
+    tool: "hand",
+  });
+  await page.close();
+}, 60_000);
+
+test("after a click on an arrow, Space and a drag pan instead of pressing the arrow that focus moved to", async () => {
+  const page = await viewerPage();
+  await zoomTo300(page);
+  const label = await labelOf(page, { to: "address" });
+  await page.mouse.click(label.x, label.y);
+  await page.waitForFunction(
+    () => document.querySelector('g.state.current[data-node-id="address"]') !== null,
+  );
+  const focused = await page.evaluate(
+    () => document.activeElement?.closest(".graph") !== null && document.activeElement !== null,
+  );
+  const spot = await emptySpot(page);
+  await page.mouse.move(spot.x + 200, spot.y + 40);
+  const before = await drawn(page);
+  await page.keyboard.down("Space");
+  await page.mouse.down();
+  await page.mouse.move(spot.x + 100, spot.y + 40, { steps: 4 });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  const after = await drawn(page);
+  const sent = await page.evaluate(() => window.sent?.length);
+  expect({ focused, sent, moved: after.scroll.x - before.scroll.x }).toEqual({
+    focused: true,
+    sent: 1,
+    moved: 100,
+  });
   await page.close();
 }, 60_000);

@@ -10,7 +10,7 @@ import type { Point, Size } from "./zoom.ts";
 import { scrollByChained } from "./chained-scroll.ts";
 
 /** A box in client coordinates. */
-export interface Box {
+interface Box {
   left: number;
   top: number;
   right: number;
@@ -24,7 +24,7 @@ interface Reach {
 }
 
 /** What a plain drag does: "select" picks elements, "hand" pans. */
-export type ViewportTool = "select" | "hand";
+type ViewportTool = "select" | "hand";
 
 /** "fitted": the drawing has the width the page's CSS gives it, and `scale` is read from that width. "chosen": the drawn width is `scale` times the natural width. */
 type ViewportSizing = "fitted" | "chosen";
@@ -79,7 +79,7 @@ export interface Viewport {
   setPan: (pan: ViewportPan) => void;
   /** Scrolls by the delta, in CSS pixels; what the container cannot take scrolls the ancestors and the page, as a wheel does. */
   panBy: (delta: Point) => void;
-  /** Call after a new drawing or a new container width: a fitted drawing reads its scale again. */
+  /** Call after a new drawing or a new container size: a fitted drawing reads its scale again. */
   redrawn: () => void;
   /** Calls `listener` after each change of the state; the result stops it. */
   subscribe: (listener: (state: Readonly<ViewportState>) => void) => () => void;
@@ -87,6 +87,7 @@ export interface Viewport {
 
 /** Where the last zoom put the drawing's top-left, and where it wanted it: the browser rounds each scroll offset. */
 interface OriginRest {
+  drawing: Element | undefined;
   actual: Point;
   ideal: Point;
 }
@@ -133,7 +134,9 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
     const drawing = options.drawing();
     const before = drawingBox(container, { drawing });
     const origin =
-      zoom.kind === "pinch" ? idealOrigin(before.origin, { last: lastOrigin }) : before.origin;
+      zoom.kind === "pinch"
+        ? idealOrigin(before.origin, { last: lastOrigin, drawing })
+        : before.origin;
     choose(target);
     const after = drawingBox(container, { drawing });
     const measured = before.width > 0 && after.width > 0;
@@ -147,6 +150,7 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
     });
     scrollTo(wanted, followed(container, { sizeBefore }));
     lastOrigin = {
+      drawing,
       actual: drawingBox(container, { drawing }).origin,
       ideal: {
         x: point.x - (point.x - origin.x) * ratio,
@@ -176,7 +180,6 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
     if (!same) changed({ ...state, scale: target, sizing: "chosen" });
   }
   function redrawn(): void {
-    lastOrigin = undefined;
     if (state.sizing === "chosen") return;
     const scale = fittedScale(options.drawing());
     if (scale === undefined || scale === state.scale) return;
@@ -228,12 +231,14 @@ const ROUNDING = 2;
 
 interface IdealOriginOptions {
   last: OriginRest | undefined;
+  /** The drawing now: a new one starts afresh. */
+  drawing: Element | undefined;
 }
 
 /** Where the last zoom wanted the drawing's top-left, while it still sits where that zoom left it and rounding is all that differs; else where it is. */
 function idealOrigin(origin: Point, options: IdealOriginOptions): Point {
   const { last } = options;
-  if (last === undefined) return origin;
+  if (last === undefined || last.drawing !== options.drawing) return origin;
   const moved = last.actual.x !== origin.x || last.actual.y !== origin.y;
   if (moved) return origin;
   const near =

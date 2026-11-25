@@ -1,6 +1,6 @@
 import { fitRoom, shownArea } from "../keep-in-view.ts";
-import type { Viewport } from "./viewport.ts";
-import { viewportOf } from "./viewport.ts";
+import type { Viewport } from "../viewport/viewport.ts";
+import { viewportOf } from "../viewport/viewport.ts";
 import type { ViewState } from "../mount/view-state.ts";
 
 export interface CanvasViewportOptions {
@@ -24,5 +24,7 @@ export function viewportOnCanvas(
   viewport.subscribe(({ scale, tool, sizing }) => {
     view.viewport = { scale, tool, sizing };
   });
+  const Observer = root.ownerDocument.defaultView?.ResizeObserver;
+  if (Observer !== undefined) new Observer(() => viewport.redrawn()).observe(canvas);
   return viewport;
 }

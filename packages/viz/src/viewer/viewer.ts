@@ -3,7 +3,7 @@ import type { Canvas } from "./mount/canvas.ts";
 import { decodeFocus, enteredBy, focusReader, unknownFocusText } from "./mount/focus.ts";
 import { drawCallbacks, drawnWhy, followedLook, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { listenEscape } from "./mount/escape.ts";
-import { listenNavigation } from "./viewport/navigate.ts";
+import { listenNavigation } from "./canvas-navigation/navigate.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
 import type { GraphCallbacks, Selection } from "./graph.ts";

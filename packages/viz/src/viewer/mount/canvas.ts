@@ -16,7 +16,7 @@ import { currentsOf } from "../compartments.ts";
 import { enteredGroupOf } from "../groups/group-machine.ts";
 import { html } from "../dom.ts";
 import type { Viewport } from "../viewport/viewport.ts";
-import { viewportOnCanvas } from "../viewport/canvas-viewport.ts";
+import { viewportOnCanvas } from "../canvas-navigation/canvas-viewport.ts";
 import type { ViewState } from "./view-state.ts";
 
 /** Board width in units where the canvas has no size (not laid out). */

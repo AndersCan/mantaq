@@ -1,4 +1,4 @@
-import type { Viewport, ViewportState } from "./viewport.ts";
+import type { Viewport, ViewportState } from "../viewport/viewport.ts";
 import { isNever } from "../../is-never.ts";
 
 /** What a key does to the viewport. */
@@ -82,23 +82,33 @@ export function listenNavigation(root: HTMLElement, options: NavigationOptions):
     const viewport = current();
     const canvas = canvasUnder(root, { target: event.target });
     if (viewport === undefined || canvas === undefined) return;
-    if (!pans(event, { viewport })) return;
+    if (!pans(event, { viewport, held: spaceDown })) return;
     event.preventDefault();
+    const focused = doc.activeElement;
+    if (focused instanceof HTMLElement && !canvas.contains(focused)) focused.blur();
     dragPan(canvas, { start: event, viewport, afterward: afterDrag });
   });
+  // Capture: a diagram button presses on its own keydown, before this would hear it.
+  doc.addEventListener(
+    "keydown",
+    (event) => {
+      const viewport = current();
+      const space = event.key === " " && keysHere(root, event);
+      const free = space && !takesSpace(root, { target: event.target });
+      if (viewport === undefined || !free) return;
+      event.preventDefault();
+      event.stopPropagation();
+      spaceDown = true;
+      if (viewport.state().pan === "none") viewport.setPan("held");
+    },
+    { capture: true },
+  );
   doc.addEventListener("keydown", (event) => {
     const viewport = current();
     const ours = !event.defaultPrevented && keysHere(root, event);
     if (viewport === undefined || !ours) return;
-    if (event.key === " ") {
-      if (takesSpace(event.target)) return;
-      event.preventDefault();
-      spaceDown = true;
-      if (viewport.state().pan === "none") viewport.setPan("held");
-      return;
-    }
     const key = keyFor(event);
-    if (key === undefined || event.repeat) return;
+    if (key === undefined) return;
     event.preventDefault();
     act(viewport, { key });
   });
@@ -138,11 +148,18 @@ function wheelZoom(event: WheelEvent, options: ViewportOptions): void {
   viewport.zoomAt({ x: event.clientX, y: event.clientY }, { scale, kind: "pinch" });
 }
 
+interface PansOptions {
+  viewport: Viewport;
+  /** Space is down, also for a viewport drawn after it went down. */
+  held: boolean;
+}
+
 /** The middle button pans with any tool; the main button pans with the Hand tool or while Space is held. */
-function pans(event: PointerEvent, options: ViewportOptions): boolean {
+function pans(event: PointerEvent, options: PansOptions): boolean {
   const { tool, pan } = options.viewport.state();
   if (event.button === 1) return true;
-  return event.button === 0 && (tool === "hand" || pan === "held");
+  const panning = tool === "hand" || pan === "held" || options.held;
+  return event.button === 0 && panning;
 }
 
 interface DragOptions {
@@ -191,9 +208,12 @@ function typesHere(target: Element): boolean {
   return field !== null || target.closest('[data-tab-panel="screen"]') !== null;
 }
 
-/** True where Space presses a control: it keeps doing that. */
-function takesSpace(target: EventTarget | null): boolean {
-  return target instanceof Element && target.matches(SPACE_TAKERS);
+/** True where Space presses a control: it keeps doing that, except on a state or an arrow while the pointer is over the canvas, where Space pans and Enter presses. */
+function takesSpace(root: HTMLElement, options: UnderOptions): boolean {
+  const { target } = options;
+  if (!(target instanceof Element) || !target.matches(SPACE_TAKERS)) return false;
+  const drawn = target.closest(".graph") !== null;
+  return !drawn || root.querySelector(".canvas")?.matches(":hover") !== true;
 }
 
 function keyFor(event: KeyboardEvent): NavigationKey | undefined {
