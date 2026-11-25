@@ -1,3 +1,4 @@
+import type { EnteredMachine } from "../graph.ts";
 import type { VizDriver, VizLiveState, VizOutputRoutes } from "../../schema.ts";
 
 export interface ViewerOptions {
@@ -32,5 +33,5 @@ export interface ViewerOptions {
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
   /** Called when the reader enters a machine node, before the viewer draws it: the embedded machine's id and the state that embeds it. The viewer shows that machine itself. */
-  onEnter?: (entered: { machine: string; state: string }) => void;
+  onEnter?: (entered: EnteredMachine) => void;
 }

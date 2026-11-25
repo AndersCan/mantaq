@@ -200,6 +200,7 @@ export function mountDriven(
   const driver = liveDriver(id, create, context.effectMode);
   mountViewer(viewer, shown, {
     ...options,
+    ...(id === "" ? {} : { machine: id }),
     ...routesOf(context),
     ...(driver === undefined ? {} : { driver }),
     ...screenOption({ doc, preview: context.preview, id }),
