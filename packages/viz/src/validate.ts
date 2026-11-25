@@ -26,7 +26,6 @@ import type {
   VizMachine,
   VizState,
 } from "./schema.ts";
-import { checkEmbeds } from "./validate/validate-embeds.ts";
 import { checkGroups } from "./validate/validate-groups.ts";
 import { Either } from "@mantaq/utils";
 import { readExplanation } from "./validate/validate-explanation.ts";
@@ -63,17 +62,6 @@ function readState(reader: Reader, options: StateRecord): VizState {
   if (typeof group === "string") state.group = group;
   if (group !== undefined && typeof group !== "string") {
     report(reader, { path: `${path}.group`, message: "expected string" });
-  }
-  const machine = record["machine"];
-  if (typeof machine === "string") state.machine = machine;
-  if (machine !== undefined && typeof machine !== "string") {
-    report(reader, { path: `${path}.machine`, message: "expected string" });
-  }
-  if (record["forward"] !== undefined) {
-    state.forward = readStrings(reader, { record, key: "forward", path });
-    if (machine === undefined) {
-      report(reader, { path: `${path}.forward`, message: "forward needs machine" });
-    }
   }
   return state;
 }
@@ -255,7 +243,6 @@ export function validateViz(value: unknown): Either<VizIssue[], VizDocument> {
   const machines = readList(reader, { record: value, key: "machines", path: "$" }, (item, at) =>
     readMachine(reader, item, at),
   );
-  if (reader.issues.length === 0) checkEmbeds(reader, machines);
   if (reader.issues.length > 0) return Either.left(reader.issues);
   const document: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines };
   return Either.right(document);

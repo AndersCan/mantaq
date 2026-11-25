@@ -292,7 +292,7 @@
   font-size: 11px;
 }
 
-/* A node that holds more than one state: a box-in-a-box glyph and its row under the name (an embedded machine's id and enter control, or a group's size). */
+/* A group node: a box-in-a-box glyph and its row under the name (the group's size, or the state the walk is in), and its enter control. */
 .viz .machine-glyph rect {
   fill: none;
   stroke: var(--fg);
@@ -327,6 +327,19 @@
 .viz .machine-enter:focus-visible rect {
   stroke: var(--select);
   stroke-width: 2;
+}
+
+/* A stub in an entered group: a state outside the group that one of its arrows reaches or leaves. */
+.viz .state.stub .frame {
+  stroke-dasharray: 4 3;
+}
+
+.viz .walk-outside {
+  margin: 0;
+}
+
+.viz .walk-outside:empty {
+  display: none;
 }
 
 .viz .edge.undetermined path {

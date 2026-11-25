@@ -73,10 +73,6 @@ export interface VizState {
   doc: string | null;
   /** Name from the `@group` tag of the `state(...)` declaration: the viewer can fold the group's states into one node. Viewer-only, the runtime never sees it. Omitted = ungrouped. */
   group?: string;
-  /** Id of another machine in the same document that this state embeds. That machine stays its own entry in `machines`; its states are not copied here. Omitted = a plain state. */
-  machine?: string;
-  /** Inputs of this machine that `embed` sends on to `machine` while this state is current (its `forward` option). Omitted = none, or no `machine`. */
-  forward?: string[];
 }
 
 export interface VizEvent {

@@ -1,5 +1,5 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
-import { decodeFocus, enteredBy, focusReader, startOf } from "./mount/focus.ts";
+import { decodeFocus, enteredBy, focusReader } from "./mount/focus.ts";
 import { drawCallbacks, membersWhy, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
@@ -27,11 +27,11 @@ export function mountViewer(
   options: ViewerOptions = {},
 ): void {
   const doc = root.ownerDocument;
-  const first = viz.machines.find((machine) => machine.id === options.machine) ?? startOf(viz);
+  const first = viz.machines.find((machine) => machine.id === options.machine) ?? viz.machines[0];
   const view = initialView(options, { events: viz.machines.flatMap((machine) => machine.events) });
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
-  if (first) view.focus = decodeFocus(options.focus ?? [], { viz, root: first });
+  if (first) view.focus = decodeFocus(options.focus ?? [], { root: first });
   const redraws: Redraws = { redraw: () => undefined, refit: () => undefined };
   listenFullscreen(root);
   listenWidth(root, { refit: () => redraws.refit() });
@@ -79,7 +79,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   const { driver } = options;
   root.classList.toggle("diagram-only", view.diagramOnly);
   const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
-  const focus = focusReader(view, { viz: context.viz, root: machine });
+  const focus = focusReader(view, { root: machine });
   function shown(): VizMachine {
     return focus().drawn;
   }
@@ -97,15 +97,10 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
       selection: view.selection,
       select: showDetails,
       ...(focus().canvas === "board" ? { hint: "Click a machine to see its states." } : {}),
-      ...(focus().walk === "live"
-        ? {
-            send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }),
-            why: (members) => membersWhy({ machine, view, driver }, { members }),
-          }
-        : {}),
+      send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }),
+      why: (members) => membersWhy({ machine, view, driver }, { members }),
     });
-    const screenView = focus().walk === "live" ? view : { ...view, selection: null };
-    const screen = screenOf(doc, { options, machine, view: screenView, driver });
+    const screen = screenOf(doc, { options, machine, view, driver });
     const tabs = panelTabs(doc, { view, parts: stepTab, details, screen, refresh });
     shownSteps = replaceKeepingSteps(panel, {
       tabs,
@@ -115,11 +110,9 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     if (view.diagramOnly) whyNot();
     mark();
   }
-  /** Diagram only: the line under the drawing says why the root's selected arrow sent nothing; an entered machine sends nothing, so it is empty. */
+  /** Diagram only: the line under the drawing says why the selected arrow sent nothing. */
   function whyNot(): void {
-    if (focus().walk === "live") return sayWhy(root, { machine, view, driver });
-    const line = root.querySelector(".viz-main > .blocked-note");
-    if (line !== null) line.textContent = "";
+    sayWhy(root, { machine, view, driver });
   }
   function pickRow(child: PickedChild): void {
     pickChild(child, { root, view, refresh, source: "row" });
@@ -128,8 +121,8 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     pickChild(child, { root, view, refresh, source: "chip" });
   }
   function mark(): void {
-    const { walk } = focus();
-    markDiagram(root, { machine, shown: shown(), view, driver, pick: pickChip, walk });
+    markDiagram(root, { machine, shown: shown(), view, driver, pick: pickChip });
+    canvas.walked();
   }
   function follow(): void {
     refresh();
@@ -152,7 +145,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   function showDetails(selection: Selection): void {
     view.selection = selection;
     const previewed = view.tab === "screen" && selection.kind === "state";
-    if (!previewed || focus().walk === "static") view.tab = "details";
+    if (!previewed) view.tab = "details";
     refresh();
   }
   function openDetails(selection: Selection): void {
@@ -162,14 +155,14 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     }
   }
   function callbacks(): GraphCallbacks {
-    const handlers = { shown: shown(), walk: focus().walk, openDetails, sendEvent };
+    const handlers = { shown: shown(), openDetails, sendEvent };
     return drawCallbacks({ machine, view, driver }, handlers);
   }
   function moved(move: FocusMove): void {
-    if (move.before.machine !== move.after.machine) view.selection = null;
+    if (move.before.drawn !== move.after.drawn) view.selection = undefined;
     navigated(options, { machine, view });
     const entered = enteredBy(move);
-    if (entered !== undefined) options.onEnter?.(entered);
+    if (entered !== undefined) options.onEnterGroup?.(entered);
   }
   const canvas = canvasOf({ doc, root, view, focus, callbacks, moved, afterSwap: refresh, mark });
   context.redraws.refit = canvas.refit;

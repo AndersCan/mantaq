@@ -1,3 +1,4 @@
+import * as shopMachines from "./groups/shop-machines.ts";
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import {
@@ -26,7 +27,7 @@ import { overlapsOf } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
 import { Either } from "@mantaq/utils";
-import { documentOf } from "../validate/embed-document.ts";
+import { foldGroups } from "./groups/fold-groups.ts";
 import { validateViz } from "../validate.ts";
 
 function state(name: string): VizState {
@@ -686,69 +687,58 @@ function right(box: Span): number {
   return box.x + box.width / 2;
 }
 
-describe("placeMachine machine node", () => {
-  const shop = documentOf([
-    {
-      id: "checkout",
-      states: [
-        { id: "cart", role: "initial" },
-        { id: "paying", machine: "payment" },
-        { id: "done", role: "final" },
-      ],
-      edges: [
-        { from: "cart", event: "pay", to: "paying" },
-        { from: "paying", event: "paid", to: "done" },
-        { from: "paying", event: "declined", to: "cart" },
-      ],
-    },
-    { id: "payment", states: [{ id: "charging", role: "initial" }] },
-  ]);
-  const checkout = shop.machines.find((machine) => machine.id === "checkout") ?? tight;
+describe("placeMachine group node", () => {
+  const shop = shopMachines.machineOf({
+    states: [
+      shopMachines.stateOf("inCart", { initial: true }),
+      shopMachines.stateOf("chargingCard", { group: "payment" }),
+      shopMachines.stateOf("confirming", { group: "payment" }),
+      shopMachines.stateOf("sent", { final: true }),
+    ],
+    edges: [
+      shopMachines.edgeOf("inCart", { event: "checkout", to: "chargingCard" }),
+      shopMachines.edgeOf("chargingCard", { event: "charged", to: "confirming" }),
+      shopMachines.edgeOf("confirming", { event: "confirmed", to: "sent" }),
+      shopMachines.edgeOf("confirming", { event: "declined", to: "inCart" }),
+    ],
+  });
+  const folded = foldGroups(shop);
 
   test("the hand-built document is a valid schema 19 document", () => {
-    expect(Either.getRight(validateViz(shop))).toEqual(shop);
+    const viz = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shop] };
+    expect(Either.getRight(validateViz(viz))).toEqual(viz);
   });
 
-  test("a state that embeds a machine is one machine node, and its edges end on it", () => {
-    const checked = Either.getRight(layoutMachine(checkout));
+  test("a group is one machine node, and its edges end on it", () => {
+    const checked = Either.getRight(layoutMachine(folded));
     expect({
       nodes: checked?.layout.nodes.map((node) => [node.id, node.kind]),
       edges: checked?.layout.edges.map((placed) => [placed.edge.from, placed.target]),
       overlaps: checked?.overlaps,
     }).toEqual({
       nodes: [
-        ["cart", "state"],
-        ["paying", "machine"],
-        ["done", "state"],
+        ["inCart", "state"],
+        ["@payment", "machine"],
+        ["sent", "state"],
       ],
       edges: [
-        ["cart", "paying"],
-        ["paying", "done"],
-        ["paying", "cart"],
+        ["inCart", "@payment"],
+        ["@payment", "@payment"],
+        ["@payment", "sent"],
+        ["@payment", "inCart"],
       ],
       overlaps: [],
     });
   });
 
-  test("a final machine node with effects keeps its chips clear of the row", () => {
-    const busy: VizMachine = {
-      ...checkout,
-      states: checkout.states.map((each) =>
-        each.id === "paying"
-          ? { ...each, final: true, effects: [{ name: "chargeCard", sends: [] }] }
-          : each,
-      ),
-    };
-    expect(Either.getRight(layoutMachine(busy))?.overlaps).toEqual([]);
-  });
-
-  test("under its name: the glyph, the machine's id and enter, each LABEL_PAD apart", () => {
-    const node = placeMachine(checkout).nodes.find((each) => each.id === "paying");
+  test("under its name: the glyph, a row wide enough for any state the walk ends in, and enter, each LABEL_PAD apart", () => {
+    const node = placeMachine(folded).nodes.find((each) => each.id === "@payment");
     const shown =
-      node?.kind === "machine" && node.enter !== undefined
+      node?.kind === "machine"
         ? {
             holds: node.holds,
             height: node.height,
+            rowWidth: node.name.width,
             nameToRow: node.name.y - node.name.height / 2 - (node.label.y + node.label.height / 2),
             glyphToName: Math.round(left(node.name) - right(node.glyph)),
             nameToEnter: Math.round(left(node.enter) - right(node.name)),
@@ -756,8 +746,9 @@ describe("placeMachine machine node", () => {
           }
         : undefined;
     expect(shown).toEqual({
-      holds: { kind: "machine", machine: "payment" },
+      holds: { group: "payment", states: ["chargingCard", "confirming"] },
       height: 2 * LABEL_PAD + 18 + LABEL_PAD + 16,
+      rowWidth: textWidth("ended in chargingCard", 11),
       nameToRow: LABEL_PAD,
       glyphToName: LABEL_PAD,
       nameToEnter: LABEL_PAD,

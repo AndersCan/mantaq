@@ -212,7 +212,7 @@ function statePanel(
 
 export interface RenderPanelOptions {
   machine: VizMachine;
-  selection: Selection | null;
+  selection: Selection | undefined;
   select: (selection: Selection) => void;
   /** What Details shows under an arrow's title to send it. */
   send?: (edge: VizEdge) => HTMLElement | undefined;

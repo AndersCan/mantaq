@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
 import { edgeOf, machineOf, stateOf } from "./shop-machines.ts";
-import type { VizDriver, VizLiveState, VizLiveStep, VizMachine, VizStep } from "../../schema.ts";
 import { mountViewer } from "../viewer.ts";
+import { walkDriver } from "./walk-driver.ts";
 import { VIZ_SCHEMA_VERSION } from "../../schema.ts";
 
 /** The grouped checkout with a way back: `cancel` leaves either payment state for the cart. */
@@ -26,76 +26,6 @@ const shop = machineOf({
 });
 
 const CANCEL = "group:@payment>cancel>inCart:transition";
-
-interface WalkOptions {
-  /** Edges whose guard never lets the walk take them. */
-  guarded: ReadonlySet<string>;
-}
-
-/** A hand-written driver that walks the machine's own edges: an event takes the first unguarded edge from the current state, or stays. */
-function walkDriver(machine: VizMachine, options: WalkOptions) {
-  const sent: VizStep[] = [];
-  let listener: ((state: VizLiveState) => void) | undefined;
-  function stepFrom(state: string, step: VizStep): VizLiveStep {
-    const event = step.kind === "event" ? step.event : "advance";
-    const edge = machine.edges.find(
-      (each) => each.from === state && each.event === event && !options.guarded.has(each.id),
-    );
-    const target = edge?.to ?? state;
-    const outcome = edge === undefined ? "stay" : "transition";
-    return {
-      from: state,
-      event,
-      to: target,
-      outcome,
-      effects: [],
-      sent: [],
-      context: null,
-      error: null,
-    };
-  }
-  function run(steps: ReadonlyArray<VizStep>): VizLiveState {
-    let state = machine.initial ?? "";
-    let last: VizLiveStep | null = null;
-    for (const step of steps) {
-      last = stepFrom(state, step);
-      state = last.to;
-    }
-    return {
-      state,
-      steps: [...steps],
-      last,
-      after: [],
-      timers: [],
-      context: null,
-      payload: null,
-      regions: {},
-      children: [],
-      effectMode: "real",
-      waiting: [],
-    };
-  }
-  const driver: VizDriver = {
-    reset: () => {
-      sent.length = 0;
-      return run([]);
-    },
-    step: (step) => {
-      sent.push(step);
-      return run(sent);
-    },
-    dryRun: (steps) => steps.map((step) => stepFrom(run(sent).state, step)),
-    listen: (callback) => {
-      listener = callback;
-    },
-  };
-  /** The actor moved by itself, as an effect result does: the viewer hears `events` sent. */
-  function arrive(events: ReadonlyArray<string>): void {
-    for (const event of events) sent.push({ kind: "event", event, payload: null });
-    listener?.(run(sent));
-  }
-  return { driver, sent, arrive };
-}
 
 function mount(guarded: ReadonlySet<string> = new Set()) {
   const root = document.createElement("div");
@@ -132,7 +62,7 @@ function marks(root: HTMLElement) {
 }
 
 describe("a grouped machine in the viewer", () => {
-  test("is drawn folded: one node per group with its name, its size and its states, and no enter control", () => {
+  test("is drawn folded: one node per group with its name, its size, its states and an enter control", () => {
     const { root } = mount();
     const nodes: string[] = [];
     for (const node of root.querySelectorAll(".graph g.state[data-node-id]")) {
@@ -145,14 +75,16 @@ describe("a grouped machine in the viewer", () => {
       row: payment?.querySelector(".machine-name")?.textContent,
       states: payment?.getAttribute("data-states"),
       aria: payment?.getAttribute("aria-label"),
-      enter: root.querySelectorAll(".machine-enter").length,
+      enter: [...root.querySelectorAll(".machine-enter")].map((each) =>
+        each.getAttribute("aria-label"),
+      ),
     }).toEqual({
       nodes: ["inCart", "@payment", "@shipping"],
       label: "payment",
       row: "2 states",
       states: JSON.stringify(["chargingCard", "confirming"]),
       aria: "group payment, 2 states: chargingCard, confirming",
-      enter: 0,
+      enter: ["enter group payment", "enter group shipping"],
     });
   });
 

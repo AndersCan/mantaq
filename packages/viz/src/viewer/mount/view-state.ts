@@ -15,7 +15,7 @@ export interface PickedChild {
 }
 
 export interface ViewState {
-  selection: Selection | null;
+  selection: Selection | undefined;
   /** The machines opened from the root, in order: one of a board, or the one a state embeds (kept in `?focus=`). Replaced, never changed in place. */
   focus: FocusStep[];
   /** Set while a driver runs the actor. */
@@ -51,7 +51,7 @@ export interface InitialViewOptions {
 
 export function initialView(options: ViewerOptions, document: InitialViewOptions): ViewState {
   return {
-    selection: null,
+    selection: undefined,
     focus: [],
     live: null,
     afters: [],

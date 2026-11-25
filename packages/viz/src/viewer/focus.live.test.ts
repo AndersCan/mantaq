@@ -1,92 +1,44 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, test } from "vite-plus/test";
-import type { VizDriver, VizLiveState, VizStep } from "../schema.ts";
-import { documentOf } from "../validate/embed-document.ts";
-import type { EnteredMachine } from "./graph.ts";
+import { edgeOf, machineOf, stateOf } from "./groups/shop-machines.ts";
+import type { EnteredGroup } from "./graph.ts";
 import { mountViewer } from "./embed.ts";
 import type { ViewerOptions } from "./embed.ts";
+import { VIZ_SCHEMA_VERSION } from "../schema.ts";
+import type { VizDocument } from "../schema.ts";
+import { walkDriver } from "./groups/walk-driver.ts";
 
-const shop = documentOf([
-  {
-    id: "checkout",
-    states: [
-      { id: "cart", role: "initial" },
-      { id: "paying", machine: "payment" },
-      { id: "refunding", machine: "payment" },
-      { id: "done", role: "final" },
-    ],
-    edges: [
-      { from: "cart", event: "pay", to: "paying" },
-      { from: "paying", event: "paid", to: "done" },
-      { from: "done", event: "refund", to: "refunding" },
-    ],
-  },
-  {
-    id: "payment",
-    states: [
-      { id: "card", role: "initial" },
-      { id: "verifying", machine: "fraud" },
-      { id: "settled", role: "final" },
-    ],
-    edges: [
-      { from: "card", event: "submit", to: "verifying" },
-      { from: "verifying", event: "pass", to: "settled" },
-    ],
-  },
-  { id: "fraud", states: [{ id: "scoring", role: "initial" }] },
-]);
+/** The checkout with its payment and shipping states in groups; `cancel` leaves payment for the cart. */
+const shop = machineOf({
+  states: [
+    stateOf("inCart", { initial: true }),
+    stateOf("chargingCard", { group: "payment" }),
+    stateOf("confirming", { group: "payment" }),
+    stateOf("packing", { group: "shipping" }),
+    stateOf("sent", { group: "shipping", final: true }),
+  ],
+  edges: [
+    edgeOf("__initial__", { event: "", to: "inCart", kind: "initial" }),
+    edgeOf("inCart", { event: "checkout", to: "chargingCard" }),
+    edgeOf("chargingCard", { event: "charged", to: "confirming" }),
+    edgeOf("confirming", { event: "cancel", to: "inCart" }),
+    edgeOf("confirming", { event: "confirmed", to: "packing" }),
+    edgeOf("packing", { event: "packed", to: "sent" }),
+  ],
+});
 
-/** Walks checkout's own arrows; counts every step it is asked to take. */
-function checkoutDriver(): VizDriver & { taken: VizStep[] } {
-  const taken: VizStep[] = [];
-  let steps: VizStep[] = [];
-  let state = "cart";
-  const checkout = shop.machines[0];
-  function liveNow(): VizLiveState {
-    return {
-      state,
-      steps: [...steps],
-      last: null,
-      after: [],
-      timers: [],
-      context: {},
-      payload: null,
-      regions: {},
-      children: [],
-      effectMode: "held",
-      waiting: [],
-    };
-  }
-  return {
-    taken,
-    reset: () => {
-      steps = [];
-      state = "cart";
-      return liveNow();
-    },
-    step: (step) => {
-      taken.push(step);
-      const event = step.kind === "event" ? step.event : "";
-      const edge = checkout?.edges.find((each) => each.from === state && each.event === event);
-      if (edge !== undefined) {
-        state = edge.to ?? state;
-        steps = [...steps, step];
-      }
-      return liveNow();
-    },
-    listen: () => undefined,
-  };
-}
+const viz: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shop] };
 
 afterEach(() => {
   document.body.replaceChildren();
 });
 
-function mount(options: ViewerOptions = {}): HTMLElement {
+function mount(options: ViewerOptions = {}) {
   const root = document.createElement("div");
   document.body.append(root);
-  mountViewer(root, shop, options);
-  return root;
+  const { driver, sent } = walkDriver(shop, { guarded: new Set() });
+  mountViewer(root, viz, { driver, ...options });
+  return { root, sent };
 }
 
 function press(element: Element | null | undefined): void {
@@ -97,12 +49,20 @@ function escape(element: Element | null | undefined): void {
   element?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 }
 
-interface EnterOptions {
-  from: string;
+interface Named {
+  id: string;
 }
 
-function enter(root: HTMLElement, options: EnterOptions): void {
-  press(root.querySelector(`.machine-enter[data-enter-state="${options.from}"]`));
+function enter(root: HTMLElement, options: Named): void {
+  press(root.querySelector(`.machine-enter[data-enter-group="${options.id}"]`));
+}
+
+function arrow(root: HTMLElement, options: Named): Element | null {
+  return root.querySelector(`.canvas g.edge[data-edge-id="${options.id}"]`);
+}
+
+function node(root: HTMLElement, options: Named): Element | null {
+  return root.querySelector(`.canvas g[data-node-id="${options.id}"]`);
 }
 
 interface CrumbOptions {
@@ -114,158 +74,196 @@ function crumb(root: HTMLElement, options: CrumbOptions): Element | undefined {
   return crumbs.find((button) => button.textContent === options.label);
 }
 
-/** What the viewer shows: the machine drawn, its states, the path above it, and the walk. */
+interface IdsOptions {
+  attribute: string;
+}
+
+function idsOf(elements: Iterable<Element>, options: IdsOptions): string[] {
+  const ids: string[] = [];
+  for (const element of elements) ids.push(element.getAttribute(options.attribute) ?? "");
+  return ids;
+}
+
+/** What the viewer shows: the states drawn, which are stubs, the path above, the walk and what a click sends. */
 function shown(root: HTMLElement) {
-  const crumbs = [...root.querySelectorAll(".focus-path li > *")];
+  const crumbs: string[] = [];
+  for (const each of root.querySelectorAll(".focus-path li > *")) crumbs.push(each.textContent);
   return {
-    drawn: root.querySelector(".canvas svg")?.getAttribute("aria-label"),
-    states: [...root.querySelectorAll(".canvas g.state")].map((node) =>
-      node.getAttribute("data-node-id"),
-    ),
-    path: crumbs.map((button) => button.textContent),
-    current: root.querySelector(".canvas g.state.current")?.getAttribute("data-node-id"),
-    steps: root.querySelectorAll("ol.explore-run > li").length,
+    states: idsOf(root.querySelectorAll(".canvas g.state"), { attribute: "data-node-id" }),
+    stubs: idsOf(root.querySelectorAll(".canvas g.state.stub"), { attribute: "data-node-id" }),
+    path: crumbs,
+    current: idsOf(root.querySelectorAll(".canvas g.current[data-node-id]"), {
+      attribute: "data-node-id",
+    }),
+    sends: idsOf(root.querySelectorAll('.canvas g.edge[role="button"]'), {
+      attribute: "data-edge-id",
+    }),
+    outside: root.querySelector(".walk-outside")?.textContent ?? undefined,
   };
 }
 
-const atCheckout = {
-  drawn: "machine checkout",
-  states: ["cart", "paying", "refunding", "done"],
+const atShop = {
+  states: ["inCart", "@payment", "@shipping"],
+  stubs: [],
   path: [],
-  current: undefined,
-  steps: 0,
+  current: ["inCart"],
+  sends: ["inCart-checkout-chargingCard"],
+  outside: undefined,
 };
 
-const atPayment = {
-  drawn: "machine payment",
-  states: ["card", "verifying", "settled"],
-  path: ["checkout", "payment"],
-  current: undefined,
-  steps: 0,
+const inPayment = {
+  states: ["inCart", "chargingCard", "confirming", "packing"],
+  stubs: ["inCart", "packing"],
+  path: ["shop", "payment"],
 };
 
-describe("entering a machine node", () => {
-  test("draws the embedded machine on its own, with the path above the canvas", () => {
-    const entered: EnteredMachine[] = [];
-    const root = mount({ onEnter: (machine) => entered.push(machine) });
-    enter(root, { from: "refunding" });
-    expect({ shown: shown(root), entered }).toStrictEqual({
-      shown: atPayment,
-      entered: [{ machine: "payment", state: "refunding" }],
-    });
-    expect(root.ownerDocument.activeElement).toBe(crumb(root, { label: "payment" }));
-  });
-
-  test("enters again from inside, and a crumb leaves to that machine", () => {
-    const root = mount();
-    enter(root, { from: "paying" });
-    enter(root, { from: "verifying" });
-    const deep = shown(root).path;
-    press(crumb(root, { label: "checkout" }));
-    const control = root.querySelector('.machine-enter[data-enter-state="paying"]');
-    expect({ deep, left: shown(root), focused: root.ownerDocument.activeElement }).toStrictEqual({
-      deep: ["checkout", "payment", "fraud"],
-      left: atCheckout,
-      focused: control,
-    });
-  });
-
-  test("Escape leaves one machine at a time", () => {
-    const root = mount();
-    enter(root, { from: "paying" });
-    enter(root, { from: "verifying" });
-    escape(root.querySelector(".focus-path [aria-current]"));
-    const once = shown(root);
-    escape(root.querySelector(".canvas svg"));
-    const twice = shown(root);
-    escape(root.querySelector(".canvas svg"));
-    expect({ once, twice, again: shown(root) }).toStrictEqual({
-      once: atPayment,
-      twice: atCheckout,
-      again: atCheckout,
-    });
-  });
-
-  test("never changes the walk or the step log, and draws the entered machine without it, its arrows plain", () => {
-    const driver = checkoutDriver();
-    const root = mount({ driver });
-    press(root.querySelector('g.edge[data-edge-id="cart-pay-paying"]'));
-    const walked = shown(root);
-    enter(root, { from: "paying" });
-    const inside = shown(root);
-    const arrow = root.querySelector('.canvas g.edge[data-edge-id="card-submit-verifying"]');
-    press(arrow);
-    const clicked = {
-      sent: driver.taken.length,
-      button: arrow?.getAttribute("role") === "button",
-      details: root.querySelector("[data-selected-edge]")?.getAttribute("data-selected-edge"),
-    };
-    escape(root.querySelector(".canvas svg"));
-    expect({ walked, inside, clicked, left: shown(root) }).toStrictEqual({
-      walked: { ...atCheckout, current: "paying", steps: 1 },
-      inside: { ...atPayment, steps: 1 },
-      clicked: { sent: 1, button: false, details: undefined },
-      left: walked,
-    });
-  });
-
-  test("a state clicked inside opens its Details, not the root's Screen", () => {
-    function screen(live: VizLiveState): Node {
-      return document.createTextNode(`screen of ${live.state}`);
-    }
-    const root = mount({ driver: checkoutDriver(), screen });
-    enter(root, { from: "paying" });
-    press(root.querySelector('.canvas g.state[data-node-id="settled"]'));
-    const inside = {
-      tab: root.querySelector('[role="tab"][aria-selected="true"]')?.textContent,
-      details: root.querySelector("[data-selected-state]")?.getAttribute("data-selected-state"),
-    };
-    escape(root.querySelector(".canvas svg"));
+describe("entering a group", () => {
+  test("draws its states and a stub for each outside state its arrows reach, with the path above", () => {
+    const entered: EnteredGroup[] = [];
+    const { root } = mount({ onEnterGroup: (group) => entered.push(group) });
+    enter(root, { id: "@payment" });
+    const stub = node(root, { id: "packing" });
     expect({
-      inside,
-      left: root.querySelector("[data-selected-state]") ?? undefined,
+      shown: shown(root),
+      entered,
+      stub: {
+        aria: stub?.getAttribute("aria-label"),
+        title: stub?.querySelector(":scope > title")?.textContent,
+        button: stub?.getAttribute("role"),
+      },
+      focused: root.ownerDocument.activeElement === crumb(root, { label: "payment" }),
     }).toStrictEqual({
-      inside: { tab: "Details", details: "settled" },
-      left: undefined,
+      shown: {
+        ...inPayment,
+        current: ["inCart"],
+        sends: ["inCart-checkout-chargingCard"],
+        outside: "The walk is in inCart, outside group payment.",
+      },
+      entered: [{ group: "@payment", name: "payment" }],
+      stub: {
+        aria: "state packing, outside group payment",
+        title: "packing is outside group payment. Click to go back to it.",
+        button: "button",
+      },
+      focused: true,
     });
   });
 
-  test("draws the enter control without onEnter", () => {
-    const root = mount();
-    expect(root.querySelectorAll(".machine-enter")).toHaveLength(2);
+  test("the walk goes on inside: each click on a drawn arrow sends, and an arrow to a stub leaves the group", () => {
+    const { root, sent } = mount();
+    enter(root, { id: "@payment" });
+    press(arrow(root, { id: "inCart-checkout-chargingCard" }));
+    const charging = shown(root);
+    press(arrow(root, { id: "chargingCard-charged-confirming" }));
+    const confirming = shown(root);
+    press(arrow(root, { id: "confirming-confirmed-packing" }));
+    const events: string[] = [];
+    for (const step of sent) events.push(step.kind === "event" ? step.event : step.kind);
+    expect({ charging, confirming, left: shown(root), events }).toStrictEqual({
+      charging: {
+        ...inPayment,
+        current: ["chargingCard"],
+        sends: ["chargingCard-charged-confirming"],
+        outside: "",
+      },
+      confirming: {
+        ...inPayment,
+        current: ["confirming"],
+        sends: ["confirming-cancel-inCart", "confirming-confirmed-packing"],
+        outside: "",
+      },
+      left: {
+        ...inPayment,
+        current: ["packing"],
+        sends: [],
+        outside: "The walk is in packing, outside group payment.",
+      },
+      events: ["checkout", "charged", "confirmed"],
+    });
+  });
+
+  test("a crumb and Escape go back, onto the enter control", () => {
+    const { root } = mount();
+    enter(root, { id: "@payment" });
+    press(crumb(root, { label: "shop" }));
+    const byCrumb = shown(root);
+    const control = root.querySelector('.machine-enter[data-enter-group="@payment"]');
+    const focusedByCrumb = root.ownerDocument.activeElement === control;
+    enter(root, { id: "@payment" });
+    escape(root.querySelector(".canvas svg"));
+    const byEscape = shown(root);
+    escape(root.querySelector(".canvas svg"));
+    expect({ byCrumb, focusedByCrumb, byEscape, again: shown(root) }).toStrictEqual({
+      byCrumb: atShop,
+      focusedByCrumb: true,
+      byEscape: atShop,
+      again: atShop,
+    });
+  });
+
+  test("a stub goes back, onto the node that draws its state", () => {
+    const { root } = mount();
+    enter(root, { id: "@payment" });
+    press(node(root, { id: "packing" }));
+    expect({
+      shown: shown(root),
+      focused: root.ownerDocument.activeElement?.getAttribute("data-node-id"),
+    }).toStrictEqual({ shown: atShop, focused: "@shipping" });
+  });
+});
+
+describe("a folded group node", () => {
+  function row(root: HTMLElement, options: Named) {
+    const group = node(root, options);
+    return {
+      text: group?.querySelector(".machine-name")?.textContent,
+      ended: group?.classList.contains("ended"),
+    };
+  }
+
+  test("names the state of the group the walk is in, and says so when it ended there", () => {
+    const { root } = mount();
+    const before = row(root, { id: "@payment" });
+    press(arrow(root, { id: "inCart-checkout-chargingCard" }));
+    const inside = row(root, { id: "@payment" });
+    press(arrow(root, { id: "chargingCard-charged-confirming" }));
+    press(arrow(root, { id: "confirming-confirmed-packing" }));
+    press(arrow(root, { id: "packing-packed-sent" }));
+    expect({
+      before,
+      inside,
+      payment: row(root, { id: "@payment" }),
+      shipping: row(root, { id: "@shipping" }),
+    }).toStrictEqual({
+      before: { text: "2 states", ended: false },
+      inside: { text: "now in chargingCard", ended: false },
+      payment: { text: "2 states", ended: false },
+      shipping: { text: "ended in sent", ended: true },
+    });
   });
 });
 
 describe("the path in the address bar", () => {
   test("each move tells the host the path, and leaving clears it", () => {
     const focus: string[][] = [];
-    const root = mount({ onNavigate: (where) => focus.push(where.focus) });
-    enter(root, { from: "paying" });
-    enter(root, { from: "verifying" });
-    press(crumb(root, { label: "checkout" }));
-    expect(focus).toEqual([["paying"], ["paying", "verifying"], []]);
+    const { root } = mount({ onNavigate: (where) => focus.push(where.focus) });
+    enter(root, { id: "@payment" });
+    press(crumb(root, { label: "shop" }));
+    expect(focus).toEqual([["@payment"], []]);
   });
 
-  test("a link with the path opens that machine", () => {
-    const root = mount({ focus: ["paying", "verifying"] });
+  test("a link with the path opens the group, and the walk goes on inside it", () => {
+    const { root } = mount({ focus: ["@payment"], steps: ["checkout"] });
     expect(shown(root)).toStrictEqual({
-      drawn: "machine fraud",
-      states: ["scoring"],
-      path: ["checkout", "payment", "fraud"],
-      current: undefined,
-      steps: 0,
+      ...inPayment,
+      current: ["chargingCard"],
+      sends: ["chargingCard-charged-confirming"],
+      outside: "",
     });
   });
 
   test("a link whose path does not resolve opens as far as it does", () => {
-    const root = mount({ focus: ["paying", "nowhere", "verifying"] });
-    expect(shown(root)).toStrictEqual(atPayment);
-  });
-
-  test("a link without the path opens the machine that no other embeds", () => {
-    const root = document.createElement("div");
-    document.body.append(root);
-    mountViewer(root, { ...shop, machines: [...shop.machines].reverse() });
-    expect(shown(root)).toStrictEqual(atCheckout);
+    const { root } = mount({ focus: ["@nowhere", "@payment"] });
+    expect(shown(root)).toStrictEqual(atShop);
   });
 });

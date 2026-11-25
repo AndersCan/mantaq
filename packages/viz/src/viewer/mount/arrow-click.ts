@@ -11,7 +11,6 @@ import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
 import { currentsOf } from "../compartments.ts";
 import type { EventClick } from "./event-send.ts";
-import type { Focus } from "./focus.ts";
 
 /** Diagram only: the line under the board says why the selected arrow sends nothing now; empty just after it moved the walk away. */
 export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
@@ -45,7 +44,6 @@ function whyText(from: ArrowSendContext, options: WhyTextOptions): string {
 
 export interface DrawHandlers {
   shown: VizMachine;
-  walk: Focus["walk"];
   openDetails: (selection: Selection) => void;
   sendEvent: (click: EventClick) => void;
 }
@@ -59,7 +57,6 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
       if (clicked.kind === "state") return handlers.openDetails(clicked);
       const { selection, edge, click } = drawnArrowClick(from, {
         shown: handlers.shown,
-        walk: handlers.walk,
         id: clicked.id,
       });
       if (edge === undefined || click.kind !== "send") return;
@@ -69,8 +66,7 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
   };
   if (view.diagramOnly) return callbacks;
   callbacks.details = (id) => {
-    const drawn: Selection = { kind: "edge", id };
-    handlers.openDetails(handlers.walk === "static" ? drawn : memberSelection(drawn, members));
+    handlers.openDetails(memberSelection({ kind: "edge", id }, members));
   };
   return callbacks;
 }
@@ -78,8 +74,6 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
 export interface DrawnArrowOptions {
   /** The machine the canvas draws. */
   shown: VizMachine;
-  /** Static: a machine drawn without the walk, whose arrows send nothing. */
-  walk: Focus["walk"];
   /** The `data-edge-id` of the drawn arrow. */
   id: string;
 }
@@ -92,21 +86,12 @@ export interface DrawnArrowClick {
   click: ArrowClick;
 }
 
-/** Why an arrow of an entered machine sends nothing: the walk runs only at the root. */
-const STATIC_WHY =
-  "This machine is shown without the walk, so its arrows send nothing. Go back to send events.";
-
 /** The one answer the marks and a click share for a drawn arrow. */
 export function drawnArrowClick(
   from: ArrowSendContext,
   options: DrawnArrowOptions,
 ): DrawnArrowClick {
   const { view, machine } = from;
-  if (options.walk === "static") {
-    const selection: Selection = { kind: "edge", id: options.id };
-    const why = view.live === null ? undefined : STATIC_WHY;
-    return { selection, edge: undefined, click: { kind: "plain", why } };
-  }
   updateBlocked(view, { machine, driver: from.driver });
   const selection = memberSelection(
     { kind: "edge", id: options.id },
@@ -174,7 +159,7 @@ export interface PickChildOptions {
 export function pickChild(child: PickedChild, options: PickChildOptions): void {
   const { root, view } = options;
   view.picked = child;
-  view.selection = null;
+  view.selection = undefined;
   view.tab = "step";
   options.refresh();
   if (options.source !== "row") return;

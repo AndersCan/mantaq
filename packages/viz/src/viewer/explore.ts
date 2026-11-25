@@ -14,6 +14,7 @@ import type {
 import { activatable, html, svg } from "./dom.ts";
 import { contextView } from "./context/context-view.ts";
 import { LOCK_SLOT, textWidth } from "./layout.ts";
+import { markGroupState } from "./graph.ts";
 
 export interface ExploreContext {
   machine: VizMachine;
@@ -425,7 +426,7 @@ export function markExplore(
     );
     markBlocked(element, blocked.get(here ?? id));
   }
-  markCurrent(root, currents);
+  markCurrent(root, { machine, currents });
 }
 
 /** A JSON list written to a `data-` attribute; ids may hold spaces. */
@@ -433,8 +434,14 @@ export function listOf(value: string | undefined): string[] | undefined {
   return value === undefined ? undefined : (JSON.parse(value) as string[]);
 }
 
-/** A node is current when it is a current state, or a shared or group node standing for one; a group node also names its current state in `data-current-state`. */
-function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
+interface MarkCurrentOptions {
+  machine: VizMachine;
+  currents: ReadonlyArray<string>;
+}
+
+/** A node is current when it is a current state, or a shared or group node standing for one; a group node also names its current state in `data-current-state` and on its row. */
+function markCurrent(root: HTMLElement, options: MarkCurrentOptions): void {
+  const { machine, currents } = options;
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
     const id = element.dataset["nodeId"] ?? "";
     const states = listOf(element.dataset["states"]) ?? [];
@@ -446,6 +453,8 @@ function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
     const inside = states.find((state) => currents.includes(state));
     if (inside === undefined) delete element.dataset["currentState"];
     else element.dataset["currentState"] = inside;
+    const ended = machine.states.some((state) => state.id === inside && state.final);
+    markGroupState(element, { state: inside, walk: ended ? "ended" : "going" });
   }
 }
 

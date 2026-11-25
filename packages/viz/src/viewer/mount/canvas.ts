@@ -1,9 +1,10 @@
 import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../graph.ts";
-import type { EnteredMachine, GraphCallbacks } from "../graph.ts";
+import { currentsOf, localName } from "../compartments.ts";
+import type { EnteredGroup, GraphCallbacks } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
-import { currentsOf } from "../compartments.ts";
 import { drawnNodeOf } from "../groups/fold-groups.ts";
+import { enteredGroupOf } from "../groups/group-machine.ts";
 import { html } from "../dom.ts";
 import { keepInView } from "../keep-in-view.ts";
 import type { ViewState } from "./view-state.ts";
@@ -28,9 +29,17 @@ export interface Canvas {
   refit: () => void;
   /** Draws the path above the canvas and listens for Escape; call once the canvas is on the page. */
   framed: () => void;
+  /** Says in the bar where the walk is while it is outside the group entered. */
+  walked: () => void;
 }
 
-/** What the canvas draws for the focus path (a board of boxes or one machine), and every move along the path. */
+/** Where focus lands after a move. */
+interface Landing {
+  /** A state of the machine drawn now: focus goes to the node that draws it. Unset: the control that led here. */
+  onto?: string;
+}
+
+/** What the canvas draws for the focus path (a board of boxes, one machine or a group entered), and every move along the path. */
 export function canvasOf(options: CanvasOptions): Canvas {
   const { doc, root, view } = options;
   let drawnUnits = 0;
@@ -42,7 +51,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     root.querySelector(".canvas")?.replaceChildren(...drawn());
     titled();
   }
-  /** The start of the bar above the canvas: the path while a machine is opened, and the overlap warning of the drawing. */
+  /** The start of the bar above the canvas: the path while a machine is opened or a group entered, and the overlap warning of the drawing. */
   function titled(): void {
     root.querySelector(".viz-bar-start")?.remove();
     const shown = [...pathOf(), ...warningLine()];
@@ -56,7 +65,12 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (focus.steps.length === 0) return [];
     const path = breadcrumbOf(doc, { focus, moveTo: (keep) => moveTo(focus.steps.slice(0, keep)) });
     path.addEventListener("keydown", leaveOnEscape);
-    return [path];
+    if (focus.group === undefined) return [path];
+    return [path, html(doc, "p", { class: "walk-outside muted", role: "status" })];
+  }
+  function walked(): void {
+    const line = root.querySelector(".viz-bar .walk-outside");
+    if (line !== null) line.textContent = outsideText({ focus: options.focus(), view }) ?? "";
   }
   function warningLine(): HTMLElement[] {
     const count = root.querySelector(".canvas .graph")?.getAttribute("data-overlaps");
@@ -64,15 +78,25 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (warning === undefined) return [];
     return [html(doc, "p", { class: "overlap-warning" }, [warning])];
   }
-  function moveTo(steps: FocusStep[]): void {
+  function moveTo(steps: FocusStep[], landing: Landing = {}): void {
+    const { onto } = landing;
     const before = options.focus();
     view.focus = steps;
     const after = options.focus();
     options.moved({ before, after });
     swap();
     options.afterSwap();
-    if (after.steps.length > before.steps.length) shownIn();
+    if (onto !== undefined) landOn(onto);
+    else if (after.steps.length > before.steps.length) shownIn();
     else returnTo(before.steps[after.steps.length]);
+  }
+  /** Focuses the node that draws `state` now: the state, or its group node. */
+  function landOn(state: string): void {
+    const id = drawnNodeOf(options.focus().drawn, { state });
+    keepInView(root, id);
+    root
+      .querySelector<SVGGElement>(`.graph g[data-node-id="${CSS.escape(id)}"]`)
+      ?.focus({ preventScroll: true });
   }
   function shownIn(): void {
     const at =
@@ -87,7 +111,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     const selector =
       left.kind === "part"
         ? `.graph g.part[data-part="${CSS.escape(left.part)}"]`
-        : `.graph g.machine-enter[data-enter-state="${CSS.escape(left.state)}"]`;
+        : `.graph g.machine-enter[data-enter-group="${CSS.escape(left.group)}"]`;
     root.querySelector<SVGGElement>(selector)?.focus({ preventScroll: true });
   }
   function leaveOnEscape(event: KeyboardEvent): void {
@@ -100,8 +124,12 @@ export function canvasOf(options: CanvasOptions): Canvas {
     const { machine } = options.focus();
     moveTo([...options.focus().steps, { kind: "part", part, name: partName(machine, part) }]);
   }
-  function enter(entered: EnteredMachine): void {
-    moveTo([...options.focus().steps, { kind: "enter", state: entered.state }]);
+  function enter(entered: EnteredGroup): void {
+    const { group, name } = entered;
+    moveTo([...options.focus().steps, { kind: "enter", group, name }]);
+  }
+  function leave(state: string): void {
+    moveTo(options.focus().steps.slice(0, -1), { onto: state });
   }
   function drawn(): Node[] {
     drawnUnits = canvasUnits();
@@ -109,7 +137,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (focus.canvas === "board") {
       return [renderBoard(doc, focus.machine, { width: drawnUnits, open })];
     }
-    const graph = renderGraph(doc, focus.drawn, { ...options.callbacks(), enter });
+    const graph = renderGraph(doc, focus.drawn, { ...options.callbacks(), enter, leave });
     if (focus.part !== undefined) graph.setAttribute("data-zoom", focus.part);
     return [graph];
   }
@@ -122,7 +150,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     root.querySelector<HTMLElement>(".canvas")?.addEventListener("keydown", leaveOnEscape);
     titled();
   }
-  return { drawn, refit, framed };
+  return { drawn, refit, framed, walked };
 }
 
 interface BreadcrumbOptions {
@@ -130,7 +158,7 @@ interface BreadcrumbOptions {
   moveTo: (keep: number) => void;
 }
 
-/** The path above the canvas: the root machine, then each machine opened; a click on one goes back to it. The machine shown is plain text that focus can land on. */
+/** The path above the canvas: the root machine, then each machine opened and the group entered; a click on one goes back to it. The one shown is plain text that focus can land on. */
 function breadcrumbOf(doc: Document, options: BreadcrumbOptions): HTMLElement {
   const { crumbs } = options.focus;
   const crumbItems: HTMLElement[] = [];
@@ -141,7 +169,7 @@ function breadcrumbOf(doc: Document, options: BreadcrumbOptions): HTMLElement {
       ]),
     );
   }
-  return html(doc, "nav", { class: "focus-path", "aria-label": "Machines opened" }, [
+  return html(doc, "nav", { class: "focus-path", "aria-label": "Path" }, [
     html(doc, "ol", {}, crumbItems),
   ]);
 }
@@ -167,16 +195,31 @@ export interface KeepCurrentOptions {
   view: ViewState;
 }
 
-/** Scrolls to the live state, or the group node that draws it; in a shown machine, to a state drawn there, never the page. An entered machine has no live state. */
-export function keepCurrentInView(root: HTMLElement, from: KeepCurrentOptions): void {
+/** The walk's current states in the machine or board machine shown. */
+function shownCurrents(from: KeepCurrentOptions): string[] {
   const { focus, view } = from;
-  if (view.live === null || focus.walk === "static") return;
+  if (view.live === null) return [];
   const live = currentsOf(view.live, view.picked);
-  const { machine, rootPart } = focus;
-  const currents =
-    rootPart === undefined ? live : live.filter((id) => partOf(machine, id) === rootPart);
-  const now = currents[0];
-  if (now !== undefined) keepInView(root, drawnNodeOf(focus.drawn, { state: now }));
+  const { machine, part } = focus;
+  return part === undefined ? live : live.filter((id) => partOf(machine, id) === part);
+}
+
+/** Scrolls to the live state, or the group node that draws it; in a shown machine, to a state drawn there, never the page. */
+export function keepCurrentInView(root: HTMLElement, from: KeepCurrentOptions): void {
+  const now = shownCurrents(from)[0];
+  if (now !== undefined) keepInView(root, drawnNodeOf(from.focus.drawn, { state: now }));
+}
+
+/** Where the walk is while a group is entered and the walk is in none of its states; undefined otherwise. */
+function outsideText(from: KeepCurrentOptions): string | undefined {
+  const group = enteredGroupOf(from.focus.drawn);
+  const currents = shownCurrents(from);
+  if (group === undefined || currents.length === 0) return undefined;
+  if (currents.some((state) => group.states.includes(state))) return undefined;
+  const names: string[] = [];
+  for (const state of currents) names.push(localName(state));
+  const listed = names.join(", ");
+  return `The walk is in ${listed}, outside group ${group.name}.`;
 }
 
 export interface ListenWidthOptions {

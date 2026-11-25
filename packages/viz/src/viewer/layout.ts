@@ -4,7 +4,7 @@ import { edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { hasQueue } from "./queue.ts";
-import { isNever } from "../is-never.ts";
+import { localName } from "./compartments.ts";
 import { isSharedNode, shareArrows } from "./shared.ts";
 import type { Shared } from "./shared.ts";
 import type { Overlap } from "./overlaps.ts";
@@ -30,20 +30,20 @@ export interface PlacedState {
   workers?: LabelBox;
 }
 
-/** What a machine node stands for: the machine a state embeds (by id, in the same document), or the states a group folds into one node. */
-export type Holds =
-  | { kind: "machine"; machine: string }
-  | { kind: "group"; group: string; states: string[] };
+/** What a group node stands for: the group's name and the real states it folds into one node. */
+export interface Holds {
+  group: string;
+  states: string[];
+}
 
-/** A node that holds more than one state: a row under its name for a glyph, what it holds, and the enter control of an embedded machine. Its internals are never drawn here. */
+/** A group drawn as one node: a row under its name for a glyph, its size or the state the walk is in, and its enter control. Its states are never drawn here. */
 export interface PlacedMachine extends Omit<PlacedState, "kind"> {
   kind: "machine";
   holds: Holds;
   glyph: LabelBox;
-  /** The row's text: the embedded machine's id, or how many states the group holds. */
+  /** The row's text: how many states the group holds, or the one the walk is in; wide enough for each. */
   name: LabelBox;
-  /** Absent for a group: it has no enter control yet. */
-  enter?: LabelBox;
+  enter: LabelBox;
 }
 
 /** Placeholder target for an undetermined edge. One per edge; never shared or guessed. */
@@ -174,7 +174,7 @@ const LABEL_HEIGHT = 16;
 const NAME_HEIGHT = 18;
 const MACHINE_ROW_HEIGHT = 16;
 const MACHINE_GLYPH = 12;
-/** Text of a machine node's enter control. */
+/** Text of a group node's enter control. */
 export const ENTER_TEXT = "enter";
 const ENTER_WIDTH = textWidth(ENTER_TEXT, CHIP_FONT) + 12;
 /** Label to its own arrow, and to any other arrow: strictly farther, so the nearest arrow is always its own. */
@@ -214,7 +214,7 @@ const ANY_LABEL = "any state";
 /** A machine with the shared arrows already swapped in for the edges they stand for. */
 interface Drawing extends VizMachine {
   shared: Shared;
-  /** The machine nodes by state id. */
+  /** The group nodes by state id. */
   holds: ReadonlyMap<string, Holds>;
   /** The real edges a drawn arrow stands for, by its id; absent when it is its own one edge. */
   members: ReadonlyMap<string, string[]>;
@@ -255,43 +255,52 @@ function hasRow(machine: VizMachine, state: VizState): boolean {
   return hasQueue(machine);
 }
 
-/** What a machine node of the drawn machine holds; undefined for a plain state. */
+/** What a group node of the drawn machine holds; undefined for a plain state. */
 function holdsOf(machine: VizMachine, state: VizState): Holds | undefined {
-  if (state.machine !== undefined) return { kind: "machine", machine: state.machine };
   const node = groupNodeAt(machine, { node: state.id });
-  return node === undefined ? undefined : { kind: "group", group: node.name, states: node.states };
+  return node === undefined ? undefined : { group: node.name, states: node.states };
 }
 
-/** The text of a machine node's row: the embedded machine's id, or the group's size. */
+/** The text of a group node's row while the walk is elsewhere: the group's size. */
 export function rowText(holds: Holds): string {
-  switch (holds.kind) {
-    case "machine":
-      return holds.machine;
-    case "group": {
-      const count = holds.states.length;
-      return count === 1 ? "1 state" : `${count} states`;
-    }
-    default:
-      return isNever(holds);
-  }
+  const count = holds.states.length;
+  return count === 1 ? "1 state" : `${count} states`;
 }
 
-/** Room for an embedded machine's enter control after the row's text; a group has none. */
-function enterRoom(holds: Holds): number {
-  return holds.kind === "machine" ? LABEL_PAD + ENTER_WIDTH : 0;
+/** How the walk is in a state of a group: still going, or ended in a final state. */
+export type WalkInside = "going" | "ended";
+
+export interface CurrentRowOptions {
+  walk: WalkInside;
+}
+
+/** The text of a group node's row while the walk is in `state`, one of its states. */
+export function currentRowText(state: string, options: CurrentRowOptions): string {
+  const name = localName(state);
+  return options.walk === "ended" ? `ended in ${name}` : `now in ${name}`;
+}
+
+/** The widest text the row can show: the size, or any state the walk can be in. */
+function rowTextWidth(holds: Holds): number {
+  let widest = textWidth(rowText(holds), CHIP_FONT);
+  for (const state of holds.states) {
+    const text = currentRowText(state, { walk: "ended" });
+    widest = Math.max(widest, textWidth(text, CHIP_FONT));
+  }
+  return widest;
 }
 
 /** Glyph, the row's text and the enter control, `LABEL_PAD` apart. */
 function machineRowWidth(holds: Holds): number {
-  return MACHINE_GLYPH + LABEL_PAD + textWidth(rowText(holds), CHIP_FONT) + enterRoom(holds);
+  return MACHINE_GLYPH + LABEL_PAD + rowTextWidth(holds) + LABEL_PAD + ENTER_WIDTH;
 }
 
-/** Height a machine node's row adds under the name; 0 for a plain state. */
+/** Height a group node's row adds under the name; 0 for a plain state. */
 function machineRoom(holds: Holds | undefined): number {
   return holds === undefined ? 0 : LABEL_PAD + MACHINE_ROW_HEIGHT;
 }
 
-/** What shapes a state's box besides the state: its worker row, and what it holds as a machine node. */
+/** What shapes a state's box besides the state: its worker row, and what it holds as a group node. */
 interface StateShape {
   worker: boolean;
   holds: Holds | undefined;
@@ -1197,7 +1206,7 @@ interface RowAt {
   label: LabelBox;
 }
 
-/** The row under a machine node's name: glyph, the row's text, then an embedded machine's enter control, centred as a whole. */
+/** The row under a group node's name: glyph, the row's text, then the enter control, centred as a whole. */
 function machineRowOf(
   holds: Holds,
   options: RowAt,
@@ -1206,8 +1215,8 @@ function machineRowOf(
   const width = machineRowWidth(holds);
   const left = label.x - width / 2;
   const y = label.y + label.height / 2 + LABEL_PAD + MACHINE_ROW_HEIGHT / 2;
-  const nameWidth = textWidth(rowText(holds), CHIP_FONT);
-  const row = {
+  const nameWidth = rowTextWidth(holds);
+  return {
     glyph: { x: left + MACHINE_GLYPH / 2, y, width: MACHINE_GLYPH, height: MACHINE_GLYPH },
     name: {
       x: left + MACHINE_GLYPH + LABEL_PAD + nameWidth / 2,
@@ -1215,15 +1224,8 @@ function machineRowOf(
       width: nameWidth,
       height: MACHINE_ROW_HEIGHT,
     },
+    enter: { x: left + width - ENTER_WIDTH / 2, y, width: ENTER_WIDTH, height: MACHINE_ROW_HEIGHT },
   };
-  if (holds.kind === "group") return row;
-  const enter = {
-    x: left + width - ENTER_WIDTH / 2,
-    y,
-    width: ENTER_WIDTH,
-    height: MACHINE_ROW_HEIGHT,
-  };
-  return { ...row, enter };
 }
 
 function placedStateOf(state: VizState, spot: NodeSpot): PlacedState | PlacedMachine {
@@ -1263,7 +1265,7 @@ function placeNodes(
     states: sourcesOf(machine, { node: id }),
     walked: sourcesOf(machine, { node: id }).flatMap((source) => {
       const held = machine.holds.get(source);
-      return held?.kind === "group" ? held.states : [source];
+      return held === undefined ? [source] : held.states;
     }),
     ...at(id),
   }));
