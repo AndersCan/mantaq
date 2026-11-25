@@ -199,6 +199,21 @@ describe("a grouped machine in the viewer", () => {
     });
   });
 
+  test("a merged arrow that leaves no current state says why, on the arrow and in its Details", () => {
+    const { root, sent } = mount();
+    const cancel = arrow(root, { id: CANCEL });
+    click(cancel);
+    click(root.querySelector(`.graph g[data-details-edge="${CANCEL}"]`));
+    const why =
+      "cancel can't be sent: the walk is in inCart, this arrow leaves chargingCard or confirming.";
+    expect({
+      button: cancel?.hasAttribute("role"),
+      title: cancel?.querySelector("title")?.textContent,
+      details: root.querySelector(".details [data-blocked-note]")?.textContent,
+      steps: sent.length,
+    }).toEqual({ button: false, title: why, details: why, steps: 0 });
+  });
+
   test("a group arrow whose guard blocks its member is locked with the reason, and a click sends nothing", () => {
     const { root, sent } = mount(new Set(["confirming-confirmed-packing"]));
     click(arrow(root, { id: "inCart-checkout-chargingCard" }));

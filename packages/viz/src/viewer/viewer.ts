@@ -1,6 +1,6 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
 import { decodeFocus, enteredBy, focusReader, startOf } from "./mount/focus.ts";
-import { drawCallbacks, pickChild, sayWhy } from "./mount/arrow-click.ts";
+import { drawCallbacks, membersWhy, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
 import type { GraphCallbacks, Selection } from "./graph.ts";
@@ -98,7 +98,10 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
       select: showDetails,
       ...(focus().canvas === "board" ? { hint: "Click a machine to see its states." } : {}),
       ...(focus().walk === "live"
-        ? { send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }) }
+        ? {
+            send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }),
+            why: (members) => membersWhy({ machine, view, driver }, { members }),
+          }
         : {}),
     });
     const screenView = focus().walk === "live" ? view : { ...view, selection: null };

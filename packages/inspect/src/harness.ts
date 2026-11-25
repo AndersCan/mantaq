@@ -220,7 +220,7 @@ interface CurrentsOptions {
 /** The real states the drawn current nodes stand for: a state node's id, and for a folded group node the state of the walk among its states, else all of them. */
 async function drawnCurrents(page: Page, options: CurrentsOptions): Promise<string[]> {
   const { walked } = options;
-  const nodes = await page.locator(".graph g.current[data-node-id]").evaluateAll((elements) =>
+  const nodes = await page.locator(".graph g.state.current[data-node-id]").evaluateAll((elements) =>
     elements.map((element) => ({
       id: element.getAttribute("data-node-id") ?? "",
       states: element.getAttribute("data-states"),

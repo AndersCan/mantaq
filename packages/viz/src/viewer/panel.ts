@@ -7,6 +7,7 @@ import { edgeCondition } from "./labels.ts";
 import { isDrawn } from "./layout.ts";
 import { groupArrowsOf, groupNodeAt, realMachineOf } from "./groups/fold-groups.ts";
 import type { GroupArrow, GroupNode } from "./groups/fold-groups.ts";
+import { realMembersOf } from "./groups/acting-member.ts";
 import { shareArrows } from "./shared.ts";
 import type { SharedArrow } from "./shared.ts";
 
@@ -215,8 +216,39 @@ export interface RenderPanelOptions {
   select: (selection: Selection) => void;
   /** What Details shows under an arrow's title to send it. */
   send?: (edge: VizEdge) => HTMLElement | undefined;
+  /** Why the walk sends none of a drawn arrow's real edges now; undefined when it can, or without a walk. */
+  why?: (members: ReadonlyArray<VizEdge>) => string | undefined;
   /** Shown when nothing is selected. */
   hint?: string;
+}
+
+interface WhyLineOptions extends RenderPanelOptions {
+  real: VizMachine;
+  /** The drawn arrow's id. */
+  arrow: string;
+}
+
+/** The line under a drawn arrow's title that says why a click sends none of its real edges; undefined when one can be sent. */
+function whyLine(doc: Document, options: WhyLineOptions): HTMLElement | undefined {
+  const { machine, real, arrow, why } = options;
+  const ids = realMembersOf(machine, { shared: shareArrows(machine), arrow });
+  const members = real.edges.filter((edge) => ids.includes(edge.id));
+  const text = why?.(members);
+  if (text === undefined) return undefined;
+  const event = members[0]?.event ?? "";
+  return html(doc, "p", { class: "blocked-note", "data-blocked-note": event }, [text]);
+}
+
+interface LineOptions {
+  /** Shown under the title; nothing when undefined. */
+  line: HTMLElement | undefined;
+}
+
+/** A panel with a line under its title. */
+function withLine(panel: HTMLElement, options: LineOptions): HTMLElement {
+  const { line } = options;
+  if (line !== undefined) panel.querySelector("h2")?.after(line);
+  return panel;
 }
 
 /** The panel of a selection on the drawn machine: a real edge or state reads the real machine, a group node or arrow its fold. */
@@ -229,9 +261,12 @@ function selectedPanel(doc: Document, options: RenderPanelOptions): HTMLElement 
       const edge = real.edges.find((candidate) => candidate.id === id);
       if (edge) return edgePanel(doc, { edge, machine: real, select, send: options.send });
       const grouped = groupArrowsOf(machine).find((candidate) => candidate.id === id);
-      if (grouped) return groupArrowPanel(doc, { arrow: grouped, machine, select });
+      const line = whyLine(doc, { ...options, real, arrow: selection.id });
+      if (grouped) {
+        return withLine(groupArrowPanel(doc, { arrow: grouped, machine, select }), { line });
+      }
       const arrow = shareArrows(machine).arrows.find((candidate) => candidate.id === id);
-      return arrow && sharedPanel(doc, arrow, select);
+      return arrow && withLine(sharedPanel(doc, arrow, select), { line });
     }
     case "state": {
       const state = real.states.find((candidate) => candidate.id === id);

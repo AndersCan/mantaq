@@ -1,5 +1,6 @@
 import { actingMember, realMembersOf } from "../groups/acting-member.ts";
 import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
+import { whyNoneHere } from "../blocked.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
 import { realMachineOf } from "../groups/fold-groups.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
@@ -112,8 +113,25 @@ export function drawnArrowClick(
     { machine: options.shown, view },
   );
   const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-  if (edge === undefined) return { selection, edge, click: { kind: "plain", why: undefined } };
-  return { selection, edge, click: arrowClick(from, edge) };
+  if (edge !== undefined) return { selection, edge, click: arrowClick(from, edge) };
+  const ids = realMembersOf(options.shown, {
+    shared: sharedArrows(options.shown),
+    arrow: options.id,
+  });
+  const members = machine.edges.filter((candidate) => ids.includes(candidate.id));
+  return { selection, edge, click: { kind: "plain", why: membersWhy(from, { members }) } };
+}
+
+export interface MembersWhyOptions {
+  /** The real edges one drawn arrow stands for. */
+  members: ReadonlyArray<VizEdge>;
+}
+
+/** Why a click on a drawn arrow sends none of its real edges: the walk is elsewhere; undefined with no walk. */
+export function membersWhy(from: ArrowSendContext, options: MembersWhyOptions): string | undefined {
+  const { machine, view } = from;
+  if (view.live === null) return undefined;
+  return whyNoneHere(machine, { edges: options.members, live: view.live, picked: view.picked });
 }
 
 interface MemberOptions {

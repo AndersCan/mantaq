@@ -287,7 +287,7 @@
   font-size: 11px;
 }
 
-/* A state that embeds a machine: a box-in-a-box glyph, the machine's id and an enter control under the name. */
+/* A node that holds more than one state: a box-in-a-box glyph and its row under the name (an embedded machine's id and enter control, or a group's size). */
 .viz .machine-glyph rect {
   fill: none;
   stroke: var(--fg);
