@@ -153,4 +153,20 @@ describe("shareArrows", () => {
       },
     });
   });
+
+  test("on a fold, a shared node counts the real states that take the event, in any edge order", () => {
+    const shop = groupedCheckout();
+    const charging = shop.states.find((state) => state.id === "chargingCard");
+    const states =
+      charging === undefined ? shop.states : [...shop.states, { ...charging, id: "retrying" }];
+    const abort = ["inCart", "chargingCard", "retrying", "packing"];
+    const cancel = ["inCart", "retrying", "chargingCard", "packing"];
+    const edges = [
+      ...shop.edges,
+      ...abort.map((from) => edgeOf(from, "abort", "inCart")),
+      ...cancel.map((from) => edgeOf(from, "cancel", "inCart")),
+    ];
+    const nodes = shareArrows(foldGroups({ ...shop, states, edges })).nodes;
+    expect(nodes.map((node) => node.label)).toEqual(["4 states"]);
+  });
 });

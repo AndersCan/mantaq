@@ -130,7 +130,8 @@ export function shareArrows(machine: VizMachine): Shared {
       a.sources.join(",").localeCompare(b.sources.join(",")),
   );
   for (const group of ranked) {
-    const setKey = [group.scope, group.sources.join("\u0000"), group.walked.join("\u0000")].join(
+    const walked = [...group.walked].sort((a, b) => a.localeCompare(b));
+    const setKey = [group.scope, group.sources.join("\u0000"), walked.join("\u0000")].join(
       "\u0001",
     );
     let node = sets.get(setKey);
@@ -144,7 +145,7 @@ export function shareArrows(machine: VizMachine): Shared {
         scope: group.scope,
         states: group.sources,
         walked: group.walked,
-        label: everyone ? ANY_LABEL : labelOf(group.sources),
+        label: everyone ? ANY_LABEL : labelOf(group.walked),
       };
       sets.set(setKey, node);
       nodes.push(node);
