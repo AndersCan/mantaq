@@ -1,6 +1,7 @@
 import { activatable, html, onButtonPress, svg } from "./dom.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
 import {
+  canTurn,
   currentRowText,
   ENTER_TEXT,
   HELP_SLOT,
@@ -11,6 +12,7 @@ import {
 import { edgeCondition, edgeLines } from "./labels.ts";
 import { enteredGroupOf, isStub } from "./groups/group-machine.ts";
 import type {
+  Flow,
   LabelBox,
   PlacedAny,
   PlacedEdge,
@@ -518,11 +520,14 @@ const LABEL_CAP_EM = 1.4;
 /**
  * Sizes the drawing against its canvas: labels never drop under 0.6rem (about
  * 10px) nor grow past 1.4em; between those the drawing fills the canvas. A
- * machine too wide for the floor scrolls sideways by the reader's hand.
+ * machine too wide for the floor scrolls sideways by the reader's hand. A
+ * drawing that runs down stays at the floor: growing it would grow its height.
  */
-function graphWidth(units: number): string {
+function graphWidth(units: number, options: FlowChoice): string {
   const size = (scale: number) => ((units * scale) / LABEL_UNITS).toFixed(2);
-  return `--graph-floor: ${size(LABEL_FLOOR_REM)}rem; width: clamp(var(--graph-floor), 100%, ${size(LABEL_CAP_EM)}em)`;
+  const floor = `--graph-floor: ${size(LABEL_FLOOR_REM)}rem`;
+  if (options.flow === "down") return `${floor}; width: var(--graph-floor)`;
+  return `${floor}; width: clamp(var(--graph-floor), 100%, ${size(LABEL_CAP_EM)}em)`;
 }
 
 function messageGroup(doc: Document, message: PlacedMessage): SVGElement {
@@ -554,24 +559,60 @@ export function overlapWarning(count: number): string | undefined {
 
 type Laid = ReturnType<typeof layoutMachine>;
 
-/** Layouts by machine, so moving back and forth between machines lays each one out once. */
-const layouts = new WeakMap<VizMachine, Laid>();
+/** Layouts by machine and flow, so moving back and forth between machines lays each one out once. */
+const layouts = new WeakMap<VizMachine, Map<Flow, Laid>>();
 
-function layoutOnce(machine: VizMachine): Laid {
-  const known = layouts.get(machine);
-  if (known !== undefined) return known;
-  const laid = layoutMachine(machine);
-  layouts.set(machine, laid);
+interface FlowChoice {
+  flow: Flow;
+}
+
+function layoutOnce(machine: VizMachine, options: FlowChoice): Laid {
+  const { flow } = options;
+  const known = layouts.get(machine) ?? new Map<Flow, Laid>();
+  layouts.set(machine, known);
+  const laid = known.get(flow) ?? layoutMachine(machine, { flow });
+  known.set(flow, laid);
   return laid;
 }
 
-/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. An overlapping layout is drawn too; `data-overlaps` counts what overlaps. */
+interface RoomOptions {
+  /** Pixels to the rem on the page. */
+  rem: number;
+}
+
+/** How many layout units a canvas `width` px wide shows with its labels at the smallest size. */
+export function roomAtFloor(width: number, options: RoomOptions): number {
+  return (width * LABEL_UNITS) / (LABEL_FLOOR_REM * options.rem);
+}
+
+export interface FlowOptions {
+  /** Layout units the canvas shows at the smallest label size (`roomAtFloor`); unset when the canvas is not laid out. */
+  room?: number;
+}
+
+/** Left to right when that fits the room or the room is unknown; else top to bottom when that is narrower and overlaps no more. */
+export function flowFor(machine: VizMachine, options: FlowOptions): Flow {
+  const { room } = options;
+  const across = Either.getRight(layoutOnce(machine, { flow: "across" }));
+  const fits = across === undefined || room === undefined || across.layout.width <= room;
+  if (fits || !canTurn(machine)) return "across";
+  const down = Either.getRight(layoutOnce(machine, { flow: "down" }));
+  if (down === undefined) return "across";
+  const narrower = down.layout.width < across.layout.width;
+  return narrower && down.overlaps.length <= across.overlaps.length ? "down" : "across";
+}
+
+/** What a graph is drawn with: what its clicks do, and the room it has. */
+export type GraphOptions = GraphCallbacks & FlowOptions;
+
+/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. An overlapping layout is drawn too; `data-overlaps` counts what overlaps. `data-flow` says which way its ranks run. */
 export function renderGraph(
   doc: Document,
   machine: VizMachine,
-  callbacks: GraphCallbacks,
+  callbacks: GraphOptions,
 ): SVGSVGElement | HTMLElement {
-  const layout = layoutOnce(machine);
+  const flow = flowFor(machine, callbacks);
+  const layout = layoutOnce(machine, { flow });
   if (Either.isLeft(layout)) {
     return html(doc, "p", { class: "load-error", role: "alert" }, [`Cannot draw ${machine.id}.`]);
   }
@@ -588,9 +629,10 @@ export function renderGraph(
       // Natural size; graphWidth clamps the drawn width.
       width,
       height,
-      style: graphWidth(units),
+      style: graphWidth(units, { flow }),
       role: "group",
       "aria-label": `machine ${machine.id}`,
+      "data-flow": flow,
       ...(overlaps.length === 0 ? {} : { "data-overlaps": overlaps.length }),
     },
     [
@@ -669,7 +711,7 @@ export function renderBoard(
       viewBox: `0 0 ${Math.ceil(board.width)} ${Math.ceil(board.height)}`,
       width: Math.ceil(board.width),
       height: Math.ceil(board.height),
-      style: graphWidth(board.width),
+      style: graphWidth(board.width, { flow: "across" }),
       role: "group",
       "aria-label": `machine ${machine.id}: ${board.parts.length} machines`,
     },

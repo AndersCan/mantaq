@@ -89,9 +89,12 @@
   gap: 12px;
 }
 
+/* The scrollbar's room is kept, so the width a drawing is chosen for holds
+   while the drawing, or the path above it, changes. */
 .viz .canvas {
   overflow: auto;
   position: relative;
+  scrollbar-gutter: stable;
 }
 
 .viz:has(.focus-path) .canvas {

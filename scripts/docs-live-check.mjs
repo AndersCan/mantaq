@@ -6,8 +6,9 @@
 // Then it clicks every element of every viewer on every built page that looks clickable
 // (a pointer cursor or role=button), on a fresh load each, and fails when a click changes
 // nothing; a dead button planted on one page must be caught, so a weakened sweep fails too.
-// On the group guide it replays the walk the guide describes: into the payment group,
-// enter it, click arrows inside, leave it by an arrow, and go back by the path.
+// On the group guide it replays the walk the guide describes at a docs-column and a phone
+// width: into the payment group, enter it, click arrows inside, leave it by an arrow, go
+// back by the path and by the browser's Back. No click needs a sideways scroll first.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { GROUP_GUIDE, groupWalkFailures } from "./lib/group-walk.mjs";
 import { clickFailures } from "./lib/viewer-sweep.mjs";

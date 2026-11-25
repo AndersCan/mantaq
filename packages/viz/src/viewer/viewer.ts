@@ -47,7 +47,6 @@ export function mountViewer(
   const opened = view.focus.length > 0 ? "claim" : "plain";
   listenEscape(root, { escape: () => redraws.escape(), opened });
   listenFullscreen(root);
-  listenWidth(root, { refit: () => redraws.refit() });
   watchDriver(view, { driver, redraw: () => redraws.redraw() });
   options.followFocus?.((link) => {
     const other = link.machine !== undefined && link.machine !== first?.id;
@@ -72,6 +71,7 @@ export function mountViewer(
   }
 
   render();
+  listenWidth(root, { refit: () => redraws.refit() });
 }
 
 /** What a driver event, a width change, Escape or a link's path does; the last drawn machine sets them. */
