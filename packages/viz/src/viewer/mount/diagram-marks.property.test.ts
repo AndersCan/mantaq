@@ -14,6 +14,7 @@ import { initialView } from "./view-state.ts";
 import { machineArbitrary } from "../layout.arbitrary.ts";
 import { memberSelection } from "./arrow-click.ts";
 import { mountViewer } from "../embed.ts";
+import { renderGraph } from "../graph.ts";
 import { VIZ_SCHEMA_VERSION } from "../../schema.ts";
 
 /** Where a generated walk is: one state per scope, and the children of each map. */
@@ -240,6 +241,19 @@ describe("a state or an arrow is a button exactly when a click on it acts", () =
         }
       }),
       { seed: 0xaff0, numRuns: 120, endOnFailure: true },
+    );
+  }, 60_000);
+
+  test("before any mark, every state and arrow is drawn plain", () => {
+    fc.assert(
+      fc.property(machineArbitrary, (machine) => {
+        const graph = renderGraph(document, machine, { select: () => undefined });
+        const buttons = graph.querySelectorAll(
+          "g.state[role], g.state[tabindex], g.edge[role], g.edge[tabindex]",
+        );
+        expect(buttons.length).toBe(0);
+      }),
+      { seed: 0xaff1, numRuns: 60, endOnFailure: true },
     );
   }, 60_000);
 });

@@ -145,7 +145,7 @@ async function handlesAnEvent(root: PwLocator, page: PwPage): Promise<string | u
     await root.locator(".graph[data-zoom]").waitFor();
   }
   const before = await explore.first().getAttribute("data-current");
-  const arrows = root.locator(".graph g.edge.next");
+  const arrows = root.locator('.graph g.edge.next[role="button"]');
   const count = await arrows.count();
   for (let index = 0; index < count; index += 1) {
     await arrows.nth(index).dispatchEvent("click");

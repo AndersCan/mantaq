@@ -100,7 +100,8 @@ export function drawnArrowClick(
   const { view, machine } = from;
   if (options.walk === "static") {
     const selection: Selection = { kind: "edge", id: options.id };
-    return { selection, edge: undefined, click: { kind: "plain", why: STATIC_WHY } };
+    const why = view.live === null ? undefined : STATIC_WHY;
+    return { selection, edge: undefined, click: { kind: "plain", why } };
   }
   const selection = memberSelection(
     { kind: "edge", id: options.id },
