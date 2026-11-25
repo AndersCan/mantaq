@@ -1,4 +1,5 @@
 import { isAnyState, scopeOf } from "../schema.ts";
+import { isNever } from "../is-never.ts";
 import type { VizEdge, VizFuzzMessage, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
@@ -116,6 +117,9 @@ export interface PlacedMessage {
 
 export type PlacedNode = PlacedState | PlacedMachine | PlacedUnknown | PlacedAny;
 
+/** The way the ranks run: left to right, or top to bottom for a canvas too narrow for that. */
+export type Flow = "across" | "down";
+
 export interface MachineLayout {
   width: number;
   height: number;
@@ -220,6 +224,7 @@ interface Drawing extends VizMachine {
   holds: ReadonlyMap<string, Holds>;
   /** The real edges a drawn arrow stands for, by its id; absent when it is its own one edge. */
   members: ReadonlyMap<string, string[]>;
+  flow: Flow;
 }
 
 function anyIds(machine: VizMachine): string[] {
@@ -439,6 +444,38 @@ function labelSize(edge: VizEdge): { width: number; height: number } {
   };
 }
 
+interface Size {
+  width: number;
+  height: number;
+}
+
+interface FlowOptions {
+  flow: Flow;
+}
+
+/** A size as the layout sees it: turned when the ranks run down, so the left-to-right steps below lay out top to bottom. */
+function turned(size: Size, options: FlowOptions): Size {
+  const { flow } = options;
+  switch (flow) {
+    case "across":
+      return size;
+    case "down":
+      return { width: size.height, height: size.width };
+    default:
+      return isNever(flow);
+  }
+}
+
+function labelRoom(edge: VizEdge, options: FlowOptions): Size {
+  return turned(labelSize(edge), options);
+}
+
+/** What dagre keeps free for a label: down, also the gap between the label and the line beside it. */
+function labelReserve(edge: VizEdge, options: FlowOptions): Size {
+  const room = labelRoom(edge, options);
+  return options.flow === "down" ? { ...room, height: room.height + LEVEL_CLEAR } : room;
+}
+
 export function isDrawn(edge: VizEdge): boolean {
   return edge.kind !== "initial" && edge.kind !== "effect";
 }
@@ -463,11 +500,11 @@ interface Loop {
  * Nested rectangles above a node: each loop is `2 * LEG_GAP` wider than the
  * one inside it and wide enough that the inner label clears its legs.
  */
-function loopsOf(edges: ReadonlyArray<VizEdge>): Loop[] {
+function loopsOf(edges: ReadonlyArray<VizEdge>, options: FlowOptions): Loop[] {
   const loops: Loop[] = [];
   let before: Loop | undefined;
   for (const edge of edges) {
-    const size = labelSize(edge);
+    const size = labelRoom(edge, options);
     const loop: Loop =
       before === undefined
         ? { edge, size, span: LOOP_FIRST_SPAN, rise: LOOP_BASE }
@@ -530,19 +567,23 @@ function specsOf(machine: Drawing, heights: ReadonlyMap<string, number>): Map<st
   const starts = new Set(startIds(machine));
   const specs = new Map<string, Spec>();
   const tall = (id: string, height: number): number => Math.max(height, heights.get(id) ?? 0);
-  const loopsAt = (id: string): Loop[] =>
-    loopsOf(machine.edges.filter((edge) => isDrawn(edge) && isLoop(edge) && edge.from === id));
+  function loopsAt(id: string): Loop[] {
+    const own = machine.edges.filter((edge) => isDrawn(edge) && isLoop(edge) && edge.from === id);
+    return loopsOf(own, machine);
+  }
+  function room(id: string, real: Size): Size {
+    const laid = turned(real, machine);
+    return { width: laid.width, height: tall(id, laid.height) };
+  }
   for (const state of machine.states) {
     const loops = loopsAt(state.id);
     const shape = { worker: hasRow(machine, state), holds: machine.holds.get(state.id) };
-    const size = {
-      width: stateWidth(state, shape),
-      height: tall(state.id, stateHeight(state, shape)),
-    };
+    const real = { width: stateWidth(state, shape), height: stateHeight(state, shape) };
+    const size = room(state.id, real);
     specs.set(state.id, specOf(state.id, size, loops, starts.has(state.id) ? ENTRY_STUB : 0));
   }
   for (const id of anyIds(machine)) {
-    const size = { width: textWidth(anyLabel(machine, id)) + 24, height: tall(id, NODE_HEIGHT) };
+    const size = room(id, { width: textWidth(anyLabel(machine, id)) + 24, height: NODE_HEIGHT });
     specs.set(id, specOf(id, size, loopsAt(id), 0));
   }
   for (const edge of machine.edges) {
@@ -568,7 +609,7 @@ function ownersOf(machine: VizMachine): Map<string, string | null> {
   return owners;
 }
 
-function graphOf(machine: VizMachine, specs: ReadonlyMap<string, Spec>): LayoutGraph {
+function graphOf(machine: Drawing, specs: ReadonlyMap<string, Spec>): LayoutGraph {
   const graph: LayoutGraph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({
     multigraph: true,
     compound: true,
@@ -597,7 +638,7 @@ function graphOf(machine: VizMachine, specs: ReadonlyMap<string, Spec>): LayoutG
   }
   for (const edge of machine.edges) {
     if (!isDrawn(edge) || isLoop(edge)) continue;
-    const size = labelSize(edge);
+    const size = labelReserve(edge, machine);
     const label: EdgeLabel = {
       width: size.width,
       height: size.height,
@@ -649,26 +690,56 @@ interface Geo {
 
 function routesOf(
   graph: LayoutGraph,
-  machine: VizMachine,
+  machine: Drawing,
 ): { labels: Map<string, Point>; routes: Map<string, Point[]> } {
   const labels = new Map<string, Point>();
   const routes = new Map<string, Point[]>();
   for (const edge of machine.edges) {
     if (!isDrawn(edge) || isLoop(edge)) continue;
     const placed = graph.edge(edge.from, targetOf(edge), edge.id);
-    labels.set(edge.id, {
-      x: placed.x ?? 0,
-      y: (placed.y ?? 0) + LEVEL_CLEAR + labelSize(edge).height / 2,
-    });
-    routes.set(
-      edge.id,
-      (placed.points ?? []).map((point: Point) => ({ x: point.x, y: point.y })),
-    );
+    const centre = { x: placed.x ?? 0, y: placed.y ?? 0 };
+    const points = (placed.points ?? []).map((point: Point) => ({ x: point.x, y: point.y }));
+    const beside = besideLabel(edge, { machine, centre, points });
+    labels.set(edge.id, beside.label);
+    routes.set(edge.id, beside.points);
   }
   return { labels, routes };
 }
 
-function geoOf(graph: LayoutGraph, machine: VizMachine, specs: ReadonlyMap<string, Spec>): Geo {
+interface BesideOptions {
+  machine: Drawing;
+  /** Where dagre put the label's reserved room. */
+  centre: Point;
+  points: Point[];
+}
+
+/**
+ * Across, the label hangs `LEVEL_CLEAR` under the line, which runs through
+ * the room dagre kept. Down, a label is as tall as its text is wide, so it
+ * keeps that room and the line moves to the room's edge instead.
+ */
+function besideLabel(edge: VizEdge, options: BesideOptions): { label: Point; points: Point[] } {
+  const { machine, centre, points } = options;
+  const room = labelRoom(edge, machine);
+  if (machine.flow === "across") {
+    return { label: { x: centre.x, y: centre.y + LEVEL_CLEAR + room.height / 2 }, points };
+  }
+  const line = centre.y - labelReserve(edge, machine).height / 2;
+  const moved: Point[] = [];
+  for (const point of points) {
+    const atLabel = Math.abs(point.x - centre.x) < 0.5 && Math.abs(point.y - centre.y) < 0.5;
+    moved.push(atLabel ? { x: point.x, y: line } : point);
+  }
+  return { label: { x: centre.x, y: centre.y + LEVEL_CLEAR / 2 }, points: moved };
+}
+
+interface GeoOptions {
+  machine: Drawing;
+  specs: ReadonlyMap<string, Spec>;
+}
+
+function geoOf(graph: LayoutGraph, options: GeoOptions): Geo {
+  const { machine, specs } = options;
   const nodes = new Map<string, Point>();
   for (const id of specs.keys()) {
     const node = graph.node(id);
@@ -990,7 +1061,7 @@ function laidOut(machine: Drawing): { graph: LayoutGraph; specs: Map<string, Spe
     const specs = specsOf(machine, heights);
     const graph = graphOf(machine, specs);
     layout(graph, { customOrder });
-    const geo = geoOf(graph, machine, specs);
+    const geo = geoOf(graph, { machine, specs });
     const boxes = new Map(
       [...specs].map(([id, spec]) => [id, boxOf(spec, geo.nodes.get(id) ?? { x: 0, y: 0 })]),
     );
@@ -1068,11 +1139,25 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
   return placedOf(edge, points, centre, MIN_EDGE_LENGTH);
 }
 
+/** How a machine is laid out. */
+export interface LayoutOptions {
+  /** Default "across". "down" applies only to a machine that `canTurn`; any other is laid out across. */
+  flow?: Flow;
+}
+
+/** True when the layout can run top to bottom: no regions, no actor maps and no messages, whose drawing assumes left to right. */
+export function canTurn(machine: VizMachine): boolean {
+  const plain = machine.regions.length === 0 && machine.maps.length === 0;
+  return plain && messagesOf(machine).length === 0;
+}
+
 /**
- * Layered layout (dagre, left to right). Pure: same machine in, same
- * coordinates out. The initial edge is drawn as an entry arrow, not a graph edge.
+ * Layered layout (dagre, left to right, or top to bottom for `flow: "down"`).
+ * Pure: same machine in, same coordinates out. The initial edge is drawn as an
+ * entry arrow, not a graph edge.
  */
-export function placeMachine(base: VizMachine): MachineLayout {
+export function placeMachine(base: VizMachine, options: LayoutOptions = {}): MachineLayout {
+  const flow = options.flow === "down" && canTurn(base) ? "down" : "across";
   const shared = shareArrows(base);
   const holds = new Map<string, Holds>();
   for (const state of base.states) {
@@ -1085,6 +1170,7 @@ export function placeMachine(base: VizMachine): MachineLayout {
     shared,
     holds,
     members: drawnMembersOf(base, { shared }),
+    flow,
   };
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
@@ -1107,7 +1193,61 @@ export function placeMachine(base: VizMachine): MachineLayout {
     geo.height = Math.max(geo.height, Math.max(...ys) + shift + LABEL_PAD);
     built = assemble(machine, specs, geo, regions);
   }
-  return built.layout;
+  return flow === "down" ? turnedBack(built.layout, machine) : built.layout;
+}
+
+function pointBack(point: Point): Point {
+  return { x: point.y, y: point.x };
+}
+
+function boxBack(laid: LabelBox): LabelBox {
+  return { x: laid.y, y: laid.x, width: laid.height, height: laid.width };
+}
+
+/** A node of the turned layout, turned back: a state's name, chips and row are placed again in its real box. */
+function nodeBack(node: PlacedNode, machine: Drawing): PlacedNode {
+  const real = boxBack(node);
+  switch (node.kind) {
+    case "state":
+    case "machine": {
+      const holds = machine.holds.get(node.id);
+      return placedStateOf(node.state, { box: real, worker: false, holds });
+    }
+    case "any":
+    case "unknown":
+      return { ...node, ...real };
+    default:
+      return isNever(node);
+  }
+}
+
+/** An arrow of the turned layout, turned back: its label reads across, beside the line. */
+function edgeBack(placed: PlacedEdge): PlacedEdge {
+  const points: Point[] = [];
+  for (const point of placed.points) points.push(pointBack(point));
+  return {
+    ...placed,
+    points,
+    path: polyline(points),
+    ...boxed(placed.edge, pointBack(placed.label)),
+  };
+}
+
+/** The layout of turned sizes, turned back so its ranks run top to bottom; it widens to hold each label, which sits right of its line. */
+function turnedBack(laid: MachineLayout, machine: Drawing): MachineLayout {
+  const nodes: PlacedNode[] = [];
+  for (const node of laid.nodes) nodes.push(nodeBack(node, machine));
+  const edges: PlacedEdge[] = [];
+  for (const placed of laid.edges) edges.push(edgeBack(placed));
+  const entries: MachineLayout["entries"] = [];
+  for (const entry of laid.entries) {
+    entries.push({ from: pointBack(entry.from), to: pointBack(entry.to) });
+  }
+  let width = laid.height;
+  for (const placed of edges) {
+    width = Math.max(width, placed.label.x + placed.label.width / 2 + MARGIN_Y);
+  }
+  return { ...laid, width, height: laid.width, nodes, edges, entries };
 }
 
 function assemble(
@@ -1121,7 +1261,7 @@ function assemble(
   const starts = startIds(machine);
   const { ports, entryY } = assignPorts(endsOf(machine, geo.routes), boxes, new Set(starts));
   const nodes = placeNodes(machine, specs, boxes);
-  const columns = columnsOf(specs, geo, machine);
+  const columns = columnsOf(geo, { specs, machine });
   const placedRegions = regions
     .map((region) => {
       const sides = geo.regions.get(region) ?? { left: 0, right: 0, top: 0, bottom: 0 };
@@ -1300,7 +1440,13 @@ interface Columns {
  * extent is the widest node footprint (with the finding mark) or label in it;
  * every route point is a label's, so it adds none.
  */
-function columnsOf(specs: ReadonlyMap<string, Spec>, geo: Geo, machine: VizMachine): Columns {
+interface ColumnsOptions {
+  specs: ReadonlyMap<string, Spec>;
+  machine: Drawing;
+}
+
+function columnsOf(geo: Geo, options: ColumnsOptions): Columns {
+  const { specs, machine } = options;
   const columns = new Map<number, Column>();
   const key = (x: number): number => Math.round(2 * x);
   const grow = (x: number, half: number): void => {
@@ -1315,7 +1461,7 @@ function columnsOf(specs: ReadonlyMap<string, Spec>, geo: Geo, machine: VizMachi
   }
   for (const edge of machine.edges) {
     const centre = geo.labels.get(edge.id);
-    if (centre !== undefined) grow(centre.x, labelSize(edge).width / 2);
+    if (centre !== undefined) grow(centre.x, labelRoom(edge, machine).width / 2);
   }
   const at = (x: number): Column => columns.get(key(x)) ?? { left: x, right: x };
   return { at, ofNode: (id) => at(geo.nodes.get(id)?.x ?? 0) };
@@ -1366,8 +1512,11 @@ export function checkedLayout(placed: MachineLayout): CheckedLayout {
 }
 
 /** The layout and its overlaps, or the error when dagre or a missing node spec stops it. */
-export function layoutMachine(machine: VizMachine): Either<unknown, CheckedLayout> {
-  const placed = Either.from(() => placeMachine(machine));
+export function layoutMachine(
+  machine: VizMachine,
+  options: LayoutOptions = {},
+): Either<unknown, CheckedLayout> {
+  const placed = Either.from(() => placeMachine(machine, options));
   return Either.isLeft(placed) ? placed : Either.right(checkedLayout(placed[1]));
 }
 

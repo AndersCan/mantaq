@@ -1,9 +1,9 @@
-import counterexamples from "./reference/property-counterexamples.json" with { type: "json" };
-import { machineArbitrary, talkingArbitrary } from "./layout.arbitrary.ts";
-import { layoutMachine, messagesOf } from "./layout.ts";
-import type { VizMachine } from "../schema.ts";
-import fc from "fast-check";
+import { canTurn, layoutMachine, messagesOf } from "./layout.ts";
 import { describe, expect, test } from "vite-plus/test";
+import { machineArbitrary, talkingArbitrary } from "./layout.arbitrary.ts";
+import counterexamples from "./reference/property-counterexamples.json" with { type: "json" };
+import fc from "fast-check";
+import type { VizMachine } from "../schema.ts";
 
 const examples = (counterexamples as VizMachine[]).map((machine) => [machine] as [VizMachine]);
 const run = { seed: 0x700, numRuns: 300, examples };
@@ -15,6 +15,15 @@ describe("layout guarantee on generated machines", () => {
         expect(layoutMachine(machine)[1]?.overlaps).toEqual([]);
       }),
       run,
+    );
+  }, 30_000);
+
+  test("P3: laid out down, a machine that can turn is Right and the checker finds nothing", () => {
+    fc.assert(
+      fc.property(machineArbitrary.filter(canTurn), (machine) => {
+        expect(layoutMachine(machine, { flow: "down" })[1]?.overlaps).toEqual([]);
+      }),
+      { seed: 0x701, numRuns: 200 },
     );
   }, 30_000);
 
