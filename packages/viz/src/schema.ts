@@ -16,6 +16,17 @@ export function scopeOf(id: string): string {
   return cut === -1 ? "" : id.slice(0, cut);
 }
 
+/** The actor map names of a machine (`VizMachine.maps`). */
+export interface ActorMaps {
+  maps: ReadonlyArray<string>;
+}
+
+/** The actor map a state id sits in: its region scope is the map or lies below it. undefined = in no map. */
+export function actorMapOf(id: string, options: ActorMaps): string | undefined {
+  const scope = scopeOf(id);
+  return options.maps.find((map) => scope === map || scope.startsWith(`${map}.`));
+}
+
 export function isAnyState(id: string): boolean {
   return id === ANY_STATE || id.endsWith(`.${ANY_STATE}`);
 }

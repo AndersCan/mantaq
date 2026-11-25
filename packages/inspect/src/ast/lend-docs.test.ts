@@ -174,11 +174,15 @@ test("a state in an actor map gets no group, a state in a plain region does", ()
     states: idle
       ? [
           { ...idle, id: "orders.idle" },
-          { ...idle, id: "payment.idle" },
+          { ...idle, id: "payment.paying" },
         ]
       : [],
   };
-  const analysis = docs({ stateGroups: new Map([["idle", "waiting"]]) });
+  const stateGroups = new Map([
+    ["idle", "waiting"],
+    ["paying", "waiting"],
+  ]);
+  const analysis = docs({ stateGroups });
   const result = annotateWith(regioned, { analysis: Either.right(analysis), source: SOURCE });
   expect(result.states.map((state) => state.group)).toEqual([undefined, "waiting"]);
 });

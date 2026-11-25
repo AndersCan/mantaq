@@ -1,12 +1,20 @@
+import { actorMapOf, scopeOf } from "@mantaq/viz";
+import type {
+  ActorMaps,
+  VizEdge,
+  VizExplanation,
+  VizField,
+  VizJson,
+  VizMachine,
+  VizState,
+} from "@mantaq/viz";
 import type { AnalysisSource, FileRead, LoadedSource, LoadSourceOptions } from "./program.ts";
-import type { VizEdge, VizExplanation, VizField, VizJson, VizMachine, VizState } from "@mantaq/viz";
 import { machineExports } from "./discover.ts";
 import type { MachineExport } from "./discover.ts";
 import { explainRegistration } from "./handler.ts";
 import { payloadFields, payloadSamples } from "./payloads.ts";
 import { loadSource } from "./program.ts";
 import { Either } from "@mantaq/utils";
-import { scopeOf } from "@mantaq/viz";
 
 /** One explained registration, keyed the way runtime edges are: state + event. */
 export interface HandlerSite {
@@ -231,10 +239,9 @@ export function annotateMachine(machine: VizMachine, source: AnalysisSource): Vi
 }
 
 /** The files a machine's state notes come from: its own first, then those that lent it handlers. */
-interface StateNotes {
+interface StateNotes extends ActorMaps {
   own: FileDocs;
   lent: ReadonlyArray<FileDocs>;
-  maps: ReadonlyArray<string>;
 }
 
 /** What a declaration's JSDoc says about a state, by the state's name. */
@@ -249,18 +256,59 @@ function noteOf(name: string, options: StateNote): string | undefined {
   return supplier?.[kind].get(name);
 }
 
+/** A key (a state name, a group name) and the region scope of one state that has it. */
+interface ScopedKey {
+  key: string;
+  scope: string;
+}
+
+function inSeveralScopes(keys: ReadonlyArray<ScopedKey>): Set<string> {
+  const homes = new Map<string, string>();
+  const several = new Set<string>();
+  for (const { key, scope } of keys) {
+    const home = homes.get(key) ?? scope;
+    homes.set(key, home);
+    if (home !== scope) several.add(key);
+  }
+  return several;
+}
+
+/** A state that a `@group` tag reaches by the state's name. */
+interface TaggedState {
+  id: string;
+  group: string;
+  scope: string;
+}
+
 /**
- * The state with the doc and `@group` of its declaration. A state in an actor map
- * keeps no group: the viewer folds groups of the machine's own regions only.
+ * The group of each state, by id. A tag is found by the state's name, so a name in several
+ * scopes (a root `idle` and `upload.idle`) gets no group, and nor does a state in an actor map.
+ * A group that still reaches several scopes is left off, so the document passes `validateViz`.
  */
-function annotateState(state: VizState, notes: StateNotes): VizState {
-  const name = localState(state.id);
-  const annotated: VizState = { ...state, doc: noteOf(name, { notes, kind: "stateDocs" }) ?? null };
-  const group = noteOf(name, { notes, kind: "stateGroups" });
-  const scope = scopeOf(state.id);
-  const inMap = notes.maps.some((map) => scope === map || scope.startsWith(`${map}.`));
-  if (group !== undefined && !inMap) annotated.group = group;
-  return annotated;
+function groupsOf(states: ReadonlyArray<VizState>, notes: StateNotes): Map<string, string> {
+  const named = states.map((state) => ({ key: localState(state.id), scope: scopeOf(state.id) }));
+  const shared = inSeveralScopes(named);
+  const tagged = states.flatMap((state): TaggedState[] => {
+    const name = localState(state.id);
+    const group = noteOf(name, { notes, kind: "stateGroups" });
+    const untaggable = shared.has(name) || actorMapOf(state.id, notes) !== undefined;
+    if (group === undefined || untaggable) return [];
+    return [{ id: state.id, group, scope: scopeOf(state.id) }];
+  });
+  const split = inSeveralScopes(tagged.map(({ group, scope }) => ({ key: group, scope })));
+  const kept = tagged.filter(({ group }) => !split.has(group));
+  return new Map(kept.map(({ id, group }) => [id, group]));
+}
+
+function annotateStates(states: ReadonlyArray<VizState>, notes: StateNotes): VizState[] {
+  const groups = groupsOf(states, notes);
+  return states.map((state) => {
+    const doc = noteOf(localState(state.id), { notes, kind: "stateDocs" }) ?? null;
+    const annotated: VizState = { ...state, doc };
+    const group = groups.get(state.id);
+    if (group !== undefined) annotated.group = group;
+    return annotated;
+  });
 }
 
 /** `annotateMachine` with the analysis already done (one program for many machines). */
@@ -289,9 +337,7 @@ export function annotateWith(
   const lent = [...suppliers];
   return {
     ...machine,
-    states: machine.states.map((state) =>
-      annotateState(state, { own: analysis[1], lent, maps: machine.maps }),
-    ),
+    states: annotateStates(machine.states, { own: analysis[1], lent, maps: machine.maps }),
     events: machine.events.map((event) => ({
       ...event,
       doc:

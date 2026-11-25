@@ -1,6 +1,6 @@
+import { actorMapOf, scopeOf } from "../schema.ts";
 import type { Reader } from "./validate-read.ts";
 import { report } from "./validate-read.ts";
-import { scopeOf } from "../schema.ts";
 import type { VizMachine } from "../schema.ts";
 
 /** A machine of the document and its path, e.g. `$.machines[0]`. */
@@ -39,7 +39,7 @@ export function checkGroups(reader: Reader, options: MachineAt): void {
     const problem = nameProblem(group);
     if (problem !== undefined) report(reader, { path: at, message: problem });
     const scope = scopeOf(state.id);
-    const map = machine.maps.find((each) => scope === each || scope.startsWith(`${each}.`));
+    const map = actorMapOf(state.id, machine);
     const name = JSON.stringify(group);
     if (map !== undefined) {
       const quotedMap = JSON.stringify(map);
