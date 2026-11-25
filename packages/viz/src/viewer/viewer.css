@@ -138,6 +138,10 @@
   cursor: default;
 }
 
+.viz .tab-strip [role="tab"][aria-selected="true"]:hover {
+  background: none;
+}
+
 .viz .tab-panel {
   max-height: 25vh;
   overflow: auto;
