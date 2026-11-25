@@ -17,9 +17,13 @@ const DOCUMENTS = "\0virtual:mantaq/documents";
 const EXPECTED = [
   { id: "chargingCard", group: "payment", doc: "The card is charged." },
   { id: "confirming", group: "payment", doc: "The bank asks the buyer to confirm." },
-  { id: "inCart", group: undefined, doc: "The order waits in the cart." },
-  { id: "packing", group: "shipping", doc: null },
-  { id: "sent", group: "shipping", doc: "The parcel is on its way." },
+  {
+    id: "inCart",
+    group: undefined,
+    doc: "The order waits in the cart. Mail help@group.example with questions.",
+  },
+  { id: "packing", group: "shipping", doc: "The parcel is packed and sent." },
+  { id: "sent", group: "shipping", doc: "The parcel is packed and sent." },
 ];
 
 function groupsOf(state: VizState) {

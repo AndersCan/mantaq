@@ -1,7 +1,7 @@
 /** Checkout whose states carry `@group` tags: two groups and an ungrouped state. */
 import { Actor, event, machine, state } from "@mantaq/core";
 
-/** The order waits in the cart. */
+/** The order waits in the cart. Mail help@group.example with questions. */
 const inCart = state("inCart")();
 /** The card is charged. @group payment */
 const chargingCard = state("chargingCard")();
@@ -10,10 +10,9 @@ const chargingCard = state("chargingCard")();
  * @group payment
  */
 const confirming = state("confirming")();
-/** @group shipping */
-const packing = state("packing")();
-/** The parcel is on its way. @group shipping */
-const sent = state("sent")().final();
+/** The parcel is packed and sent. @group shipping. */
+const packing = state("packing")(),
+  sent = state("sent")().final();
 
 /** The buyer checked out. */
 const checkout = event("checkout")();

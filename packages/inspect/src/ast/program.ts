@@ -308,16 +308,17 @@ interface DeclarationDocs {
   eventDocs: Map<string, string>;
 }
 
-/** First word of the statement's `@group` tag; undefined without a tag or a name. */
+/** First word of the statement's `@group` tag, without a closing full stop; undefined without a tag or a name. */
 function groupOf(statement: ts.VariableStatement): string | undefined {
   const tag = ts.getJSDocTags(statement).find((each) => each.tagName.text === "group");
-  const [name] = (ts.getTextOfJSDocComment(tag?.comment) ?? "").trim().split(/\s+/);
+  const [word = ""] = (ts.getTextOfJSDocComment(tag?.comment) ?? "").trim().split(/\s+/);
+  const name = word.replace(/[.,;:]+$/, "");
   return name === "" ? undefined : name;
 }
 
 /** The doc without its `@group name` text; undefined when nothing else is left. */
 function withoutGroup(doc: string | null): string | undefined {
-  const prose = doc?.replace(/\s*@group(?![\w-])[^\S\n]*[^\s@]*/g, "").trim();
+  const prose = doc?.replace(/(?:^|\s+)@group(?![\w-])[^\S\n]*[^\s@]*/g, "").trim();
   return prose === "" ? undefined : prose;
 }
 
