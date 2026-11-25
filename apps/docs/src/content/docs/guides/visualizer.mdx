@@ -45,6 +45,26 @@ A move along the path does not change the walk or the Step log. An arrow from th
 
 The address keeps the path in `?focus=`: the name of a machine on a board, then the id of a group node, such as `@payment`. A link with `?focus=` opens the same level. For example, `?machine=order&focus=@payment` opens the group `payment` of the machine `order`. Repeat `focus` for each level: `?focus=till&focus=@payment` opens the machine `till` of a board, then its group `payment`.
 
+### Navigation
+
+The viewer opens with the whole width of the diagram in the canvas. You can zoom and pan the canvas. The zoom and the tool stay the same after a step, after a move along the path and after a resize, until you reload the page.
+
+| Gesture or key                            | What it does                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| Ctrl or Cmd and the mouse wheel           | Zooms in or out at the pointer                                          |
+| Pinch on a trackpad                       | Zooms in or out at the pointer                                          |
+| Mouse wheel, or Shift and the mouse wheel | Scrolls, as on any page                                                 |
+| Hold Space and drag                       | Pans the canvas                                                         |
+| Drag with the middle mouse button         | Pans the canvas                                                         |
+| Ctrl or Cmd and `+` or `=`                | Zooms in one step                                                       |
+| Ctrl or Cmd and `-`                       | Zooms out one step                                                      |
+| Shift+1                                   | Zooms so that the whole diagram fits                                    |
+| Shift+0                                   | Zooms to 100%, the natural size of the diagram                          |
+| H                                         | Hand tool: a drag anywhere on the canvas pans, and a click does nothing |
+| V                                         | Select tool: a click on a state or an arrow acts again                  |
+
+The keys work while focus is in the viewer and not in a text field, or while nothing has focus and the pointer is over the canvas. Space still presses a button that has focus.
+
 ### Nodes
 
 | Style                                                              | Meaning                                                                                       |
