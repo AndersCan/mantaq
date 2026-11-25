@@ -19,12 +19,17 @@ function isElsewhere(target: EventTarget | null): boolean {
   return typing || target.closest('[data-tab-panel="screen"]') !== null;
 }
 
-/** True on a page where nothing has focus and `root` is the viewer that owns Escape there. */
+/** True for a key pressed while nothing had focus. A field that drops focus on Escape, such as a site search, still had it. */
+function pressedUnfocused(event: KeyboardEvent): boolean {
+  const { target } = event;
+  if (!(target instanceof Element)) return false;
+  const doc = target.ownerDocument;
+  return target === doc.body || target === doc.documentElement;
+}
+
+/** True when `root` is the viewer that owns Escape on a page where nothing has focus. */
 function ownsUnfocusedEscape(root: HTMLElement): boolean {
-  const doc = root.ownerDocument;
-  const active = doc.activeElement;
-  const unfocused = active === doc.body || active === null;
-  return unfocused && root.isConnected && owners.get(doc) === root;
+  return root.isConnected && owners.get(root.ownerDocument) === root;
 }
 
 function answer(root: HTMLElement, event: KeyboardEvent): void {
@@ -56,7 +61,6 @@ export function listenEscape(root: HTMLElement, options: EscapeOptions): void {
     if (!isElsewhere(event.target)) answer(root, event);
   });
   doc.addEventListener("keydown", (event) => {
-    const inside = event.target instanceof Node && root.contains(event.target);
-    if (!inside && ownsUnfocusedEscape(root)) answer(root, event);
+    if (pressedUnfocused(event) && ownsUnfocusedEscape(root)) answer(root, event);
   });
 }

@@ -266,6 +266,16 @@ describe("entering a group", () => {
     });
   });
 
+  test("Escape in the page's own search box does nothing, even when the box drops focus on it", () => {
+    const { root } = mount({ focus: ["@payment"] });
+    const search = document.createElement("input");
+    document.body.append(search);
+    search.addEventListener("keydown", () => search.blur());
+    search.focus();
+    escape(search);
+    expect(shown(root).path).toStrictEqual(["shop", "payment"]);
+  });
+
   test("Escape on the host's own screen in the Screen tab does nothing", () => {
     const { root } = mount({
       focus: ["@payment"],
