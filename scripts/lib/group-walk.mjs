@@ -1,8 +1,8 @@
 /**
  * Replays the walk of the group guide on the built docs, clicking each button by its
- * label, then Back, Forward and a reload. After each, the viewer must show what the guide
- * says, and only a move along the path adds a history entry. Half on screen, the panel
- * must not cover the canvas and Full screen keeps one line.
+ * label, then Back, Forward and a reload. Each button is in the canvas's view before
+ * its click. After each step the viewer shows what the guide says, and only a move along
+ * the path adds a history entry. Half on screen, the panel does not cover the canvas.
  */
 
 /** The page of the guide, under the site's base. */
@@ -101,6 +101,28 @@ function framing() {
 /** What `framing` must find. */
 const FRAMED = JSON.stringify({ panel: "below the canvas", fullScreen: 1 });
 
+/** Runs in the page: whether the reader sees `element` without scrolling the canvas it is drawn in. */
+function inCanvasView(element) {
+  const canvas = element.closest(".canvas");
+  if (canvas === null) return true;
+  const box = canvas.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
+  const across = rect.left >= box.left && rect.right <= box.left + canvas.clientWidth;
+  return across && rect.top >= box.top && rect.bottom <= box.top + canvas.clientHeight;
+}
+
+/** Runs in the page: whether the canvas scrolls sideways. */
+function scrollsSideways() {
+  const canvas = document.querySelector(".viz .canvas");
+  return canvas.scrollWidth > canvas.clientWidth;
+}
+
+/** The widths the walk runs at: a docs column, where an entered group fits the canvas, and a phone, where the viewer scrolls the canvas to the next arrow. */
+const SCREENS = [
+  { name: "docs column", viewport: { width: 1280, height: 900 }, groupFits: "fits" },
+  { name: "phone", viewport: { width: 390, height: 844 }, groupFits: "scrolls" },
+];
+
 /** The first line of a Playwright failure. */
 function firstLine(error) {
   return error.message.split("\n")[0];
@@ -118,6 +140,8 @@ async function clickButton(options) {
   const target = (await label.count()) > 0 ? label.first() : button;
   const looks = await target.evaluate(looksClickable);
   if (!looks) return "it does not look clickable";
+  const seen = await target.evaluate(inCanvasView);
+  if (!seen) return "it is out of the canvas's view, so the reader has to scroll to it";
   return target.click({ timeout: STEP_MS }).then(() => "clicked", firstLine);
 }
 
@@ -156,12 +180,19 @@ async function shownAfter(options) {
 }
 
 /**
- * Opens the group guide on the site at `options.origin` under `options.base` in a
- * tab of `options.browser`, and replays its walk. Returns one failure line per step
- * that could not be clicked or showed something else than the guide says.
+ * Opens the group guide on the site at `options.origin` under `options.base` in a tab
+ * of `options.browser` for each screen width, and replays its walk. Returns one failure
+ * line per step that could not be clicked or showed something else than the guide says.
  */
 export async function groupWalkFailures(options) {
-  const tab = await options.browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const walks = await Promise.all(SCREENS.map((screen) => screenWalk({ ...options, screen })));
+  return walks.flat();
+}
+
+/** The walk in one tab sized as `options.screen`. */
+async function screenWalk(options) {
+  const { screen } = options;
+  const tab = await options.browser.newPage({ viewport: screen.viewport });
   const errors = [];
   tab.on("pageerror", (error) => errors.push(error.message));
   await tab.goto(`${options.origin}${options.base}${GROUP_GUIDE}`);
@@ -170,7 +201,7 @@ export async function groupWalkFailures(options) {
   const failures = [];
   for (const [index, step] of STEPS.entries()) {
     const number = index + 1;
-    const where = `${GROUP_GUIDE} step ${number}`;
+    const where = `${GROUP_GUIDE} at ${screen.name} width, step ${number}`;
     const done = step.go === undefined ? step.click : `browser ${step.go}`;
     const moved = await takeStep({ tab, step });
     if (moved !== "done") {
@@ -182,6 +213,10 @@ export async function groupWalkFailures(options) {
     if (shown !== wanted) {
       failures.push(`${where}: after "${done}" the viewer shows ${shown}, not ${wanted}`);
       break;
+    }
+    const entered = step.shows.path.length > 0 && screen.groupFits === "fits";
+    if (entered && (await tab.evaluate(scrollsSideways))) {
+      failures.push(`${where}: the group drawn is wider than the canvas`);
     }
     if (step.shows !== OUTSIDE) continue;
     const framed = JSON.stringify(await tab.evaluate(framing));
