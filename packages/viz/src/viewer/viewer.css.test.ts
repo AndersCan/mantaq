@@ -165,8 +165,8 @@ test("a pointer, a hover style or the march on a state or an arrow needs it to b
     const pointer = /cursor:\s*pointer|animation:\s*viz-march/.test(body);
     for (const selector of head.split(",").map((each) => each.trim())) {
       const looksClickable = pointer || selector.includes(":hover");
-      const parts = stateOrArrowParts(selector);
-      const gated = parts.every((part) => part.includes('[role="button"]'));
+      const compounds = stateOrArrowParts(selector);
+      const gated = compounds.every((part) => part.includes('[role="button"]'));
       if (looksClickable && !gated) offending.push(selector);
     }
   }
