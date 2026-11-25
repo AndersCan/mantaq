@@ -135,6 +135,7 @@
   color: var(--fg);
   border-bottom-color: var(--fg);
   font-weight: 600;
+  cursor: default;
 }
 
 .viz .tab-panel {
