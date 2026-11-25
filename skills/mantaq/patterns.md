@@ -102,12 +102,15 @@ m.onAny({
 
 ## Big Machine → Parent That Embeds Smaller Machines
 
-Split a machine when it has more than about 12 states, when the same handler is registered in a loop over many states, or when a group of states has one way in, a few ways out and no arrows to the rest. Do not add more states to it. Move each group into its own machine with final states for its ends. In the parent, replace the group with one state that runs the child with `embed` from `@mantaq/sugar`. The viz draws that state as one machine node with its arrows; the reader enters it to see the child.
+Split a machine when it has more than about 12 states, when the same handler is registered in a loop over many states, or when a group of states has one way in, a few ways out and no other arrows to the rest. Do not add more states to it. Move each group into its own machine with final states for its ends. In the parent, replace the group with one state that runs the child with `embed` from `@mantaq/sugar`. The viz draws that state as one machine node with its arrows; the reader enters it to see the child.
 
 ```ts
 import { Actor, event, machine, state } from "@mantaq/core";
 import type { Snapshot } from "@mantaq/core";
-import { embed, withTimeout } from "@mantaq/sugar";
+import { embed, withPromise } from "@mantaq/sugar";
+
+/** Asks the card provider to take the money. */
+declare function chargeCard(): Promise<"accepted" | "declined">;
 
 /** The card is being charged. */
 const chargingCard = state("chargingCard")();
@@ -115,24 +118,40 @@ const chargingCard = state("chargingCard")();
 const couldNotChargeCard = state("couldNotChargeCard")();
 /** The money is taken. */
 const paymentTaken = state("paymentTaken")().final();
+/** The provider took the money. */
+const cardAccepted = event("cardAccepted")();
 /** The provider declined the card. */
 const cardDeclined = event("cardDeclined")();
 /** The shopper asks to charge the card again. */
 const retryPayment = event("retryPayment")();
 
 export const payment = machine("payment", {
-  create: ({ clock }) =>
+  create: () =>
     Actor({
       inputs: [retryPayment],
-      internal: [cardDeclined],
+      internal: [cardAccepted, cardDeclined],
       states: [chargingCard, couldNotChargeCard, paymentTaken],
       initial: chargingCard,
-      clock,
       setup: (m) => {
         m.effect(chargingCard, {
           name: "chargeCard",
-          sends: [cardDeclined],
-          fn: (input) => withTimeout(100, { input, event: () => cardDeclined.create() }),
+          sends: [cardAccepted, cardDeclined],
+          fn: (input) =>
+            withPromise({
+              promise: chargeCard(),
+              signal: input.signal,
+              emit: input.emit,
+              events: {
+                success: (answer) =>
+                  answer === "accepted" ? cardAccepted.create() : cardDeclined.create(),
+                error: () => cardDeclined.create(),
+              },
+            }),
+        });
+        m.on(chargingCard, {
+          event: cardAccepted,
+          to: [paymentTaken],
+          handler: () => ({ state: paymentTaken }),
         });
         m.on(chargingCard, {
           event: cardDeclined,
@@ -203,7 +222,7 @@ export const order = machine("order", {
 - `done` maps each final state of the child to a parent internal event without a payload. `error` is the parent event for a child in `__error`. Handle them with plain `m.on` in the embedding state, so the diagram draws the arrows.
 - The app sends only to the parent. `forward` lists the parent inputs that go on to the running child (a retry button). Never add a second handler for a forwarded event in that state: the last one replaces the other.
 - `snapshot` names a parent internal event that carries the child snapshot on entry and after each change. Keep it in context so the screen can read the child state (`context.payment.path`). After the parent leaves, the field keeps the last snapshot: check the parent state too.
-- Embed builds the child with the parent clock only. A child that needs a port: build its machine in the parent `create` with that port (`paymentMachine({ port })`).
+- The parent needs a clock, even when no child has a timer. Embed builds the child with the parent clock only. A child that needs a port: build its machine in the parent `create` with that port (`paymentMachine({ port })`).
 - Test through the parent with a `VirtualClock` and fake ports, as the app uses it. `settled()` also waits for the child effects.
 - Keep a group in the parent when its handlers read and write the parent context: the child cannot read it. Always-on parallel parts are `regions`; a run-time count of children is `createActorMap`.
 

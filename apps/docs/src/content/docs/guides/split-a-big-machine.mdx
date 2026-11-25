@@ -41,7 +41,7 @@ for (const cancellable of [reviewingOrder, chargingCard, couldNotChargeCard]) {
 }
 ```
 
-The card states only send events to each other. The parcel states do the same. Each group has one way in and a few ways out. So each group is a machine:
+The example is small on purpose. It has fewer than 12 states, but it shows the other two signs. The card states only send events to each other, and so do the parcel states. Each group has one way in and a few ways out, and the cancel loop goes over the card states. So each group is a machine:
 
 - `payment` holds `chargingCard`, `couldNotChargeCard` and the final state `paymentTaken`.
 - `delivery` holds `packingParcel`, `parcelOnTheWay`, `waitingAtDoor` and the final states `parcelHandedOver` and `parcelTakenBack`.
@@ -68,7 +68,7 @@ When the parent enters `shippingOrder`, embed builds `delivery` with the clock o
 
 `done` maps each final state of the child to an internal event of the parent. When `delivery` enters `parcelHandedOver`, the parent receives `parcelDelivered`. The types reject a `done` that does not name every final state of the child.
 
-If the child enters `__error`, the parent receives the `error` event. If one of its effects or handlers throws, the child enters `__error`. Here `deliveryBroke` takes the order to `couldNotCompleteOrder`.
+If the child enters `__error`, the parent receives the `error` event. If one of its effects or handlers throws, the child enters `__error`. In `order`, `paymentBroke` and `deliveryBroke` take the order to `couldNotCompleteOrder`. `order.error.test.ts` reaches it with a card provider that throws.
 
 The parent handles the `done` and `error` events with ordinary `builder.on` calls, so the diagram draws their arrows. The `done` and `error` events have no payload.
 
@@ -107,7 +107,7 @@ Embed builds the child with the clock of the parent and no other option. `paymen
 
 The viewer draws each embedding state as a machine node. It does not draw the states of the child next to the states of the parent.
 
-1. Click enter on `payingForOrder`, or focus the node and press Enter. The viewer draws `payment` on its own.
+1. Click the enter control on `payingForOrder`. With the keyboard, press Tab until the enter control has focus, then press Enter. The viewer draws `payment` on its own.
 2. Read the path of machine names above the diagram. It names each machine that you opened, here `order` and `payment`.
 3. Click `order` in the path to go back to it. Escape goes back one machine.
 4. Copy the address. `?focus=payingForOrder` keeps the path in it, so the link opens `payment` inside `order`.
@@ -141,7 +141,7 @@ If one of these is true, split the machine:
 
 - It has more than about 12 states.
 - The same handler is registered in a loop over many states.
-- A group of states has one way in, a few ways out, and no arrows to the other states.
+- A group of states has one way in, a few ways out, and no other arrows to the other states.
 
 If the handlers of a group read and write the context of the parent, keep the group in the parent. The child cannot read the context of the parent. For parts that run all the time next to each other, use `regions`. For a count of children that changes at run time, use `createActorMap`.
 

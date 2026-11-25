@@ -79,7 +79,7 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 - **A failure the person can see gets its own state** (`couldNotCreateAlbum`). Never land back in the state that means things are fine with the error in context. Going back to the step the person retries from is fine when its JSDoc says the message shows there.
 - **One state is a store, not a flow.** Name it for what it holds (`holdingPreferences`) and do not draw a journey from it.
 - **Every journey ends in a named outcome**, success included. One state per way it can end. Never fall back to the start state to mean done. Mark the outcome final when the actor's work is over. An actor reused for the next attempt keeps it non-final and says so in its JSDoc. Exception: a cyclic controller (traffic light) has no outcome or final state; every state must be on the cycle, reachable back to the start.
-- **Split a machine that grows too big; never keep growing it.** More than about 12 states, the same handler registered in a loop over many states, or a group of states with one way in and no arrows to the rest: move each group into its own machine and `embed` it in one parent state. See `patterns.md` "Big Machine".
+- **Split a machine that grows too big; never keep growing it.** More than about 12 states, the same handler registered in a loop over many states, or a group of states with one way in and no arrows to the rest except its ways out: move each group into its own machine and `embed` it in one parent state. Keep a group in the parent when its handlers read or write the parent context: the child cannot read it. See `patterns.md` "Big Machine".
 - Test with `VirtualClock` and the `@mantaq/test` harness. See `testing.md`.
 
 ## Hand a machine to a builder

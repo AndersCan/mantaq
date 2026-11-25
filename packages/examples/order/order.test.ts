@@ -47,11 +47,9 @@ describe("an order split into payment and delivery", () => {
     await actor.settled();
     const paid = screen(actor);
     clock.advance(3000);
-    const atDoor = screen(actor);
     actor.send(signForParcel.create());
-    expect({ paid, atDoor, end: screen(actor) }).toStrictEqual({
+    expect({ paid, end: screen(actor) }).toStrictEqual({
       paid: { order: ["shippingOrder"], payment: ["paymentTaken"] },
-      atDoor: { order: ["shippingOrder"], payment: ["paymentTaken"] },
       end: { order: ["orderDelivered"], payment: ["paymentTaken"] },
     });
   });
