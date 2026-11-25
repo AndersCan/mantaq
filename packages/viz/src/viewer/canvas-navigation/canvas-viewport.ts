@@ -24,6 +24,7 @@ export function viewportOnCanvas(
   });
   viewport.subscribe(({ scale, tool, sizing }) => {
     view.viewport = { scale, tool, sizing };
+    floored(canvas, { view, sizing });
   });
   function resized(): void {
     viewport.redrawn();
@@ -40,16 +41,16 @@ interface FlooredOptions {
   sizing: ViewportState["sizing"];
 }
 
-/** Keeps the canvas at least as tall as it was at the fitted width, where its height follows the drawing; a capped canvas has no floor. */
+/** Keeps a zoomed canvas at least as tall as it was at the fitted width, where its height follows the drawing; a capped canvas has no floor. The style changes only once a zoom needs it, so a change in the canvas alone draws nothing new. */
 function floored(canvas: HTMLElement, options: FlooredOptions): void {
   const { view } = options;
   const capped = canvas.ownerDocument.defaultView?.getComputedStyle(canvas).maxHeight !== "none";
-  if (capped) {
-    canvas.style.removeProperty("--viz-canvas-floor");
+  if (options.sizing === "fitted" && !capped) {
+    view.canvasFloor = canvas.offsetHeight;
     return;
   }
-  if (options.sizing === "fitted") view.canvasFloor = canvas.offsetHeight;
-  if (view.canvasFloor !== undefined) {
-    canvas.style.setProperty("--viz-canvas-floor", `${view.canvasFloor}px`);
+  const floor = capped || view.canvasFloor === undefined ? "" : `${view.canvasFloor}px`;
+  if (canvas.style.getPropertyValue("--viz-canvas-floor") !== floor) {
+    canvas.style.setProperty("--viz-canvas-floor", floor);
   }
 }
