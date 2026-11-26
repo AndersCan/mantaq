@@ -4,7 +4,16 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: { ignorePatterns: ["**/__runs__/**"] },
+  fmt: {
+    ignorePatterns: ["**/__runs__/**"],
+    /** html templates keep their hand layout, so a tag with many attributes can stay one attribute per line instead of being folded back whenever it fits. */
+    overrides: [
+      {
+        files: ["**/*.{ts,mts,cts,js,mjs,cjs}"],
+        options: { embeddedLanguageFormatting: "off" },
+      },
+    ],
+  },
   lint: {
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
