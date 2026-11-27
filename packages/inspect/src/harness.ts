@@ -62,6 +62,8 @@ export interface OpenVizOptions {
   machine?: string;
   /** Default 1280 x 720. */
   viewport?: { width: number; height: number };
+  /** Folder that holds the harness's temp directory. Default `os.tmpdir()`. */
+  tempRoot?: string;
 }
 
 const PANEL = '[data-tab-panel="step"]';
@@ -380,7 +382,7 @@ function describe(
 }
 
 export async function openViz(options: OpenVizOptions): Promise<Either<string, VizHarness>> {
-  const dir = mkdtempSync(join(tmpdir(), "mantaq-harness-"));
+  const dir = mkdtempSync(join(options.tempRoot ?? tmpdir(), "mantaq-harness-"));
   const opened: { browser?: Browser; server?: Server } = {};
   let closed = false;
   const close = async () => {

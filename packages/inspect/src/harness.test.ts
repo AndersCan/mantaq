@@ -2,7 +2,7 @@ import { Either } from "@mantaq/utils";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vite-plus/test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { openViz, type VizHarness } from "./harness.ts";
 
 const docs = (file: string) =>
@@ -138,11 +138,11 @@ test("close is idempotent and send after close is a Left", async () => {
 }, 60_000);
 
 test("a failed open leaves no temp directory behind", async () => {
-  const count = () => readdirSync(tmpdir()).filter((n) => n.startsWith("mantaq-harness-")).length;
-  const before = count();
-  const result = await openViz({ file: join(tmpdir(), "does-not-exist.ts") });
+  const ownTemp = mkdtempSync(join(tmpdir(), "harness-own-temp-"));
+  onTestFinished(() => rmSync(ownTemp, { recursive: true, force: true }));
+  const result = await openViz({ file: join(ownTemp, "does-not-exist.ts"), tempRoot: ownTemp });
   expect(Either.getLeft(result)).toBe("does-not-exist.ts has no machine the inspector can read.");
-  expect(count()).toBe(before);
+  expect(readdirSync(ownTemp)).toEqual([]);
 }, 60_000);
 
 test("a machine that ignores the clock it is given is not live, and the page says why", async () => {
