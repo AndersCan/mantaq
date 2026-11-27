@@ -123,7 +123,7 @@ A PR that changes a package adds a bump file, or CI's `bumpy ci check` fails wit
 ## Known surprises
 
 - If astro detects an agent (for example, `CLAUDECODE` is set), `astro dev` in `apps/docs` starts in the background and prints its pid. Stop it with `pnpm exec astro dev stop` in `apps/docs`. To keep it in the foreground, run `env -u CLAUDECODE pnpm exec astro dev`.
-- happy-dom's `getComputedStyle` does not expand CSS shorthands: after `style.overflow = "auto"`, `overflowX` and `overflowY` are empty. Set the longhands in a happy-dom test.
+- happy-dom's `getComputedStyle` does not expand the `overflow` shorthand: after `style.overflow = "auto"`, `overflowX` and `overflowY` are empty. Set `overflowX` and `overflowY` in a happy-dom test.
 - `mountViewer` adds a `resize` listener to the window and has no unmount. A test that mounts many viewers in one happy-dom window runs the worker out of memory. Mount each one in its own `Window` and close it with `await window.happyDOM.close()`, as `packages/inspect/src/affordance/sweep.ts` does.
 - A property test that mounts the viewer for each case passes `endOnFailure: true` in its `fc.assert` options, as `packages/viz/src/viewer/mount/diagram-marks.property.test.ts` does. Without it, fast-check shrinks a failure and runs the worker out of memory. In a package that depends on `@mantaq/pbt`, `runProperty` sets it for you.
 
