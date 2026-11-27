@@ -43,4 +43,9 @@ packages/*/reports
 packages/inspect/src/fixtures/credit.notes.md
 packages/inspect/src/astro-site-*
 packages/inspect/src/check-site-*/
-apps/docs/src/content/docs/*.d.ts
+
+# `vp pack` in packages/inspect (dts generator tsgo) writes declarations next to these sources.
+# A hand-written .d.ts in these folders needs a `!` exception here.
+packages/viz/src/**/*.d.ts
+packages/examples/**/*.d.ts
+apps/docs/src/**/*.d.ts
