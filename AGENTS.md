@@ -118,6 +118,15 @@ Type-level tests: `packages/core/src/typecheck.test.ts` (`expectTypeOf` + `@ts-e
 
 Never a `major` bump file: a breaking change is `minor` (0.5 → 0.6). `vp run bump:check` fails on `major`. Packages stay on 0.x, except `@mantaq/sugar` and `@mantaq/test`: they reached 2.x by mistake and stay on 2.x (breaking = 2.0 → 2.1), never back to 0.x.
 
+Every PR adds a bump file, or CI's `bumpy ci check` fails with "No bump files found in this PR". `vp run ready` does not catch it. A PR that releases nothing adds an empty one: `vp exec bumpy add --empty --name <name>`.
+
+## Known surprises
+
+- If `CLAUDECODE` is set, `astro dev` in `apps/docs` starts in the background and prints its pid. Stop it with `pnpm exec astro dev stop` in `apps/docs`. To keep it in the foreground, run `env -u CLAUDECODE pnpm exec astro dev`.
+- happy-dom's `getComputedStyle` does not expand CSS shorthands: after `style.overflow = "auto"`, `overflowX` and `overflowY` are empty. Set the longhands in a happy-dom test.
+- `mountViewer` adds a `resize` listener to the window and has no unmount. A test that mounts many viewers in one happy-dom window runs the worker out of memory. Mount each one in its own `Window` and close it with `await window.happyDOM.close()`, as `packages/inspect/src/affordance/sweep.ts` does.
+- A property test that mounts the viewer for each case runs through `runProperty` from `@mantaq/pbt`. Its global config sets `endOnFailure: true`. Without it, fast-check shrinks a failure and runs the worker out of memory.
+
 ## Docs and viz UI blocks
 
 New docs/viz UI blocks go on `apps/docs/src/pages/design.astro` first; mark `Approved` only when the maintainer says so on the PR.
